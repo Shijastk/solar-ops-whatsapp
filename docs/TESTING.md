@@ -14,9 +14,14 @@ Verified custom webhook events so far:
 
 - Meta GET verification returned HTTP 200.
 - Meta dashboard `messages` test reached `POST /api/whatsapp`.
-- That POST currently returns HTTP 503 because the deployed ingestion environment is invalid: `MAX_MEDIA_BYTES` is empty/missing in Vercel.
+- Runtime configuration validation is green.
+- Meta dashboard sample text was parsed as one text message.
+- With the prototype sender allowlist and destination Phone Number ID checks temporarily disabled for this dashboard-only test, the sample text was written successfully to `public.whatsapp_messages`.
+- The user visually confirmed the row appeared in Supabase.
 
-The complete Meta -> Vercel -> Supabase data path is therefore not yet accepted.
+This proves the custom Meta dashboard test -> Vercel -> Supabase database write path for text.
+
+It does **not** yet prove a real inbound WhatsApp message reaches the custom webhook while the app is unpublished, and it does **not** yet prove live media download/storage.
 
 Automated repository tests and GitHub Actions quality gates are active. A workflow must be observed passing before it is described as successful.
 
@@ -145,6 +150,15 @@ Expected:
 - text body stored
 - `processing_status = stored`
 
+Dashboard sample status on 2026-09-21:
+
+- custom webhook POST: HTTP 200
+- parsed messages: 1 text
+- stored: 1
+- user confirmed Supabase row exists
+
+A real inbound WhatsApp text through the custom webhook is still pending.
+
 ### Test D - PDF/document
 
 Forward a small PDF.
@@ -191,13 +205,14 @@ Use test documents that contain no sensitive customer information until the stor
 
 ## Still requiring integration coverage
 
-The following cannot be honestly proven by the initial unit suite alone:
+The following cannot be honestly proven by the current suite/dashboard text test alone:
 
-- Supabase upsert idempotency against the real schema
+- a real inbound WhatsApp text through the custom webhook
+- Supabase upsert idempotency against a real retry
 - private Storage upload against the real bucket
 - Meta media download against the live Graph API
 - sender allowlist behavior through a complete live webhook request
 - media-size rejection against a real download
-- complete Meta -> Vercel -> Supabase delivery
+- complete Meta -> Vercel -> Supabase media delivery
 
-These are covered by the manual end-to-end milestone test until a safe credentialed integration-test environment is approved.
+These remain part of the manual end-to-end milestone test.
