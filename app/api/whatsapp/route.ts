@@ -68,7 +68,8 @@ export async function POST(request: Request) {
 
     const messages = extractWhatsAppMessages(payload);
     const statuses = extractWhatsAppStatuses(payload);
-    const statusUpdates = await applyWhatsAppStatusUpdates(statuses);
+    const statusUpdates =
+      statuses.length > 0 ? await applyWhatsAppStatusUpdates(statuses) : 0;
 
     if (messages.length === 0) {
       console.info("WhatsApp webhook received no parseable messages", {
