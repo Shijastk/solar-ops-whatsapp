@@ -182,3 +182,44 @@ Observed real inbound evidence:
 - real WhatsApp PDF/document -> Meta -> custom Vercel webhook -> media download -> private Supabase Storage -> finalized database row: PASS
 - credentialed replay/idempotency and media byte-integrity checks: PASS
 - repository CI for the deployed implementation: PASS
+
+
+## Milestone 2A - Temporary media retention
+
+Status: approved direction; implementation in progress.
+
+### R14 - Raw media is temporary
+
+Successfully processed inbound media must not be retained indefinitely.
+
+The default retention target is 24 hours.
+
+### R15 - Deletion safety
+
+The retention job may delete only media rows that:
+
+- have `processing_status = stored`
+- still contain a non-null `storage_path`
+- have `processed_at` older than the configured retention cutoff
+
+If Storage deletion fails, the database `storage_path` must remain present so a later run can retry.
+
+### R16 - Preserve non-file metadata
+
+Deleting the raw Storage object must not delete the WhatsApp message row.
+
+The current metadata, such as message type, original filename, MIME type, hash/size metadata, sender metadata, and timestamps, may remain for operational traceability.
+
+### R17 - No invented extraction schema
+
+The long-term direction is to retain only useful structured business data instead of raw PDFs/images.
+
+However, the exact invoice fields and stock semantics are not yet defined. The implementation must not invent them or automatically update inventory until those rules are explicitly approved.
+
+### N9 - Low-cost scheduled cleanup
+
+The prototype should reuse existing low-cost infrastructure.
+
+The scheduled cleanup runs once per day using GitHub Actions and the existing protected `integration` environment Supabase credentials.
+
+Because scheduled workflows can be delayed, 24 hours is a retention target rather than a hard deletion SLA.

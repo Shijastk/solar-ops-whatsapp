@@ -184,3 +184,30 @@ The public policy is live at:
 `https://solar-ops-whatsapp.vercel.app/privacy`
 
 The URL was entered into Meta App Settings and the app was published successfully.
+
+
+## K017 - Structured invoice extraction fields are not defined yet
+
+The user approved the direction of keeping only useful data and deleting raw media after short retention.
+
+The system intentionally does not yet decide which invoice fields are authoritative.
+
+Before implementing OCR/parser output as operational data, define at least:
+
+- company identity rule
+- invoice/bill identifier
+- date semantics
+- product/description fields
+- quantity/unit semantics
+- correction/approval behavior
+- whether any extracted field is allowed to affect stock
+
+Do not infer these rules from a single sample bill.
+
+## K018 - Media retention timing is approximate
+
+The cleanup cutoff is 24 hours, but the scheduled GitHub Actions job runs once per day and may be delayed by GitHub.
+
+Therefore a raw file can remain longer than 24 hours before the next cleanup run.
+
+This is acceptable for the current low-cost prototype. If a strict deletion SLA is required later, move the cleanup to a scheduler with stronger timing guarantees.

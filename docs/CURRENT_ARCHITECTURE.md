@@ -224,3 +224,40 @@ There is currently no implemented:
 - automated WhatsApp reply path
 
 Do not describe any of those as existing features.
+
+
+## Temporary media retention
+
+Milestone 2A adds a low-cost raw-media lifecycle.
+
+### `scripts/maintenance/media-retention.mjs`
+
+Responsibilities:
+
+- validate Supabase maintenance configuration
+- calculate the retention cutoff
+- query only successfully stored media with a non-null Storage path
+- delete eligible private Storage objects
+- clear `storage_path` only after successful object deletion
+- leave failed items retryable
+- emit count-only reports with no customer identifiers or file paths
+
+Defaults:
+
+- retention target: 24 hours
+- maximum rows per run: 500
+- Storage bucket: `whatsapp-media`
+
+### `.github/workflows/media-retention.yml`
+
+Responsibilities:
+
+- run the cleanup once per day
+- reuse the protected `integration` environment Supabase secrets
+- allow explicit manual runs
+- prevent overlapping cleanup runs
+- upload a non-sensitive retention report artifact
+
+The workflow is scheduled for 21:00 UTC daily. GitHub scheduling may be delayed, so the 24-hour value is a cutoff target rather than a guaranteed exact deletion time.
+
+The database schema is unchanged. After successful deletion, the existing message row remains and only `storage_path` is cleared. The extraction schema for essential invoice data is intentionally not yet defined.

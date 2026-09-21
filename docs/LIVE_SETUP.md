@@ -259,3 +259,17 @@ The Meta access token used during the test setup may be temporary.
 Do not treat the test token as the final production credential.
 
 Production credential lifecycle will be handled only after the prototype path is proven.
+
+
+## Media retention maintenance
+
+A daily GitHub Actions workflow named `Media Retention` removes successfully processed raw media after the 24-hour cutoff.
+
+It uses the existing `integration` environment secrets:
+
+- `SUPABASE_URL`
+- `SUPABASE_SECRET_KEY`
+
+No additional provider credential is required.
+
+The workflow stores only a count-based report artifact. It must not log customer filenames, Storage paths, phone numbers, message payloads, or document contents.

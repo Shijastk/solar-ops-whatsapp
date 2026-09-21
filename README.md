@@ -132,3 +132,20 @@ Milestone 1 intentionally does **not** include:
 - automatic WhatsApp replies
 
 Those are added only after reliable inbound capture is proven.
+
+
+## Temporary media retention
+
+Raw WhatsApp media is now treated as temporary working data.
+
+The scheduled `Media Retention` GitHub Actions workflow runs once per day and removes successfully processed Storage objects older than the 24-hour cutoff. The WhatsApp message row remains, while `storage_path` is cleared after successful deletion.
+
+Manual/local maintenance command:
+
+```bash
+npm run maintenance:media-retention
+```
+
+The cleanup report contains counts only and must not contain customer filenames, Storage paths, phone numbers, payloads, or document contents.
+
+The long-term direction is to retain useful structured bill/invoice data rather than raw files. Exact extraction fields are intentionally not implemented yet because those business semantics must be defined explicitly before parser/OCR output is treated as operational data.

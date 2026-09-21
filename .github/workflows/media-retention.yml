@@ -1,0 +1,53 @@
+name: Media Retention
+
+on:
+  schedule:
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media-retention
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: delete-expired-media
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: integration
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      SUPABASE_STORAGE_BUCKET: whatsapp-media
+      MEDIA_RETENTION_HOURS: "24"
+      MEDIA_RETENTION_BATCH_SIZE: "500"
+      MEDIA_RETENTION_REPORT_DIR: artifacts/media-retention
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Delete expired media
+        run: npm run maintenance:media-retention
+
+      - name: Upload retention report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: solar-ops-media-retention-report
+          path: artifacts/media-retention
+          if-no-files-found: warn
+          retention-days: 14
