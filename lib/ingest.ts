@@ -68,6 +68,7 @@ export async function ingestWhatsAppMessage(
     env.allowedSenders.size > 0 &&
     !env.allowedSenders.has(message.senderPhone.replace(/\D/g, ""))
   ) {
+    console.info("WhatsApp message ignored", { reason: "sender_allowlist" });
     return "ignored";
   }
 
@@ -76,6 +77,7 @@ export async function ingestWhatsAppMessage(
     message.phoneNumberId &&
     message.phoneNumberId !== env.WHATSAPP_PHONE_NUMBER_ID
   ) {
+    console.info("WhatsApp message ignored", { reason: "phone_number_id" });
     return "ignored";
   }
 
