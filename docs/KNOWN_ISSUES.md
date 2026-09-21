@@ -238,3 +238,12 @@ Approved Meta template messaging outside that window is not implemented.
 The production deployment attempt after the operations-dashboard merge was rejected by Vercel with a build-rate-limit instruction to retry in 24 hours.
 
 Repository CI can verify source quality, but new behavior must not be described as live on the stable production alias until a production deployment reaches READY.
+
+
+## K025 - Automatic preview-deployment spam is prevented in source
+
+The repository now contains `vercel.json` branch deployment rules that disable automatic Vercel deployments for feature branches and keep automatic deployment enabled for `main`.
+
+This prevents the development pattern that exhausted the Hobby deployment/build quota.
+
+The current already-triggered quota block is external account state and is not cleared merely by adding this configuration. The latest `main` release still requires a successful production deployment after Vercel allows another production deployment or the account quota/plan is changed.
