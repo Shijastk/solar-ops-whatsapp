@@ -223,3 +223,56 @@ The prototype should reuse existing low-cost infrastructure.
 The scheduled cleanup runs once per day using GitHub Actions and the existing protected `integration` environment Supabase credentials.
 
 Because scheduled workflows can be delayed, 24 hours is a retention target rather than a hard deletion SLA.
+
+
+## Milestone 2B - Internal verification dashboard
+
+Status: approved and implemented in source.
+
+### R18 - Protected internal dashboard
+
+The application must provide an internal mobile-first web dashboard at `/ops`.
+
+The dashboard must not expose WhatsApp operational data without an authenticated server-side session.
+
+For the prototype:
+
+- `OPS_ACCESS_KEY` is the preferred dashboard login key
+- when `OPS_ACCESS_KEY` is not configured, the existing `WHATSAPP_VERIFY_TOKEN` is used as a temporary bootstrap fallback
+- successful login creates an HttpOnly, SameSite=Strict session cookie
+- session contents are signed server-side and expire
+
+### R19 - Private file preview
+
+Available raw media must remain in the private Supabase bucket.
+
+The dashboard may preview a file only by creating a short-lived signed URL server-side after session validation.
+
+Current signed URL lifetime target: 5 minutes.
+
+### R20 - Manual raw-file deletion
+
+An authenticated operator may delete an available raw file before automatic retention cleanup.
+
+The Storage object must be removed before its database `storage_path` is cleared.
+
+The WhatsApp message row and non-file metadata must remain.
+
+### R21 - Operational visibility
+
+The dashboard should show, without exposing secrets:
+
+- total accepted messages
+- successfully stored messages
+- currently available raw files
+- failed messages
+- message type
+- received time
+- original filename when present
+- media size and MIME type
+- masked sender reference
+- whether the raw file is available or already deleted
+
+### N10 - Mobile-first web UI
+
+The verification dashboard must be usable on a phone-sized viewport so the same information architecture can later inform the mobile app.
