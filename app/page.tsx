@@ -40,6 +40,10 @@ export default function Home() {
             <li key={capability}>{capability}</li>
           ))}
         </ul>
+
+        <footer className="siteFooter">
+          <a href="/privacy">Privacy Policy</a>
+        </footer>
       </section>
     </main>
   );

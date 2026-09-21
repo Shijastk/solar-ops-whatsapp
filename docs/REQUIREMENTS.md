@@ -100,6 +100,16 @@ Milestone 1 must not:
 
 Those belong to a later explicitly approved milestone.
 
+### R13 - Public privacy policy
+
+The deployed application must expose a public privacy policy at:
+
+`/privacy`
+
+The policy must accurately describe the current inbound WhatsApp data flow, categories of data processed, purposes, service providers, storage/retention, security controls, sharing, and access/correction/deletion requests.
+
+It must not publish credentials, customer documents, internal costs, or other operational secrets.
+
 ## Non-functional requirements
 
 ### N1 - Readability

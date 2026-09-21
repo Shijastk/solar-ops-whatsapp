@@ -172,3 +172,16 @@ Secret values remain intentionally unreadable from repository code and reports. 
 Meta's dashboard warning observed during setup states that while the app is unpublished, production data is not delivered to the custom webhook; only dashboard test webhooks are available.
 
 The credentialed harness proves the server/provider/storage path without publishing the app, but Milestone 1 acceptance still requires a real inbound text and PDF to be delivered by Meta to the custom callback when the app state permits it.
+
+
+## K016 - Meta privacy-policy URL still requires account-level entry
+
+The repository now provides a public privacy policy route at `/privacy`.
+
+After the production deployment is verified, the user must enter:
+
+`https://solar-ops-whatsapp.vercel.app/privacy`
+
+under Meta App Settings -> Basic -> Privacy Policy URL and save it.
+
+Publishing requirements after that point must be read from the current Meta dashboard rather than assumed.
