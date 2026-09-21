@@ -186,7 +186,7 @@ Observed real inbound evidence:
 
 ## Milestone 2A - Temporary media retention
 
-Status: approved direction; implementation in progress.
+Status: implemented in source and covered by automated tests; first scheduled live deletion observation is still pending.
 
 ### R14 - Raw media is temporary
 
