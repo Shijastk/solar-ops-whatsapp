@@ -14,7 +14,8 @@ Before changing code, read these files in order:
 6. `docs/DECISIONS.md`
 7. `docs/TESTING.md`
 8. `docs/KNOWN_ISSUES.md`
-9. The exact source files relevant to the requested change.
+9. `docs/INTEGRATION_TESTING.md` when the task touches live/provider integration testing
+10. The exact source files relevant to the requested change.
 
 Do not make a code change based only on memory, prior conversation, assumptions, or file names.
 
@@ -78,6 +79,8 @@ For every code change:
 5. Do not weaken/delete a failing test simply to make CI green unless the requirement itself was intentionally changed and documented.
 
 GitHub Pages is only a static quality-report surface. It does not prove the server-side WhatsApp runtime works.
+
+Credentialed integration tests are separate from normal CI. They must be manual-only, use synthetic data, keep sender and destination restrictions enabled, clean up fixtures, and produce redacted reports with no secrets, phone numbers, media IDs, or raw payloads. The existence of an integration workflow is not proof that providers work; only an observed successful run is evidence.
 
 ## Definition of done for a change
 

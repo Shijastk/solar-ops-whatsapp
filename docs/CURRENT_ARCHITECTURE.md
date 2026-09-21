@@ -101,6 +101,40 @@ Responsibilities:
 - report whether required environment variables are configured
 - never return actual secret values
 
+### `scripts/integration/helpers.mjs`
+
+Responsibilities:
+
+- build synthetic text/document webhook fixtures
+- generate a tiny synthetic PDF
+- sign webhook bodies for controlled integration requests
+- hash fixture bytes
+- redact sensitive values from reports
+- render the Markdown integration report
+
+### `scripts/integration/run-whatsapp-e2e.mjs`
+
+Responsibilities:
+
+- verify deployed health and security-filter presence
+- verify invalid-signature rejection
+- verify sender allowlist and destination Phone Number ID enforcement
+- verify text persistence and idempotency
+- upload/retrieve/download a synthetic PDF through Meta Cloud API
+- submit a signed synthetic document event to the deployed webhook
+- verify Supabase row, private bucket, Storage path, and file-byte hash
+- clean up synthetic database, Storage, and Meta media fixtures
+- write redacted JSON and Markdown reports
+
+### `.github/workflows/integration.yml`
+
+Responsibilities:
+
+- expose the credentialed suite only through manual `workflow_dispatch`
+- inject provider credentials through GitHub Actions secrets
+- force fixture cleanup
+- upload the redacted integration report as a workflow artifact
+
 ## Data model
 
 Current SQL source:
@@ -132,6 +166,8 @@ Expected bucket:
 The bucket was created as private by the user during live setup.
 
 A real media upload into the bucket has not yet been verified.
+
+A credentialed synthetic-media harness is now implemented to verify this path without disabling the production security filters. It is not considered evidence until an actual credentialed run succeeds.
 
 Current path strategy is approximately:
 

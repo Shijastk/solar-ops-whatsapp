@@ -63,10 +63,50 @@ Automated coverage includes:
 - webhook POST rejection for invalid signatures
 - invalid JSON behavior after a valid signature
 - Meta Graph API default configuration
+- Meta media-size rejection before and after download
+- successful Meta media metadata/download normalization
+- integration-fixture webhook builders
+- deterministic integration HMAC signing
+- synthetic PDF generation and hashing
+- integration-report secret/identifier redaction
 - full runtime environment validation
 - safe reporting of invalid environment field names without exposing values
 
 External Meta/Supabase calls are not treated as proven by unit tests.
+
+## Credentialed provider integration
+
+A separate manual integration suite is implemented in:
+
+- `scripts/integration/run-whatsapp-e2e.mjs`
+- `scripts/integration/helpers.mjs`
+- `.github/workflows/integration.yml`
+
+Detailed setup, provider research, safety rules, secret names, checks, cleanup behavior, and report contents are documented in:
+
+`docs/INTEGRATION_TESTING.md`
+
+The suite uses a generated synthetic PDF and a signed synthetic webhook to test the deployed endpoint while keeping sender allowlisting and destination Phone Number ID restrictions enabled.
+
+It verifies:
+
+- deployed health and security-filter presence
+- invalid signature rejection
+- allowlist rejection
+- destination Phone Number ID rejection
+- text persistence
+- idempotent replay
+- private Supabase bucket state
+- Meta media upload/retrieve/download
+- document ingestion into Supabase Storage
+- stored-file SHA-256 integrity
+- cleanup of database, Storage, and Meta media fixtures
+
+The workflow is `workflow_dispatch` only. It does not call WhatsApp's `/messages` send endpoint.
+
+Generated reports are uploaded as workflow artifacts and are not published to GitHub Pages.
+
+Important: implementation of the harness is not evidence that provider integration passes. The first credentialed workflow run is still pending.
 
 ## GitHub Actions quality gate
 
@@ -203,16 +243,19 @@ Expected:
 
 Use test documents that contain no sensitive customer information until the storage/security path has been verified.
 
-## Still requiring integration coverage
+## Still requiring live evidence
 
-The following cannot be honestly proven by the current suite/dashboard text test alone:
+The following remain unverified until the credentialed workflow is actually configured and run successfully:
 
-- a real inbound WhatsApp text through the custom webhook
-- Supabase upsert idempotency against a real retry
-- private Storage upload against the real bucket
-- Meta media download against the live Graph API
-- sender allowlist behavior through a complete live webhook request
-- media-size rejection against a real download
-- complete Meta -> Vercel -> Supabase media delivery
+- live Meta media upload/retrieve/download with the current account token
+- Supabase database idempotency through the deployed webhook
+- private Storage upload/download through the deployed webhook
+- sender allowlist and destination Phone Number ID behavior through the deployed endpoint
+- complete synthetic Meta media -> Vercel -> Supabase document path
+- cleanup behavior against the real provider accounts
 
-These remain part of the manual end-to-end milestone test.
+The following remains outside the synthetic harness even after it passes:
+
+- a real inbound WhatsApp message delivered by Meta to the custom webhook
+
+Real inbound delivery is still required before Milestone 1 can be declared complete.

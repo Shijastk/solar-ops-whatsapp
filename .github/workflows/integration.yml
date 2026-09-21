@@ -1,0 +1,62 @@
+name: Credentialed Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Deployed Solar Ops origin to test
+        required: true
+        default: https://solar-ops-whatsapp.vercel.app
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: credentialed-integration
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: whatsapp-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: integration
+
+    env:
+      INTEGRATION_BASE_URL: ${{ inputs.base_url }}
+      INTEGRATION_REPORT_DIR: artifacts/integration
+      INTEGRATION_CLEANUP: "true"
+      META_GRAPH_API_VERSION: v26.0
+      SUPABASE_STORAGE_BUCKET: whatsapp-media
+      WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
+      META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+      WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+      INTEGRATION_ALLOWED_SENDER: ${{ secrets.INTEGRATION_ALLOWED_SENDER }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run credentialed integration suite
+        run: npm run test:integration
+
+      - name: Upload integration report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: solar-ops-integration-report
+          path: artifacts/integration
+          if-no-files-found: warn
+          retention-days: 14

@@ -139,6 +139,18 @@ When GitHub Pages is available for the repository/account, the project may publi
 
 The Pages site is not the application runtime and must never contain secrets, customer documents, internal costs, environment values, or webhook payload data.
 
+### N8 - Credentialed integration safety
+
+Live provider integration tests must:
+
+- be manually triggered rather than run on every push or pull request
+- use synthetic data only
+- keep sender allowlisting and destination Phone Number ID restrictions enabled
+- avoid outbound WhatsApp messages to people
+- clean up synthetic database, Storage, and Meta media fixtures
+- produce redacted reports that contain no credentials, phone numbers, media IDs, or raw payloads
+- remain separate from GitHub Pages
+
 ## Acceptance criteria for Milestone 1
 
 A successful end-to-end test is:

@@ -23,6 +23,7 @@ Before changing code, coding agents must read:
 - `docs/DECISIONS.md`
 - `docs/TESTING.md`
 - `docs/KNOWN_ISSUES.md`
+- `docs/INTEGRATION_TESTING.md` when working on live/provider integration testing
 
 For the account-level deployment sequence, use:
 
@@ -111,6 +112,14 @@ npm run verify
 ```
 
 CI separately runs typecheck, lint, Vitest, and the Next.js production build.
+
+Credentialed provider integration is manual-only:
+
+```bash
+npm run test:integration
+```
+
+The GitHub Actions workflow `Credentialed Integration` uses synthetic data to test the deployed webhook, security filters, Meta media upload/retrieval/download, Supabase database persistence, private Storage, byte integrity, idempotency, and cleanup. It never sends a WhatsApp message to a person. See `docs/INTEGRATION_TESTING.md`.
 
 ## Scope
 
