@@ -149,3 +149,24 @@ npm run maintenance:media-retention
 The cleanup report contains counts only and must not contain customer filenames, Storage paths, phone numbers, payloads, or document contents.
 
 The long-term direction is to retain useful structured bill/invoice data rather than raw files. Exact extraction fields are intentionally not implemented yet because those business semantics must be defined explicitly before parser/OCR output is treated as operational data.
+
+
+## Operations dashboard
+
+The internal verification dashboard is available at:
+
+`/ops`
+
+It is mobile-first and shows recent accepted WhatsApp messages, storage state, file size/type, masked sender reference, runtime status, and temporary-file availability.
+
+Security:
+
+- server-side session only
+- HttpOnly + SameSite=Strict cookie
+- private Supabase bucket remains private
+- file previews use a 5-minute signed URL generated server-side
+- raw files can be deleted manually without deleting the message row
+- `OPS_ACCESS_KEY` is the preferred login key
+- if `OPS_ACCESS_KEY` is not configured, the prototype temporarily falls back to `WHATSAPP_VERIFY_TOKEN`
+
+For broader production or the future mobile app, replace the fallback with dedicated user authentication.
