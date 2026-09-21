@@ -1,6 +1,6 @@
 # Requirements
 
-Status: Milestone 1
+Status: Milestone 1 accepted on 2026-09-21
 
 ## Goal
 
@@ -174,4 +174,11 @@ A successful end-to-end test is:
 7. Re-delivering the same webhook does not create a duplicate row.
 8. The repository quality workflow passes for the tested commit.
 
-Milestone 1 is not accepted until the full path is tested against the custom deployed webhook, not only Meta's built-in webhook viewer.
+Milestone 1 acceptance completed on 2026-09-21.
+
+Observed real inbound evidence:
+
+- real WhatsApp text -> Meta -> custom Vercel webhook -> Supabase: PASS
+- real WhatsApp PDF/document -> Meta -> custom Vercel webhook -> media download -> private Supabase Storage -> finalized database row: PASS
+- credentialed replay/idempotency and media byte-integrity checks: PASS
+- repository CI for the deployed implementation: PASS
