@@ -3,6 +3,7 @@ import {
   buildMarkdownReport,
   buildMinimalPdf,
   buildWebhookPayload,
+  describeGraphApiError,
   normalizeDigits,
   redactText,
   sha256Hex,
@@ -70,6 +71,31 @@ describe("credentialed integration helpers", () => {
     expect(redacted).not.toContain("919999999999");
     expect(redacted).toContain("[redacted-secret]");
     expect(redacted).toContain("[redacted-identifier]");
+  });
+
+  it("renders safe Meta Graph error details without leaking identifiers or secrets", () => {
+    const details = describeGraphApiError(
+      {
+        error: {
+          message:
+            "Unsupported post request for object 123456789012345 using token super-secret",
+          type: "GraphMethodException",
+          code: 100,
+          error_subcode: 33,
+        },
+      },
+      400,
+      ["super-secret"],
+    );
+
+    expect(details).toContain("HTTP 400");
+    expect(details).toContain("type=GraphMethodException");
+    expect(details).toContain("code=100");
+    expect(details).toContain("subcode=33");
+    expect(details).not.toContain("123456789012345");
+    expect(details).not.toContain("super-secret");
+    expect(details).toContain("[redacted-identifier]");
+    expect(details).toContain("[redacted-secret]");
   });
 
   it("renders a report without adding payload or credential sections", () => {

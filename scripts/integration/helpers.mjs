@@ -116,6 +116,35 @@ export function redactText(value, secretValues = []) {
   return output;
 }
 
+export function describeGraphApiError(body, status, secretValues = []) {
+  const error =
+    body && typeof body === "object" && body.error && typeof body.error === "object"
+      ? body.error
+      : null;
+
+  const parts = [`HTTP ${status}`];
+
+  if (error) {
+    if (typeof error.type === "string" && error.type) {
+      parts.push(`type=${error.type}`);
+    }
+
+    if (Number.isInteger(error.code)) {
+      parts.push(`code=${error.code}`);
+    }
+
+    if (Number.isInteger(error.error_subcode)) {
+      parts.push(`subcode=${error.error_subcode}`);
+    }
+
+    if (typeof error.message === "string" && error.message) {
+      parts.push(`message=${error.message}`);
+    }
+  }
+
+  return redactText(parts.join("; "), secretValues).slice(0, 900);
+}
+
 export function buildMarkdownReport(report) {
   const lines = [
     "# Solar Ops Credentialed Integration Report",

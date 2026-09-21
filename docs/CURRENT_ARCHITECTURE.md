@@ -110,6 +110,7 @@ Responsibilities:
 - sign webhook bodies for controlled integration requests
 - hash fixture bytes
 - redact sensitive values from reports
+- extract only safe Meta Graph error type/code/subcode/message diagnostics
 - render the Markdown integration report
 
 ### `scripts/integration/run-whatsapp-e2e.mjs`

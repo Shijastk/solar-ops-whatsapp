@@ -106,7 +106,16 @@ The workflow is `workflow_dispatch` only. It does not call WhatsApp's `/messages
 
 Generated reports are uploaded as workflow artifacts and are not published to GitHub Pages.
 
-Important: implementation of the harness is not evidence that provider integration passes. The first credentialed workflow run is still pending.
+Observed credentialed runs on 2026-09-21:
+
+- the deployed health, webhook security checks, sender allowlist, destination Phone Number ID check, text persistence, text replay idempotency, and private bucket check all passed
+- the initial Meta media upload attempt returned HTTP 401 with the earlier token
+- after replacing it with a system-user token, Meta media upload advanced to HTTP 400
+- therefore the current blocker is specifically the Meta media upload request/account-asset path, not Vercel, Supabase text persistence, idempotency, or bucket privacy
+
+The harness now reports only redacted Meta Graph error type/code/subcode/message details so the next run can identify the 400 without exposing secrets or identifiers.
+
+A fully successful credentialed run is still pending.
 
 ## GitHub Actions quality gate
 
