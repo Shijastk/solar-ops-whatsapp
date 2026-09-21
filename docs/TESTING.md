@@ -21,7 +21,7 @@ Verified custom webhook events so far:
 
 This proves the custom Meta dashboard test -> Vercel -> Supabase database write path for text.
 
-It does **not** yet prove a real inbound WhatsApp message reaches the custom webhook while the app is unpublished, and it does **not** yet prove live media download/storage.
+The app was subsequently published and subscribed to the test WABA. Real inbound text and document delivery were then verified through the deployed webhook.
 
 Automated repository tests and GitHub Actions quality gates are active. A workflow must be observed passing before it is described as successful.
 
@@ -220,7 +220,7 @@ Dashboard sample status on 2026-09-21:
 - stored: 1
 - user confirmed Supabase row exists
 
-A real inbound WhatsApp text through the custom webhook is still pending.
+A real inbound WhatsApp text through the custom webhook is verified.
 
 ### Test D - PDF/document
 
