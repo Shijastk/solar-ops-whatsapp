@@ -68,8 +68,12 @@ Decision: Future customer-facing views, if added, must not expose porter/driver/
 
 Reason: Internal procurement/operating data is not inherently customer-facing information.
 
-## D012 - Unknown provider details must be verified
+## D012 - Pin Meta Graph API v26.0
 
-Decision: Provider-version assumptions must not be invented.
+Decision: The prototype is intentionally pinned to Meta Graph API `v26.0`.
 
-Current concern: `META_GRAPH_API_VERSION` is presently defaulted in source. Before production, the exact supported/current Meta Graph API version must be verified against official Meta documentation and then intentionally pinned.
+Evidence recorded on 2026-09-21: Meta's version table supplied for this project lists v26.0 as released on July 29, 2026, with expiration date still TBD. The preceding v25.0 expires July 29, 2028.
+
+Reason: Provider-version assumptions must not be invented. The repository should use an explicitly selected version rather than silently inheriting an older default.
+
+Follow-up: Re-check Meta's official version table before production rollout and when Meta publishes the v26.0 expiration date.
