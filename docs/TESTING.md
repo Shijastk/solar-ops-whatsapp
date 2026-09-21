@@ -10,7 +10,7 @@ Meta's built-in test environment has already demonstrated:
 
 The custom repository webhook has not yet been proven end-to-end against Vercel + Supabase.
 
-Automated repository tests and GitHub Actions quality gates are being added in Milestone 1. A workflow must be observed passing before it is described as successful.
+Automated repository tests and GitHub Actions quality gates are active. A workflow must be observed passing before it is described as successful.
 
 ## What GitHub Pages is used for
 
@@ -55,10 +55,12 @@ External Meta/Supabase calls are not treated as proven by unit tests.
 
 ## GitHub Actions quality gate
 
-On pushes and pull requests the CI workflow runs:
+The repository contains a committed `package-lock.json`.
+
+On pushes and pull requests the CI workflow runs reproducible installs with:
 
 ```bash
-npm install --no-audit --no-fund
+npm ci --no-audit --no-fund
 npm run typecheck
 npm run lint
 npm run test
@@ -72,7 +74,7 @@ Do not infer success from source review alone.
 ## Local quality commands
 
 ```bash
-npm install
+npm ci
 npm run typecheck
 npm run lint
 npm run test
