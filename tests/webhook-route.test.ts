@@ -104,6 +104,7 @@ describe("/api/whatsapp", () => {
     await expect(response.json()).resolves.toEqual({
       received: true,
       processed: 0,
+      statusUpdates: 0,
     });
   });
 });
