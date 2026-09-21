@@ -65,6 +65,9 @@ export async function POST(request: Request) {
     const messages = extractWhatsAppMessages(payload);
 
     if (messages.length === 0) {
+      console.info("WhatsApp webhook received no parseable messages", {
+        messageCount: 0,
+      });
       return Response.json({ received: true, processed: 0 });
     }
 
@@ -76,6 +79,13 @@ export async function POST(request: Request) {
         result,
       });
     }
+
+    console.info("WhatsApp webhook processing summary", {
+      messageCount: messages.length,
+      messageTypes: messages.map((message) => message.type),
+      storedCount: results.filter((item) => item.result === "stored").length,
+      ignoredCount: results.filter((item) => item.result === "ignored").length,
+    });
 
     return Response.json({
       received: true,
