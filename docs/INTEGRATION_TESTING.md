@@ -1,6 +1,6 @@
 # Credentialed Integration Testing
 
-Status: harness implemented; a credentialed run is required before provider-dependent checks may be called verified.
+Status: credentialed runs are active. Core deployed security/text/database/private-bucket checks pass; Meta media upload is currently blocked by an HTTP 400 response.
 
 Research checked: 2026-09-21.
 
@@ -131,6 +131,7 @@ The report contains only:
 - cleanup status
 - Graph API version
 - public target origin
+- when Meta Graph fails: redacted error type, numeric code/subcode, and redacted message text
 
 It intentionally excludes:
 
@@ -142,6 +143,8 @@ It intentionally excludes:
 - raw webhook payloads
 - real documents
 - Supabase credentials
+
+Provider error messages are passed through the report redactor before logging or artifact generation. Long numeric identifiers and configured secret values are replaced before output.
 
 Generated reports are gitignored and must not be published to GitHub Pages.
 
@@ -177,3 +180,21 @@ Provider-dependent checks may be marked verified only after:
 2. the generated report shows PASS,
 3. cleanup succeeds,
 4. the relevant deployment and commit are identified.
+
+
+## Current observed provider state
+
+Credentialed run evidence from 2026-09-21:
+
+- health/security/text/idempotency/private-bucket checks: PASS
+- Meta media upload with the previous token: HTTP 401
+- Meta media upload after switching to a system-user token: HTTP 400
+
+Official Meta WhatsApp Business Platform documentation confirms:
+
+- media upload uses `POST /{phone-number-ID}/media`
+- the request is multipart form data containing `messaging_product=whatsapp` and a `file`
+- media endpoints require a system-user access token with `whatsapp_business_messaging`
+- `application/pdf` is a supported document MIME type
+
+Therefore the next diagnostic step is to inspect Meta's structured Graph error code/type/subcode/message from the same request, not to guess whether the issue is token scope, asset assignment, Phone Number ID access, or another provider validation rule.
