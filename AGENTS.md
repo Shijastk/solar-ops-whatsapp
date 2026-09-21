@@ -50,15 +50,24 @@ When uncertain, stop and state the exact concern to the user before implementing
 
 ## Current milestone
 
-Milestone 1 is inbound WhatsApp capture only:
+Milestone 1 is complete:
 
 `WhatsApp -> Meta Cloud API -> Next.js webhook -> Supabase database/private Storage`
 
-Not part of Milestone 1 unless the user explicitly approves it:
+The user has approved the next direction: keep raw inbound media only temporarily, retain useful structured data long-term, and avoid wasting Storage.
 
-- OCR
-- invoice parsing
-- stock mutation
+Current Milestone 2A scope:
+
+- temporary raw-media retention
+- automatic deletion of successfully stored media after approximately 24 hours
+- preserve message metadata after file deletion
+- prepare for later invoice/document extraction
+
+Do not invent invoice fields, OCR semantics, stock-in/out rules, or automatic inventory mutations. Those business rules are still undefined and must be explicitly decided before implementation.
+
+Still out of scope unless explicitly approved:
+
+- automatic stock mutation
 - customer-facing portal
 - WhatsApp auto-replies
 - outbound notification system
