@@ -116,11 +116,21 @@ The repository is private. Private-repository Pages availability depends on the 
 
 If Pages is unavailable, CI remains the authoritative test system. Do not make this repository public merely to obtain a Pages status page without explicit user approval.
 
-## K011 - Real provider integrations are not fully covered yet
+## K011 - Credentialed provider harness implemented but not yet run
 
-The initial automated test suite intentionally avoids real Meta and Supabase credentials.
+The normal automated test suite intentionally avoids real Meta and Supabase credentials.
 
-The dashboard sample proves text persistence, but live Meta media download, Supabase Storage, database idempotency under retries, and a complete real Meta -> Vercel -> Supabase media delivery still require the documented end-to-end test.
+A manual credentialed integration harness now exists for:
+
+- Meta media upload/retrieve/download
+- deployed webhook signature/security checks
+- Supabase database persistence
+- idempotency
+- private Storage upload/download
+- byte-integrity verification
+- cleanup
+
+This does not become verified evidence until a real credentialed workflow run completes successfully and its report is inspected. Real inbound WhatsApp delivery from Meta remains a separate acceptance test.
 
 ## K012 - Dependency installs are reproducible
 
@@ -128,13 +138,24 @@ Resolved: `package-lock.json` is committed and CI/Pages workflows use `npm ci`.
 
 Any future dependency change must update both `package.json` and `package-lock.json`.
 
-## K013 - Security filters temporarily disabled for Meta dashboard sample testing
+## K013 - Security filters restored after Meta dashboard sample testing
 
-For the dashboard-only sample text test, the user temporarily removed:
+Resolved on 2026-09-21.
+
+The user restored both:
 
 - `ALLOWED_WHATSAPP_SENDERS`
 - `WHATSAPP_PHONE_NUMBER_ID`
 
-This was necessary because Meta's dashboard sample values do not match the project's real test sender/destination values.
+The deployed health endpoint was verified afterward and reports both fields present with webhook and ingestion validation healthy.
 
-Before any broader live testing or production use, restore both values and redeploy.
+The credentialed integration harness is designed to keep both protections enabled.
+
+
+## K014 - GitHub integration secrets still require account-level setup
+
+The repository now contains the manual `Credentialed Integration` workflow, but the required GitHub Actions secrets cannot be inferred or committed.
+
+Before the first credentialed run, configure the `integration` GitHub environment (preferred) or repository secrets listed in `docs/INTEGRATION_TESTING.md`.
+
+Do not copy credentials into workflow inputs, source files, issues, or chat.
