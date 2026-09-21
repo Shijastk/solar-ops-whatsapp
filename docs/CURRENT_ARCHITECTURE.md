@@ -211,19 +211,19 @@ Do not rename these without updating source, `.env.example`, README, and documen
 
 ## Important boundary
 
-There is currently no implemented:
+Current source implements deterministic PDF document parsing and manual operator replies, but still has no:
 
-- OCR pipeline
-- stock/inventory model
-- company model
+- OCR pipeline for scanned/image-only PDFs
+- stock/inventory mutation model
+- company master-data model
 - driver model
 - porter model
-- invoice parser
-- authentication UI
 - customer dashboard
-- automated WhatsApp reply path
+- automatic WhatsApp reply path
+- template-message path outside the customer-service window
+- production-grade multi-user authentication
 
-Do not describe any of those as existing features.
+Do not describe those missing capabilities as existing features.
 
 
 ## Temporary media retention
@@ -260,7 +260,7 @@ Responsibilities:
 
 The workflow is scheduled for 21:00 UTC daily. GitHub scheduling may be delayed, so the 24-hour value is a cutoff target rather than a guaranteed exact deletion time.
 
-The database schema is unchanged. After successful deletion, the existing message row remains and only `storage_path` is cleared. The extraction schema for essential invoice data is intentionally not yet defined.
+The retention workflow itself does not require changing the existing `whatsapp_messages` row shape. After successful deletion, the message row remains and only `storage_path` is cleared. Separate additive tables now hold structured document drafts/items and outbound-message state.
 
 
 ## Internal operations dashboard
@@ -312,6 +312,8 @@ The bucket remains private.
 - preserves the WhatsApp message row and metadata
 
 This web dashboard is internal only. It is not a customer portal.
+
+The stable production alias may still be serving the earlier deployed revision until Vercel allows the next production build. Repository CI success does not by itself prove the new Milestone 2C source is live.
 
 
 ## Structured document parsing
