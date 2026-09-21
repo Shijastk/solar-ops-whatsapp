@@ -46,7 +46,7 @@ Verified:
 - downloaded Supabase Storage bytes match the original synthetic PDF by SHA-256
 - synthetic database and Storage fixtures are cleaned up after the run
 
-A real Meta-delivered inbound PDF remains a separate acceptance test.
+A real Meta-delivered inbound PDF has also been verified through the custom deployed webhook.
 
 ## K004 - Meta access token lifecycle
 
@@ -135,7 +135,7 @@ All credentialed checks passed, including:
 - stored-file SHA-256 integrity
 - cleanup of Meta media and Supabase fixtures
 
-Remaining limitation: the harness creates signed synthetic webhook payloads itself, so real Meta-delivered inbound WhatsApp callbacks are still a separate acceptance test.
+The harness creates signed synthetic webhook payloads itself, but real Meta-delivered inbound text and PDF callbacks have now also been verified separately.
 
 ## K012 - Dependency installs are reproducible
 
