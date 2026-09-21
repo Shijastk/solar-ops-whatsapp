@@ -41,6 +41,12 @@ export default function Home() {
           ))}
         </ul>
 
+        <div className="homeActions">
+          <a className="homePrimaryButton" href="/ops">
+            Open operations
+          </a>
+        </div>
+
         <footer className="siteFooter">
           <a href="/privacy">Privacy Policy</a>
         </footer>

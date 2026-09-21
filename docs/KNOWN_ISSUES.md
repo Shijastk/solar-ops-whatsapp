@@ -46,7 +46,7 @@ Verified:
 - downloaded Supabase Storage bytes match the original synthetic PDF by SHA-256
 - synthetic database and Storage fixtures are cleaned up after the run
 
-A real Meta-delivered inbound PDF remains a separate acceptance test.
+A real Meta-delivered inbound PDF has also been verified through the custom deployed webhook.
 
 ## K004 - Meta access token lifecycle
 
@@ -135,7 +135,7 @@ All credentialed checks passed, including:
 - stored-file SHA-256 integrity
 - cleanup of Meta media and Supabase fixtures
 
-Remaining limitation: the harness creates signed synthetic webhook payloads itself, so real Meta-delivered inbound WhatsApp callbacks are still a separate acceptance test.
+The harness creates signed synthetic webhook payloads itself, but real Meta-delivered inbound text and PDF callbacks have now also been verified separately.
 
 ## K012 - Dependency installs are reproducible
 
@@ -211,3 +211,16 @@ The cleanup cutoff is 24 hours, but the scheduled GitHub Actions job runs once p
 Therefore a raw file can remain longer than 24 hours before the next cleanup run.
 
 This is acceptable for the current low-cost prototype. If a strict deletion SLA is required later, move the cleanup to a scheduler with stronger timing guarantees.
+
+
+## K019 - Dashboard bootstrap authentication should be replaced before broader production use
+
+The internal dashboard supports a dedicated `OPS_ACCESS_KEY`, but the current deployment can fall back to `WHATSAPP_VERIFY_TOKEN` so the prototype works without a new environment variable.
+
+This is acceptable for the current single-operator verification prototype, but broader production or mobile use should move to dedicated user authentication (for example Supabase Auth) and remove the fallback.
+
+## K020 - Human-visible signed preview needs one interactive verification
+
+The private bucket, stored document row, and Storage object are live-verified.
+
+The signed-preview implementation follows Supabase's current private-bucket signed URL API and is covered by the production build, but a human opening the file through the authenticated `/ops` dashboard remains the final UI-level preview check.

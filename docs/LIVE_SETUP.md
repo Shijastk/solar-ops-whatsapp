@@ -186,36 +186,32 @@ It is not equivalent to a real inbound WhatsApp message through the custom webho
 
 ### E2. Real inbound text
 
-Pending.
+Verified on 2026-09-21.
 
-Expected:
+Observed:
 
-- one row in `public.whatsapp_messages`
-- `message_type = text`
-- text body stored
-- `processing_status = stored`
+- real Meta callback reached the deployed webhook
+- one text message was accepted
+- `storedCount = 1`
+- the database row was persisted
 
 ### E3. PDF/media
 
-Pending.
+Verified on 2026-09-21.
 
-Expected:
+Observed:
 
-- one new database row
+- a real PDF/document callback reached the deployed webhook
 - `message_type = document`
-- original filename when Meta supplies it
-- `processing_status = stored`
-- non-null internal `storage_path`
-
-Expected in Storage:
-
-- the PDF exists inside private bucket `whatsapp-media`
+- `storedCount = 1`
+- the database row has a non-null internal `storage_path`
+- Supabase inspection confirms the private bucket contains the stored object
 
 ### E4. Duplicate behavior
 
-Pending.
+Verified by the credentialed provider integration suite.
 
-The same WhatsApp message ID must not create a second row if Meta retries the event.
+The same WhatsApp message ID does not create a second row when the event is replayed.
 
 ## Phase G - Evidence before declaring success
 
@@ -273,3 +269,22 @@ It uses the existing `integration` environment secrets:
 No additional provider credential is required.
 
 The workflow stores only a count-based report artifact. It must not log customer filenames, Storage paths, phone numbers, message payloads, or document contents.
+
+
+## Internal operations dashboard
+
+Dashboard:
+
+`https://solar-ops-whatsapp.vercel.app/ops`
+
+The page requires an operations session.
+
+Preferred login configuration:
+
+`OPS_ACCESS_KEY`
+
+If it is not configured, the prototype temporarily accepts the existing webhook verify token as the dashboard access key.
+
+Available files are opened using a 5-minute signed Supabase URL generated only after server-side session validation.
+
+The dashboard also provides authenticated manual deletion for raw files. Message rows and metadata remain after file deletion.

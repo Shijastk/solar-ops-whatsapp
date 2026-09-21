@@ -21,7 +21,7 @@ Verified custom webhook events so far:
 
 This proves the custom Meta dashboard test -> Vercel -> Supabase database write path for text.
 
-It does **not** yet prove a real inbound WhatsApp message reaches the custom webhook while the app is unpublished, and it does **not** yet prove live media download/storage.
+The app was subsequently published and subscribed to the test WABA. Real inbound text and document delivery were then verified through the deployed webhook.
 
 Automated repository tests and GitHub Actions quality gates are active. A workflow must be observed passing before it is described as successful.
 
@@ -220,7 +220,7 @@ Dashboard sample status on 2026-09-21:
 - stored: 1
 - user confirmed Supabase row exists
 
-A real inbound WhatsApp text through the custom webhook is still pending.
+A real inbound WhatsApp text through the custom webhook is verified.
 
 ### Test D - PDF/document
 
@@ -295,3 +295,26 @@ Automated tests cover:
 - failure reporting when database finalization fails
 
 The scheduled provider cleanup itself uses real Supabase credentials and must not be described as observed live until a scheduled or manual maintenance run has completed successfully.
+
+
+## Operations dashboard tests
+
+Automated tests now cover:
+
+- operations access-key validation
+- dedicated-key precedence over the temporary fallback
+- signed session creation
+- session expiry rejection
+- session tamper rejection
+
+The production build also verifies the dashboard and operations API routes compile under the current Next.js version.
+
+Live Supabase inspection on 2026-09-21 confirmed:
+
+- 3 accepted message rows currently exist
+- 1 document row is stored
+- that document row has a non-null Storage path
+- the private `whatsapp-media` bucket currently contains 1 object
+- the bucket is confirmed private
+
+The authenticated browser preview itself still requires a user login interaction; do not claim a human-visible preview was observed until it is opened successfully through `/ops`.

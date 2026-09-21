@@ -143,3 +143,21 @@ Implementation choice:
 - reports contain counts/timing only, never filenames, paths, phone numbers, or customer document content
 
 The current workflow does not define invoice/OCR fields. Structured extraction semantics remain a separate explicit decision.
+
+
+## D018 - Build a protected mobile-first web dashboard before the mobile app
+
+Decision: Add an internal web dashboard first so the actual WhatsApp/Supabase data flow can be visually verified before building the mobile app.
+
+Reason: The web dashboard reuses the existing Next.js deployment and server-side Supabase access, making it the lowest-risk way to validate the operational information architecture.
+
+Security decisions:
+
+- keep the Storage bucket private
+- generate file preview links only after authenticated server-side checks
+- signed preview URLs expire after 5 minutes
+- never expose Supabase server credentials to the browser
+- mask sender phone numbers in the dashboard
+- allow manual raw-file deletion while preserving message metadata
+
+Prototype authentication uses an optional dedicated `OPS_ACCESS_KEY`. If that is not configured, the existing webhook verify token is accepted only as a temporary bootstrap fallback. A future mobile app should move to dedicated user authentication rather than depending on this fallback.
