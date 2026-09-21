@@ -1,12 +1,35 @@
 # Current Architecture
 
-This document describes the repository as verified on 2026-09-21.
+This document describes the repository and deployed prototype as verified on 2026-09-21.
 
 ## Runtime
 
 The application is a Next.js App Router project using TypeScript.
 
 The webhook explicitly uses the Node.js runtime because the implementation uses Node cryptography and Buffer-based media handling.
+
+## Deployment status
+
+Verified Vercel project:
+
+`solar-ops-whatsapp`
+
+Framework:
+
+`Next.js`
+
+Stable production alias:
+
+`https://solar-ops-whatsapp.vercel.app`
+
+Verified state:
+
+- production deployment: `READY`
+- `/api/health`: HTTP 200
+- `configured: true`
+- no Vercel runtime errors observed in the one-hour verification window
+
+This proves the deployed application and runtime configuration are reachable. It does not yet prove Meta -> Vercel -> Supabase end-to-end ingestion.
 
 ## Current modules
 
