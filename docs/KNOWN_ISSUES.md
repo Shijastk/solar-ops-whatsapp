@@ -224,3 +224,28 @@ This is acceptable for the current single-operator verification prototype, but b
 The private bucket, stored document row, and Storage object are live-verified.
 
 The signed-preview implementation follows Supabase's current private-bucket signed URL API and is covered by the production build, but a human opening the file through the authenticated `/ops` dashboard remains the final UI-level preview check.
+
+
+## K021 - OCR fallback is intentionally not implemented yet
+
+Selectable-text PDFs are parsed locally. Scanned/image-only PDFs are marked `needs_ocr`.
+
+No paid OCR provider or heavy local OCR runtime has been added without a validated need.
+
+## K022 - Inventory semantics remain a business-rule blocker
+
+Product quantities can be parsed and approved as document data, but current-stock mutation remains intentionally disabled.
+
+Before implementing a stock ledger, define opening balance, which document types mean stock IN/OUT, and return/cancellation/correction behavior.
+
+## K023 - Manual reply scope is limited to the open service window
+
+The UI supports free-form operator replies only when the latest inbound message from that WhatsApp user is within 24 hours.
+
+Approved Meta template messaging outside that window is not implemented.
+
+## K024 - Vercel production deployment is quota-delayed
+
+The production deployment attempt after the operations-dashboard merge was rejected by Vercel with a build-rate-limit instruction to retry in 24 hours.
+
+Repository CI can verify source quality, but new behavior must not be described as live on the stable production alias until a production deployment reaches READY.
