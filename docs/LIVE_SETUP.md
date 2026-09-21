@@ -1,6 +1,6 @@
 # Live Setup Runbook
 
-Status: Vercel deployment, webhook verification, and Meta dashboard sample text -> Supabase database write verified. Security filters are restored. A manual credentialed media integration harness is implemented; its first credentialed run and real inbound delivery remain pending.
+Status: Vercel deployment, webhook verification, dashboard sample text persistence, security filters, and the full credentialed synthetic media path are verified. Real Meta-delivered inbound text/PDF callbacks remain pending.
 
 This runbook intentionally separates account-level manual actions from code changes.
 
@@ -236,11 +236,19 @@ Verified now:
 - dashboard sample text persisted into Supabase
 - sender allowlist and destination Phone Number ID restored and present in live health
 
+Verified credentialed integration:
+
+- workflow run `35578308664` -> PASS
+- Meta media upload/retrieve/download -> PASS
+- signed synthetic document webhook -> deployed Vercel endpoint -> PASS
+- private Supabase Storage persistence -> PASS
+- byte-integrity verification -> PASS
+- Meta/Supabase cleanup -> PASS
+
 Still pending:
 
-- first successful credentialed integration workflow/report
-- real inbound text on the custom webhook
-- real inbound PDF/media delivery from Meta
+- real inbound text delivered by Meta to the custom webhook
+- real inbound PDF/media delivered by Meta to the custom webhook
 
 ## Known temporary limitation
 

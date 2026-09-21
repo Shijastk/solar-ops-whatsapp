@@ -32,20 +32,22 @@ Verified:
 - Meta dashboard POST test reached the deployed route
 - runtime configuration is valid
 
-## K003 - Supabase database write is verified; media storage is not
+## K003 - Supabase database and private media storage are verified through the credentialed harness
 
 Verified:
 
 - `supabase/schema.sql` was applied by the user
 - `public.whatsapp_messages` exists
-- private `whatsapp-media` bucket was created by the user
+- private `whatsapp-media` bucket exists
 - Meta dashboard sample text was written to the table
+- signed synthetic text persists through the deployed webhook
+- Meta media can be uploaded/retrieved/downloaded with the current system-user setup
+- a signed synthetic document webhook causes the deployed endpoint to download the real Meta media bytes and store them in `whatsapp-media`
+- the database row contains the expected Storage path
+- downloaded Supabase Storage bytes match the original synthetic PDF by SHA-256
+- synthetic database and Storage fixtures are cleaned up after the run
 
-Still unverified:
-
-- live Meta media retrieval
-- actual file upload into `whatsapp-media`
-- media `storage_path` update
+A real Meta-delivered inbound PDF remains a separate acceptance test.
 
 ## K004 - Meta access token lifecycle
 
@@ -116,31 +118,25 @@ The repository is private. Private-repository Pages availability depends on the 
 
 If Pages is unavailable, CI remains the authoritative test system. Do not make this repository public merely to obtain a Pages status page without explicit user approval.
 
-## K011 - Credentialed provider harness partially passes; Meta media upload is the current blocker
+## K011 - Credentialed provider harness passes
 
-Credentialed runs were performed on 2026-09-21.
+Resolved on 2026-09-21.
 
-Verified by the live harness:
+Workflow run `35578308664` completed successfully after assigning the system user to the Test WhatsApp Business Account with Messages and Phone numbers (view only) access.
 
-- deployed health is healthy
-- invalid webhook signatures are rejected
-- sender allowlist is enforced
-- destination Phone Number ID is enforced
-- signed synthetic text reaches Vercel and Supabase
-- replay leaves exactly one database row
-- configured Supabase Storage bucket is private
-- synthetic database fixtures are cleaned up
+All credentialed checks passed, including:
 
-Meta media upload results:
+- security filters
+- text persistence
+- idempotency
+- private bucket verification
+- Meta synthetic PDF upload
+- Meta media metadata retrieval and download
+- deployed document ingestion into private Supabase Storage
+- stored-file SHA-256 integrity
+- cleanup of Meta media and Supabase fixtures
 
-- earlier token: HTTP 401
-- replacement system-user token: HTTP 400
-
-The 401 -> 400 change indicates the failure mode changed after the token replacement, but the exact Meta Graph cause must not be guessed. The harness now records redacted Meta Graph error type/code/subcode/message details for the next run.
-
-Until media upload succeeds, live media retrieval, webhook media download, Storage upload, byte-integrity verification, and Meta-media cleanup remain unverified.
-
-Real inbound WhatsApp delivery from Meta remains a separate acceptance test.
+Remaining limitation: the harness creates signed synthetic webhook payloads itself, so real Meta-delivered inbound WhatsApp callbacks are still a separate acceptance test.
 
 ## K012 - Dependency installs are reproducible
 
@@ -169,3 +165,10 @@ Resolved on 2026-09-21.
 The user configured the required `integration` environment secrets and the manual workflow can access them.
 
 Secret values remain intentionally unreadable from repository code and reports. Do not copy credentials into workflow inputs, source files, issues, or chat.
+
+
+## K015 - Real inbound callback remains blocked by unpublished-app behavior
+
+Meta's dashboard warning observed during setup states that while the app is unpublished, production data is not delivered to the custom webhook; only dashboard test webhooks are available.
+
+The credentialed harness proves the server/provider/storage path without publishing the app, but Milestone 1 acceptance still requires a real inbound text and PDF to be delivered by Meta to the custom callback when the app state permits it.

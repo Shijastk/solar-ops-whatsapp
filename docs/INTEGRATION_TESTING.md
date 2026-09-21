@@ -1,6 +1,6 @@
 # Credentialed Integration Testing
 
-Status: credentialed runs are active. Core deployed security/text/database/private-bucket checks pass; Meta media upload is currently blocked by an HTTP 400 response.
+Status: PASS. The credentialed provider suite completed successfully on 2026-09-21 in workflow run `35578308664` against commit `9d394bc6c28f9969b1d348bce0fb789788ef8283`.
 
 Research checked: 2026-09-21.
 
@@ -187,14 +187,22 @@ Provider-dependent checks may be marked verified only after:
 Credentialed run evidence from 2026-09-21:
 
 - health/security/text/idempotency/private-bucket checks: PASS
-- Meta media upload with the previous token: HTTP 401
-- Meta media upload after switching to a system-user token: HTTP 400
+- Meta synthetic PDF upload: PASS
+- Meta media metadata retrieval: PASS
+- direct Meta media download + SHA-256 verification: PASS
+- signed synthetic document webhook -> deployed Vercel endpoint: PASS
+- webhook Meta download -> private Supabase Storage: PASS
+- Supabase stored-file SHA-256 verification: PASS
+- cleanup of Supabase Storage fixtures: PASS
+- cleanup of Supabase database fixtures: PASS
+- cleanup of Meta media fixture: PASS
 
-Official Meta WhatsApp Business Platform documentation confirms:
+The successful run followed assignment of the system user to the Test WhatsApp Business Account with Messages and Phone numbers (view only) access.
 
-- media upload uses `POST /{phone-number-ID}/media`
-- the request is multipart form data containing `messaging_product=whatsapp` and a `file`
-- media endpoints require a system-user access token with `whatsapp_business_messaging`
-- `application/pdf` is a supported document MIME type
+Historical diagnostic progression:
 
-Therefore the next diagnostic step is to inspect Meta's structured Graph error code/type/subcode/message from the same request, not to guess whether the issue is token scope, asset assignment, Phone Number ID access, or another provider validation rule.
+- earlier token: Meta media upload HTTP 401
+- replacement system-user token before WABA asset assignment: HTTP 400, OAuthException code 100, Authorization Error
+- after WABA asset assignment: PASS
+
+This provider-level integration is now verified for synthetic signed events. It does not replace the final real-inbound Meta callback test.

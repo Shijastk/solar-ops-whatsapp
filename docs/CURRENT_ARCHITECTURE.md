@@ -31,7 +31,11 @@ Verified state:
 - Meta dashboard sample text reaches `POST /api/whatsapp`
 - the sample text is persisted into `public.whatsapp_messages`
 
-This proves the deployed text-ingestion database path for Meta's dashboard sample. Real inbound WhatsApp delivery and live media download/private Storage upload remain pending.
+This proves the deployed text-ingestion database path for Meta's dashboard sample.
+
+The credentialed provider harness also passed on 2026-09-21 and verified the synthetic media path end to end: Meta media upload/retrieval/download -> signed document webhook -> deployed Vercel endpoint -> private Supabase Storage -> database Storage path -> byte-integrity check -> cleanup.
+
+Real inbound WhatsApp delivery from Meta to the custom callback remains pending and is the remaining Milestone 1 acceptance gap.
 
 ## Current modules
 
