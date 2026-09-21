@@ -1,22 +1,36 @@
 # Known Issues and Open Concerns
 
-## K001 - Custom deployment not yet tested end-to-end
+## K001 - Custom Meta -> Vercel -> Supabase path not yet tested end-to-end
 
-The repository has initial implementation, but the deployed custom Vercel webhook has not yet been connected to Meta and proven against Supabase.
+The Vercel project is deployed and healthy, but the custom WhatsApp webhook has not yet been verified by Meta and proven to write a real inbound text/PDF into Supabase.
 
 Do not call Milestone 1 complete.
 
-## K002 - Vercel deployment is not yet established for this repository
+## K002 - Vercel deployment is established
 
-The GitHub repository exists, but this repository was not found as an existing Vercel project during the initial connector inspection.
+Resolved on 2026-09-21.
 
-A deployment/import still needs to be established.
+Verified:
 
-## K003 - Supabase runtime configuration not yet verified
+- Vercel project `solar-ops-whatsapp` exists
+- framework is Next.js
+- production deployment state is `READY`
+- stable alias is `https://solar-ops-whatsapp.vercel.app`
+- `/api/health` returns HTTP 200 with `configured: true`
+- no runtime errors were reported in the one-hour verification window
 
-The repository expects a Supabase project, SQL schema, private bucket, and environment secrets.
+## K003 - Supabase credentials are configured, but live writes are not yet verified
 
-The code must not be described as operational until these are configured and tested.
+The health endpoint confirms the required Supabase environment variables are present in the deployed runtime.
+
+That does not yet prove:
+
+- `supabase/schema.sql` was applied exactly as expected
+- the `whatsapp-media` bucket is private and correctly named
+- the webhook can write rows
+- the webhook can upload media
+
+Those will be verified by the first live inbound text/PDF test.
 
 ## K004 - Meta access token lifecycle
 
@@ -26,7 +40,7 @@ Before long-lived operation, token lifecycle and the appropriate production cred
 
 ## K005 - Meta Graph API v26.0 expiration date is TBD
 
-Resolved portion: the repository now intentionally pins `META_GRAPH_API_VERSION=v26.0`, based on the Meta version table supplied for this project on 2026-09-21.
+Resolved portion: the repository intentionally pins `META_GRAPH_API_VERSION=v26.0`, based on the Meta version table supplied for this project on 2026-09-21.
 
 Remaining concern: Meta currently lists the v26.0 expiration date as TBD.
 
@@ -83,19 +97,17 @@ Required manual repository setting:
 
 `Settings -> Pages -> Build and deployment -> Source -> GitHub Actions`
 
-The repository is private. GitHub's current documentation says private-repository Pages requires GitHub Pro, Team, Enterprise Cloud, or Enterprise Server.
+The repository is private. Private-repository Pages availability depends on the GitHub account/plan.
 
-Also, a Pages site can be publicly reachable even when the source repository is private. The generated quality page therefore contains only non-sensitive build metadata.
-
-If Pages is unavailable on the account, CI remains the authoritative test system. Do not make this repository public merely to obtain a Pages status page without explicit user approval.
+If Pages is unavailable, CI remains the authoritative test system. Do not make this repository public merely to obtain a Pages status page without explicit user approval.
 
 ## K011 - Real provider integrations are not covered by unit tests yet
 
 The initial automated test suite intentionally avoids real Meta and Supabase credentials.
 
-Live Meta media download, Supabase Storage, database idempotency, and Vercel runtime behavior still require the documented end-to-end test.
+Live Meta media download, Supabase Storage, database idempotency, and complete Meta -> Vercel -> Supabase delivery still require the documented end-to-end test.
 
-## K012 - Dependency installs are now reproducible
+## K012 - Dependency installs are reproducible
 
 Resolved: `package-lock.json` is committed and CI/Pages workflows use `npm ci`.
 
