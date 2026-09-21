@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "test:integration": "node scripts/integration/run-whatsapp-e2e.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
