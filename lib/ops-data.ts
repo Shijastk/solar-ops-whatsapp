@@ -52,28 +52,6 @@ export async function listOpsMessages(limit = 100): Promise<OpsMessage[]> {
   return (data ?? []) as OpsMessage[];
 }
 
-async function countMessages(
-  configure?: (
-    query: ReturnType<ReturnType<typeof getSupabaseAdmin>["from"]>,
-  ) => unknown,
-): Promise<number> {
-  const supabase = getSupabaseAdmin();
-  let query = supabase
-    .from("whatsapp_messages")
-    .select("id", { count: "exact", head: true });
-
-  if (configure) {
-    query = configure(query) as typeof query;
-  }
-
-  const { count, error } = await query;
-  if (error) {
-    throw new Error(`Failed to count WhatsApp messages: ${error.message}`);
-  }
-
-  return count ?? 0;
-}
-
 export async function getOpsSummary(): Promise<OpsSummary> {
   const supabase = getSupabaseAdmin();
 
