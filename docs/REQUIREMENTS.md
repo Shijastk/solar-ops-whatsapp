@@ -122,6 +122,23 @@ The end user's intended action is simply forwarding a WhatsApp message/document.
 
 Untrusted webhook payloads and environment configuration should be validated at runtime.
 
+### N6 - Automated quality gate
+
+Every push and pull request must run automated checks for:
+
+- TypeScript type errors
+- ESLint errors
+- unit tests
+- Next.js production build
+
+A failed check must be visible in GitHub Actions. Do not claim a commit is healthy unless the relevant workflow actually passes.
+
+### N7 - GitHub Pages quality report
+
+When GitHub Pages is available for the repository/account, the project may publish a static quality-status page generated only after all automated checks pass.
+
+The Pages site is not the application runtime and must never contain secrets, customer documents, internal costs, environment values, or webhook payload data.
+
 ## Acceptance criteria for Milestone 1
 
 A successful end-to-end test is:
@@ -133,5 +150,6 @@ A successful end-to-end test is:
 5. The PDF appears in the private `whatsapp-media` bucket.
 6. The row contains the internal Storage path.
 7. Re-delivering the same webhook does not create a duplicate row.
+8. The repository quality workflow passes for the tested commit.
 
 Milestone 1 is not accepted until the full path is tested against the custom deployed webhook, not only Meta's built-in webhook viewer.
