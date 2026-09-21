@@ -118,7 +118,9 @@ The user has approved temporary media retention and the direction of extracting 
 
 Do not silently choose the invoice extraction schema. The exact fields that matter, correction flow, company-identification rules, and stock-in/out semantics remain business decisions that require explicit confirmation before OCR/parser output can mutate operational data.
 
-Do not add automatic stock mutation, dashboards, outbound WhatsApp messaging, billing, paid services, or customer portals unless explicitly approved.
+The user has explicitly approved an internal operational dashboard for verification. Do not turn it into a customer-facing portal or expose internal data publicly.
+
+Do not add automatic stock mutation, outbound WhatsApp messaging, billing, paid services, or customer portals unless explicitly approved.
 
 ## 10. Documentation maintenance
 
