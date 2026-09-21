@@ -25,3 +25,6 @@ yarn-error.log*
 
 # generated credentialed integration reports
 /artifacts/integration/
+
+# generated media retention reports
+/artifacts/media-retention/
