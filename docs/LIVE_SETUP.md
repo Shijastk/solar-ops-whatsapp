@@ -1,6 +1,6 @@
 # Live Setup Runbook
 
-Status: Vercel deployment, webhook verification, dashboard sample text persistence, security filters, and the full credentialed synthetic media path are verified. Real Meta-delivered inbound text/PDF callbacks remain pending.
+Status: Milestone 1 complete. Vercel deployment, webhook verification, app publishing, WABA subscription, real inbound text, real inbound PDF/document handling, security filters, private Storage, and credentialed provider integration are verified.
 
 This runbook intentionally separates account-level manual actions from code changes.
 
@@ -245,10 +245,12 @@ Verified credentialed integration:
 - byte-integrity verification -> PASS
 - Meta/Supabase cleanup -> PASS
 
-Still pending:
+Real inbound acceptance completed:
 
-- real inbound text delivered by Meta to the custom webhook
-- real inbound PDF/media delivered by Meta to the custom webhook
+- real WhatsApp text -> Meta -> Vercel -> Supabase: PASS
+- real WhatsApp PDF/document -> Meta -> Vercel -> private Supabase Storage + finalized database row: PASS
+
+Milestone 1 is accepted.
 
 ## Known temporary limitation
 

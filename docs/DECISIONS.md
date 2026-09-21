@@ -111,3 +111,17 @@ Decision: Serve the Solar Ops privacy policy from the same deployed application 
 Reason: Meta's publish flow requires a public privacy-policy URL, and hosting the policy on the existing Vercel application avoids a separate service or dependency.
 
 The policy must describe actual current behavior only. It must disclose the WhatsApp/Meta, Vercel, and Supabase processing path, avoid unsupported legal promises, and never include credentials or private operational data.
+
+
+## D016 - Publish the Meta app and subscribe it to the test WABA for final inbound acceptance
+
+Decision: Publish the Meta app and explicitly subscribe it to the Test WhatsApp Business Account before declaring Milestone 1 complete.
+
+Reason: Webhook configuration and synthetic provider tests did not prove that Meta itself would deliver real inbound callbacks.
+
+Observed result on 2026-09-21:
+
+- WABA subscription returned `{"success": true}`
+- a real inbound text was delivered to the custom webhook and stored
+- a real inbound PDF/document was delivered to the custom webhook and stored
+- therefore Milestone 1 acceptance is complete

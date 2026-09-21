@@ -59,15 +59,18 @@ Next.js webhook on Vercel
 
 ## Confirmed live Meta test
 
-The user successfully tested Meta's WhatsApp test environment on 2026-09-21.
+Milestone 1 live inbound capture was completed on 2026-09-21.
 
-Observed inbound webhook examples included:
+Verified real inbound path:
 
-- a text message with `type: "text"`
-- a PDF with `type: "document"`
-- document metadata including filename, MIME type, SHA-256, media ID, and temporary Meta URLs
+- the Meta app was published
+- the app was subscribed to the Test WhatsApp Business Account
+- a real WhatsApp text message reached the custom Vercel webhook and was stored
+- a real WhatsApp PDF/document reached the custom Vercel webhook
+- the document was processed with `storedCount: 1`
+- the ingestion code returns `stored` for media only after Meta download, private Supabase Storage upload, and database finalization succeed
 
-This confirms the basic Meta test-number inbound path works before this repository is connected as the custom webhook endpoint.
+The earlier credentialed synthetic provider suite also passed, including media byte-integrity and cleanup checks.
 
 ## Current technology direction
 
