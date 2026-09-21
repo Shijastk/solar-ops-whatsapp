@@ -95,10 +95,8 @@ The initial automated test suite intentionally avoids real Meta and Supabase cre
 
 Live Meta media download, Supabase Storage, database idempotency, and Vercel runtime behavior still require the documented end-to-end test.
 
-## K012 - No committed dependency lockfile yet
+## K012 - Dependency installs are now reproducible
 
-The repository currently uses `npm install` in CI because there is no committed `package-lock.json`.
+Resolved: `package-lock.json` is committed and CI/Pages workflows use `npm ci`.
 
-This means compatible dependency versions can move over time.
-
-Before treating the project as a stable production baseline, generate and commit a lockfile, then change CI to `npm ci` for reproducible installs.
+Any future dependency change must update both `package.json` and `package-lock.json`.
