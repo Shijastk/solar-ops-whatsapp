@@ -1,16 +1,22 @@
 # Known Issues and Open Concerns
 
-## K001 - Custom Meta -> Vercel -> Supabase path not yet complete
+## K001 - Custom Meta -> Vercel -> Supabase path partially proven
 
-The Meta custom webhook is now verified and Meta's dashboard test reaches the deployed Vercel POST endpoint.
+Verified on 2026-09-21:
 
-Current blocker:
+- Meta custom webhook GET verification succeeds.
+- Meta dashboard `messages` POST reaches Vercel.
+- A dashboard sample text is parsed and stored successfully in `public.whatsapp_messages`.
+- The user visually confirmed the Supabase row exists.
 
-- `MAX_MEDIA_BYTES` is empty/missing in Vercel.
-- Full runtime validation therefore reports ingestion configuration invalid.
-- Meta's `messages` dashboard test currently receives HTTP 503 from the webhook.
+Not yet proven:
 
-Do not call Milestone 1 complete until this value is corrected and the live Supabase write/media path is proven.
+- a real inbound WhatsApp text reaches the custom webhook while the Meta app is unpublished
+- live media download from Meta
+- private Storage upload
+- complete real PDF path
+
+Do not call Milestone 1 complete yet.
 
 ## K002 - Vercel deployment is established
 
@@ -24,22 +30,22 @@ Verified:
 - stable alias is `https://solar-ops-whatsapp.vercel.app`
 - Meta webhook GET verification reached the deployed route and returned HTTP 200
 - Meta dashboard POST test reached the deployed route
-- no platform/runtime routing failure is blocking access to the endpoint
+- runtime configuration is valid
 
-The current HTTP 503 is application configuration validation, not a Vercel routing failure.
+## K003 - Supabase database write is verified; media storage is not
 
-## K003 - Supabase credentials are present, but live writes are not yet verified
+Verified:
 
-The deployed runtime reports Supabase configuration fields as present.
+- `supabase/schema.sql` was applied by the user
+- `public.whatsapp_messages` exists
+- private `whatsapp-media` bucket was created by the user
+- Meta dashboard sample text was written to the table
 
-That does not yet prove:
+Still unverified:
 
-- `supabase/schema.sql` was applied exactly as expected
-- the `whatsapp-media` bucket is private and correctly named
-- the webhook can write rows
-- the webhook can upload media
-
-Those will be verified after the current environment validation blocker is fixed.
+- live Meta media retrieval
+- actual file upload into `whatsapp-media`
+- media `storage_path` update
 
 ## K004 - Meta access token lifecycle
 
@@ -78,15 +84,11 @@ Do not change this architecture without user approval because it introduces queu
 
 ## K008 - Media limits
 
-The intended prototype default maximum media size is 15 MiB.
-
-The current Vercel environment contains an empty/missing `MAX_MEDIA_BYTES` value, which is the active configuration blocker.
-
-Set it to:
+The prototype maximum media size is configured as 15 MiB:
 
 `15728640`
 
-This value is a project safety choice, not a claimed Meta platform limit.
+This is a project safety choice, not a claimed Meta platform limit.
 
 ## K009 - No OCR or inventory semantics
 
@@ -114,14 +116,25 @@ The repository is private. Private-repository Pages availability depends on the 
 
 If Pages is unavailable, CI remains the authoritative test system. Do not make this repository public merely to obtain a Pages status page without explicit user approval.
 
-## K011 - Real provider integrations are not covered by unit tests yet
+## K011 - Real provider integrations are not fully covered yet
 
 The initial automated test suite intentionally avoids real Meta and Supabase credentials.
 
-Live Meta media download, Supabase Storage, database idempotency, and complete Meta -> Vercel -> Supabase delivery still require the documented end-to-end test.
+The dashboard sample proves text persistence, but live Meta media download, Supabase Storage, database idempotency under retries, and a complete real Meta -> Vercel -> Supabase media delivery still require the documented end-to-end test.
 
 ## K012 - Dependency installs are reproducible
 
 Resolved: `package-lock.json` is committed and CI/Pages workflows use `npm ci`.
 
 Any future dependency change must update both `package.json` and `package-lock.json`.
+
+## K013 - Security filters temporarily disabled for Meta dashboard sample testing
+
+For the dashboard-only sample text test, the user temporarily removed:
+
+- `ALLOWED_WHATSAPP_SENDERS`
+- `WHATSAPP_PHONE_NUMBER_ID`
+
+This was necessary because Meta's dashboard sample values do not match the project's real test sender/destination values.
+
+Before any broader live testing or production use, restore both values and redeploy.
