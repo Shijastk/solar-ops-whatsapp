@@ -35,7 +35,16 @@ This proves the deployed text-ingestion database path for Meta's dashboard sampl
 
 The credentialed provider harness also passed on 2026-09-21 and verified the synthetic media path end to end: Meta media upload/retrieval/download -> signed document webhook -> deployed Vercel endpoint -> private Supabase Storage -> database Storage path -> byte-integrity check -> cleanup.
 
-Real inbound WhatsApp delivery from Meta to the custom callback remains pending and is the remaining Milestone 1 acceptance gap.
+Real inbound WhatsApp delivery from Meta to the custom callback is now verified.
+
+On 2026-09-21:
+
+- a real inbound text reached `POST /api/whatsapp` and logged `storedCount: 1`
+- a real inbound PDF/document reached `POST /api/whatsapp` and logged `messageTypes: ['document']`, `storedCount: 1`, and `ignoredCount: 0`
+
+Because `lib/ingest.ts` returns `stored` for media only after Meta media download, private Supabase Storage upload, and database finalization all succeed, the real PDF event verifies the complete Milestone 1 media path.
+
+Milestone 1 is accepted.
 
 ## Current modules
 
