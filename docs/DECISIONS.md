@@ -184,3 +184,31 @@ Decision: Add operator-triggered text replies from the protected UI using the in
 The backend derives recipient/context from stored rows, enforces the latest-inbound 24-hour service window, persists outbound state, and consumes delivery-status webhooks.
 
 Automatic replies and template messaging outside the service window are not part of this milestone.
+
+
+## D022 - Automatic Vercel deployments run only from main
+
+Decision: Automatic Vercel Git deployments are disabled for all branches except `main`.
+
+Implementation:
+
+`vercel.json` uses Vercel's documented `git.deploymentEnabled` branch rules:
+
+- `* = false`
+- `main = true`
+
+Vercel evaluates matching branch rules so the explicit `main = true` rule allows main while other branches remain disabled.
+
+Reason: During active development, many small feature-branch commits created Preview deployments and exhausted the Hobby build/deployment quota before the final production release.
+
+Release workflow:
+
+1. create a feature branch
+2. let GitHub Actions run typecheck, lint, unit tests, and production build
+3. open a pull request
+4. require PR CI to pass
+5. squash-merge to `main`
+6. let the single `main` push create the automatic Vercel production deployment
+7. verify health/runtime logs after the deployment reaches READY
+
+A Preview deployment may still be created manually when one is genuinely needed for UI/provider verification. It should not be created for every development commit.

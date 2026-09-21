@@ -178,3 +178,23 @@ Security:
 - if `OPS_ACCESS_KEY` is not configured, the prototype temporarily falls back to `WHATSAPP_VERIFY_TOKEN`
 
 For broader production or the future mobile app, replace the fallback with dedicated user authentication.
+
+
+## Deployment workflow
+
+Automatic Vercel Git deployments are intentionally limited to `main`.
+
+Normal change flow:
+
+```text
+feature branch
+  -> GitHub CI
+  -> pull request
+  -> PR CI PASS
+  -> squash merge
+  -> main
+  -> one Vercel production deployment
+  -> live health/log verification
+```
+
+Feature-branch commits still run GitHub Actions but do not automatically consume Vercel Preview deployment quota. Create a Preview deployment manually only when a browser/provider-level preview is specifically required.
