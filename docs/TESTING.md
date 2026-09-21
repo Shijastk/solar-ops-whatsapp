@@ -270,9 +270,13 @@ Use test documents that contain no sensitive customer information until the stor
 
 The credentialed synthetic provider path is verified.
 
-The remaining acceptance gap is:
+Real inbound acceptance completed on 2026-09-21.
 
-- a real inbound WhatsApp text delivered by Meta to the custom webhook
-- a real inbound WhatsApp PDF/document delivered by Meta to the custom webhook
+Observed Vercel runtime evidence:
 
-Real inbound delivery is still required before Milestone 1 can be declared complete, because the credentialed harness signs synthetic webhook payloads itself rather than relying on Meta to deliver the callback.
+- real inbound text: `POST /api/whatsapp 200`, one text message, `storedCount: 1`, `ignoredCount: 0`
+- real inbound document: `POST /api/whatsapp 200`, one document message, `storedCount: 1`, `ignoredCount: 0`
+
+The media ingestion implementation returns `stored` only after the Meta media download, private Supabase Storage upload, and database update have succeeded.
+
+Together with the previously successful credentialed integration suite for replay/idempotency, private-bucket verification, media upload/retrieval/download, Storage byte integrity, and cleanup, Milestone 1 is complete.
