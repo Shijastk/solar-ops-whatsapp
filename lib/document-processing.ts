@@ -105,7 +105,8 @@ export async function processPdfBytesForMessage(
     const extracted = await extractPdfText(bytes);
     const row = draftRow(messageId, extracted.text, extracted.pageCount);
     const items = row.items;
-    const { items: _items, ...persistedRow } = row;
+    const persistedRow = { ...row };
+    delete (persistedRow as Partial<typeof row>).items;
 
     const { data: savedDraft, error: draftError } = await supabase
       .from("document_drafts")
