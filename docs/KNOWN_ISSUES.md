@@ -32,9 +32,11 @@ Remaining concern: Meta currently lists the v26.0 expiration date as TBD.
 
 Before production rollout, or when Meta publishes an expiration date, re-check the official Meta version table and update code/docs only if needed.
 
-## K006 - No automated test suite yet
+## K006 - Automated quality workflow must still be observed
 
-The project currently documents manual test cases but does not yet contain unit/integration test files.
+Automated tests and CI are being added to the repository.
+
+Do not claim they pass until a real GitHub Actions run for the resulting commit completes successfully.
 
 ## K007 - Webhook acknowledgement behavior
 
@@ -63,3 +65,19 @@ There is no defined rule yet for:
 - who approves extracted data
 
 These decisions must be defined with the user before adding OCR/inventory automation.
+
+## K010 - GitHub Pages availability and visibility
+
+The repository is private.
+
+GitHub Pages for private repositories depends on the GitHub plan. GitHub's current documentation says private-repository Pages requires GitHub Pro, Team, Enterprise Cloud, or Enterprise Server.
+
+Also, a Pages site can be publicly reachable even when the source repository is private. Therefore the generated quality page is intentionally restricted to non-sensitive build metadata only.
+
+If Pages is unavailable on the account, CI remains the authoritative test system and the project must not be made public merely to obtain a status page without explicit user approval.
+
+## K011 - Real provider integrations are not covered by unit tests yet
+
+The initial automated test suite intentionally avoids real Meta and Supabase credentials.
+
+Live Meta media download, Supabase Storage, database idempotency, and Vercel runtime behavior still require the documented end-to-end test.
