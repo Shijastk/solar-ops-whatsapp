@@ -106,16 +106,30 @@ The workflow is `workflow_dispatch` only. It does not call WhatsApp's `/messages
 
 Generated reports are uploaded as workflow artifacts and are not published to GitHub Pages.
 
-Observed credentialed runs on 2026-09-21:
+Credentialed provider integration passed on 2026-09-21 after the system user was assigned to the Test WhatsApp Business Account.
 
-- the deployed health, webhook security checks, sender allowlist, destination Phone Number ID check, text persistence, text replay idempotency, and private bucket check all passed
-- the initial Meta media upload attempt returned HTTP 401 with the earlier token
-- after replacing it with a system-user token, Meta media upload advanced to HTTP 400
-- therefore the current blocker is specifically the Meta media upload request/account-asset path, not Vercel, Supabase text persistence, idempotency, or bucket privacy
+Verified in workflow run 35578308664 against commit `9d394bc6c28f9969b1d348bce0fb789788ef8283`:
 
-The harness now reports only redacted Meta Graph error type/code/subcode/message details so the next run can identify the 400 without exposing secrets or identifiers.
+- deployed health and security-filter presence
+- invalid HMAC rejection
+- signed empty webhook acceptance
+- sender allowlist rejection
+- destination Phone Number ID rejection
+- signed synthetic text -> Vercel -> Supabase
+- idempotent replay
+- private Supabase Storage bucket
+- synthetic PDF upload to Meta
+- Meta media metadata retrieval
+- direct Meta media download with SHA-256 round-trip verification
+- signed document webhook -> deployed Vercel endpoint
+- Meta media download by the webhook
+- private Supabase Storage persistence
+- stored-file SHA-256 integrity
+- cleanup of synthetic Supabase Storage, database, and Meta media fixtures
 
-A fully successful credentialed run is still pending.
+The report finished with Overall PASS.
+
+This still does not prove that Meta delivered a real inbound WhatsApp message to the custom callback. Real inbound delivery remains a separate acceptance test while the app is unpublished.
 
 ## GitHub Actions quality gate
 
@@ -254,17 +268,11 @@ Use test documents that contain no sensitive customer information until the stor
 
 ## Still requiring live evidence
 
-The following remain unverified until the credentialed workflow is actually configured and run successfully:
+The credentialed synthetic provider path is verified.
 
-- live Meta media upload/retrieve/download with the current account token
-- Supabase database idempotency through the deployed webhook
-- private Storage upload/download through the deployed webhook
-- sender allowlist and destination Phone Number ID behavior through the deployed endpoint
-- complete synthetic Meta media -> Vercel -> Supabase document path
-- cleanup behavior against the real provider accounts
+The remaining acceptance gap is:
 
-The following remains outside the synthetic harness even after it passes:
+- a real inbound WhatsApp text delivered by Meta to the custom webhook
+- a real inbound WhatsApp PDF/document delivered by Meta to the custom webhook
 
-- a real inbound WhatsApp message delivered by Meta to the custom webhook
-
-Real inbound delivery is still required before Milestone 1 can be declared complete.
+Real inbound delivery is still required before Milestone 1 can be declared complete, because the credentialed harness signs synthetic webhook payloads itself rather than relying on Meta to deliver the callback.
