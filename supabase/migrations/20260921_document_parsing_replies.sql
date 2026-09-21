@@ -88,6 +88,9 @@ create table if not exists public.whatsapp_outbound_messages (
 create index if not exists whatsapp_outbound_recipient_created_idx
   on public.whatsapp_outbound_messages (recipient_phone, created_at desc);
 
+create index if not exists whatsapp_outbound_reply_to_message_idx
+  on public.whatsapp_outbound_messages (reply_to_message_id);
+
 alter table public.document_drafts enable row level security;
 alter table public.document_items enable row level security;
 alter table public.whatsapp_outbound_messages enable row level security;
