@@ -47,7 +47,7 @@ WHATSAPP_VERIFY_TOKEN=<create-a-long-random-value>
 WHATSAPP_ACCESS_TOKEN=<meta-token>
 WHATSAPP_PHONE_NUMBER_ID=<meta-test-number-id>
 META_APP_SECRET=<Meta App Settings -> Basic -> App Secret>
-META_GRAPH_API_VERSION=v23.0
+META_GRAPH_API_VERSION=v26.0
 
 ALLOWED_WHATSAPP_SENDERS=<your-number-digits-only>
 
@@ -56,6 +56,8 @@ SUPABASE_SECRET_KEY=<server-side-secret>
 SUPABASE_STORAGE_BUCKET=whatsapp-media
 MAX_MEDIA_BYTES=15728640
 ```
+
+Meta Graph API is intentionally pinned to `v26.0` for this prototype based on the Meta version table verified on 2026-09-21. Re-check the version before production rollout or when Meta publishes an expiration date for v26.0.
 
 For the test sender, use digits only, for example:
 
