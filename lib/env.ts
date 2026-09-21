@@ -37,17 +37,52 @@ export function getIngestionEnv() {
   };
 }
 
+function invalidFieldNames(error: z.ZodError): string[] {
+  return Array.from(
+    new Set(
+      error.issues
+        .map((issue) => issue.path[0])
+        .filter((field): field is string => typeof field === "string"),
+    ),
+  ).sort();
+}
+
 export function getHealthConfiguration() {
-  const required = [
+  const presenceKeys = [
     "WHATSAPP_VERIFY_TOKEN",
     "META_APP_SECRET",
     "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_PHONE_NUMBER_ID",
+    "META_GRAPH_API_VERSION",
+    "ALLOWED_WHATSAPP_SENDERS",
     "SUPABASE_URL",
     "SUPABASE_SECRET_KEY",
     "SUPABASE_STORAGE_BUCKET",
+    "MAX_MEDIA_BYTES",
   ] as const;
 
-  return Object.fromEntries(
-    required.map((key) => [key, Boolean(process.env[key]?.trim())]),
+  const presence = Object.fromEntries(
+    presenceKeys.map((key) => [key, Boolean(process.env[key]?.trim())]),
   );
+
+  const webhookValidation = webhookEnvSchema.safeParse(process.env);
+  const ingestionValidation = ingestionEnvSchema.safeParse(process.env);
+
+  const invalidFields = [
+    ...(webhookValidation.success
+      ? []
+      : invalidFieldNames(webhookValidation.error)),
+    ...(ingestionValidation.success
+      ? []
+      : invalidFieldNames(ingestionValidation.error)),
+  ];
+
+  return {
+    presence,
+    validation: {
+      webhook: webhookValidation.success,
+      ingestion: ingestionValidation.success,
+      invalidFields: Array.from(new Set(invalidFields)).sort(),
+    },
+  };
 }
