@@ -186,36 +186,32 @@ It is not equivalent to a real inbound WhatsApp message through the custom webho
 
 ### E2. Real inbound text
 
-Pending.
+Verified on 2026-09-21.
 
-Expected:
+Observed:
 
-- one row in `public.whatsapp_messages`
-- `message_type = text`
-- text body stored
-- `processing_status = stored`
+- real Meta callback reached the deployed webhook
+- one text message was accepted
+- `storedCount = 1`
+- the database row was persisted
 
 ### E3. PDF/media
 
-Pending.
+Verified on 2026-09-21.
 
-Expected:
+Observed:
 
-- one new database row
+- a real PDF/document callback reached the deployed webhook
 - `message_type = document`
-- original filename when Meta supplies it
-- `processing_status = stored`
-- non-null internal `storage_path`
-
-Expected in Storage:
-
-- the PDF exists inside private bucket `whatsapp-media`
+- `storedCount = 1`
+- the database row has a non-null internal `storage_path`
+- Supabase inspection confirms the private bucket contains the stored object
 
 ### E4. Duplicate behavior
 
-Pending.
+Verified by the credentialed provider integration suite.
 
-The same WhatsApp message ID must not create a second row if Meta retries the event.
+The same WhatsApp message ID does not create a second row when the event is replayed.
 
 ## Phase G - Evidence before declaring success
 
