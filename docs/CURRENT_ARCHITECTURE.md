@@ -105,6 +105,15 @@ Responsibilities:
 - report whether required environment variables are configured
 - never return actual secret values
 
+### `app/privacy/page.tsx`
+
+Responsibilities:
+
+- provide the public Solar Ops privacy policy required for Meta app publishing
+- explain the inbound WhatsApp data flow and current receive-only scope
+- disclose Meta, Vercel, and Supabase as service providers
+- describe retention, security, sharing, and data-request handling without exposing secrets
+
 ### `scripts/integration/helpers.mjs`
 
 Responsibilities:
@@ -170,9 +179,7 @@ Expected bucket:
 
 The bucket was created as private by the user during live setup.
 
-A real media upload into the bucket has not yet been verified.
-
-A credentialed synthetic-media harness is now implemented to verify this path without disabling the production security filters. It is not considered evidence until an actual credentialed run succeeds.
+The credentialed synthetic-media harness has verified upload/download through the private bucket, including SHA-256 byte-integrity checks and cleanup. A real Meta-delivered inbound PDF remains the final media acceptance test.
 
 Current path strategy is approximately:
 
