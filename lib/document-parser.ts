@@ -15,15 +15,26 @@ export type ParsedOperationalDocument = {
   documentType: string | null;
   supplierName: string | null;
   supplierGstin: string | null;
+  supplierAddress: string | null;
   documentNumber: string | null;
   documentDate: string | null;
   ewayBillNumber: string | null;
-  customerName: string | null;
-  customerAddress: string | null;
-  customerPincode: string | null;
-  customerPhone: string | null;
+  consigneeName: string | null;
+  consigneeAddress: string | null;
+  consigneeGstin: string | null;
+  consigneePincode: string | null;
+  consigneePhone: string | null;
+  buyerName: string | null;
+  buyerAddress: string | null;
+  buyerGstin: string | null;
+  buyerPincode: string | null;
+  buyerPhone: string | null;
   destination: string | null;
+  dispatchFromAddress: string | null;
   vehicleNumber: string | null;
+  approximateDistanceKm: number | null;
+  ewayGeneratedAtText: string | null;
+  ewayValidUntilText: string | null;
   supplyType: string | null;
   transactionType: string | null;
   taxableAmount: number | null;
@@ -145,42 +156,60 @@ function blockBetween(text: string, start: RegExp, end: RegExp): string[] {
   return match[1].split("\n").map(cleanLine).filter(Boolean);
 }
 
-function parseCustomer(text: string) {
-  let block = blockBetween(
-    text,
-    /Consignee\s*\(Ship to\)\s*/,
-    /Buyer\s*\(Bill to\)/,
-  );
+function parsePhone(text: string): string | null {
+  return firstMatch(text, [
+    /\b(?:Phone|Mobile|Mob|Contact)\s*(?:No\.?|Number)?\s*[:.-]\s*(\+?\d[\d ()-]{7,18})/i,
+  ]);
+}
 
-  if (block.length === 0) {
-    block = blockBetween(
-      text,
-      /(?:^|\n)Ship To\s*/,
-      /(?:^|\n)3\.\s*Goods Details/,
-    );
-  }
-
-  const name = block[0] ?? null;
-  const addressLines = block.slice(1).filter(
+function partyFromLines(lines: string[]) {
+  const normalized = lines.map(cleanLine).filter(Boolean);
+  const name = normalized[0] ?? null;
+  const gstin = normalized
+    .map((line) => line.match(/GSTIN(?:\/UIN)?\s*:\s*([A-Z0-9]{15})/i)?.[1])
+    .find(Boolean) ?? null;
+  const contentLines = normalized.slice(1).filter(
     (line) =>
       !/^State Name\s*:/i.test(line) &&
-      !/^GSTIN\s*:/i.test(line) &&
+      !/^GSTIN(?:\/UIN)?\s*:/i.test(line) &&
       !/^Kerala$/i.test(line),
   );
-  const address = addressLines.length > 0 ? addressLines.join(", ") : null;
+  const address = contentLines.length > 0 ? contentLines.join(", ") : null;
 
   return {
     name,
     address,
-    pincode:
-      address?.match(/\b([1-9][0-9]{5})\b/)?.[1] ??
-      firstMatch(text, [
-        /\b(?:PIN|Pincode|Postal Code)\s*[:.-]?\s*([1-9][0-9]{5})\b/i,
-      ]),
-    phone: firstMatch(text, [
-      /\b(?:Phone|Mobile|Mob|Contact)\s*(?:No\.?|Number)?\s*[:.-]\s*(\+?\d[\d ()-]{7,18})/i,
-    ]),
+    gstin: gstin?.toUpperCase() ?? null,
+    pincode: address?.match(/\b([1-9][0-9]{5})\b/)?.[1] ?? null,
+    phone: parsePhone(normalized.join("\n")),
   };
+}
+
+function parseParties(text: string) {
+  const consigneeLines = blockBetween(
+    text,
+    /Consignee\s*\(Ship to\)\s*/,
+    /Buyer\s*\(Bill to\)/,
+  );
+  const buyerLines = blockBetween(
+    text,
+    /Buyer\s*\(Bill to\)\s*/,
+    /Delivery Note No\.|Invoice No\.|Bill No\.|Doc No\./,
+  );
+
+  let consignee = partyFromLines(consigneeLines);
+  const buyer = partyFromLines(buyerLines);
+
+  if (!consignee.name) {
+    const shipToLines = blockBetween(
+      text,
+      /(?:^|\n)Ship To\s*/,
+      /(?:^|\n)3\.\s*Goods Details/,
+    );
+    consignee = partyFromLines(shipToLines);
+  }
+
+  return { consignee, buyer };
 }
 
 function parseSupplier(text: string) {
@@ -188,9 +217,15 @@ function parseSupplier(text: string) {
     /(?:^|\n)From\s*\n([^\n]+)\nGSTIN\s*:\s*([A-Z0-9]{15})/i,
   );
   if (fromBlock) {
+    const addressLines = blockBetween(
+      text,
+      /(?:^|\n)From\s*\n[^\n]+\nGSTIN\s*:\s*[A-Z0-9]{15}\s*/,
+      /(?:^|\n)Dispatch From/,
+    );
     return {
       name: cleanLine(fromBlock[1]),
       gstin: fromBlock[2].toUpperCase(),
+      address: addressLines.length > 0 ? addressLines.join(", ") : null,
     };
   }
 
@@ -198,9 +233,19 @@ function parseSupplier(text: string) {
     /(?:DELIVERY NOTE|DELIVERY CHALLAN|TAX INVOICE|INVOICE)[^\n]*\n([^\n]+)[\s\S]{0,500}?GSTIN(?:\/UIN)?\s*:\s*([A-Z0-9]{15})/i,
   );
 
+  const headerLines = text.split("\n").slice(1, 12).map(cleanLine);
+  const gstinIndex = headerLines.findIndex((line) =>
+    /GSTIN(?:\/UIN)?\s*:/i.test(line),
+  );
+  const address =
+    gstinIndex > 1
+      ? headerLines.slice(1, gstinIndex).join(", ")
+      : null;
+
   return {
     name: firstPage?.[1] ? cleanLine(firstPage[1]) : null,
     gstin: firstPage?.[2]?.toUpperCase() ?? null,
+    address,
   };
 }
 
@@ -363,15 +408,26 @@ export function parseOperationalDocumentText(
       documentType: null,
       supplierName: null,
       supplierGstin: null,
+      supplierAddress: null,
       documentNumber: null,
       documentDate: null,
       ewayBillNumber: null,
-      customerName: null,
-      customerAddress: null,
-      customerPincode: null,
-      customerPhone: null,
+      consigneeName: null,
+      consigneeAddress: null,
+      consigneeGstin: null,
+      consigneePincode: null,
+      consigneePhone: null,
+      buyerName: null,
+      buyerAddress: null,
+      buyerGstin: null,
+      buyerPincode: null,
+      buyerPhone: null,
       destination: null,
+      dispatchFromAddress: null,
       vehicleNumber: null,
+      approximateDistanceKm: null,
+      ewayGeneratedAtText: null,
+      ewayValidUntilText: null,
       supplyType: null,
       transactionType: null,
       taxableAmount: null,
@@ -384,7 +440,7 @@ export function parseOperationalDocumentText(
   }
 
   const supplier = parseSupplier(text);
-  const customer = parseCustomer(text);
+  const parties = parseParties(text);
   const items = parseItems(text);
 
   const parsed = {
@@ -393,17 +449,44 @@ export function parseOperationalDocumentText(
     documentType: parseDocumentType(text),
     supplierName: supplier.name,
     supplierGstin: supplier.gstin,
+    supplierAddress: supplier.address,
     documentNumber: parseDocumentNumber(text),
     documentDate: parseDateFromText(text),
     ewayBillNumber: parseEwayNumber(text),
-    customerName: customer.name,
-    customerAddress: customer.address,
-    customerPincode: customer.pincode,
-    customerPhone: customer.phone,
+    consigneeName: parties.consignee.name,
+    consigneeAddress: parties.consignee.address,
+    consigneeGstin: parties.consignee.gstin,
+    consigneePincode: parties.consignee.pincode,
+    consigneePhone: parties.consignee.phone,
+    buyerName: parties.buyer.name,
+    buyerAddress: parties.buyer.address,
+    buyerGstin: parties.buyer.gstin,
+    buyerPincode: parties.buyer.pincode,
+    buyerPhone: parties.buyer.phone,
     destination: parseLabelValue(text, "Destination"),
+    dispatchFromAddress: (() => {
+      const lines = blockBetween(
+        text,
+        /(?:^|\n)Dispatch From\s*/,
+        /(?:^|\n)To\s*/,
+      );
+      return lines.length > 0 ? lines.join(", ") : null;
+    })(),
     vehicleNumber: firstMatch(text, [
       /Vehicle No\.\s*:\s*([A-Z0-9-]{5,20})/i,
       /Vehicle Number\s*:\s*([A-Z0-9-]{5,20})/i,
+    ]),
+    approximateDistanceKm: (() => {
+      const value = firstMatch(text, [
+        /Approx Distance\s*:\s*(\d+)\s*KM/i,
+      ]);
+      return value ? Number(value) : null;
+    })(),
+    ewayGeneratedAtText: firstMatch(text, [
+      /Generated Date\s*:\s*(.+?)(?=\s+Generated By\s*:|\n|$)/i,
+    ]),
+    ewayValidUntilText: firstMatch(text, [
+      /Valid Upto\s*:\s*([^\n]+)/i,
     ]),
     supplyType: firstMatch(text, [
       /Supply Type\s*:\s*(.+?)(?=\s+Transaction Type\s*:|\n|$)/i,
@@ -435,7 +518,7 @@ export function parseOperationalDocumentText(
     ["supplier_name", parsed.supplierName],
     ["document_number", parsed.documentNumber],
     ["document_date", parsed.documentDate],
-    ["customer_name", parsed.customerName],
+    ["consignee_name", parsed.consigneeName],
     ["items", parsed.items.length > 0 ? parsed.items : null],
   ];
 
