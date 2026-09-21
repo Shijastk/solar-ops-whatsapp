@@ -1,6 +1,6 @@
 # Live Setup Runbook
 
-Status: Vercel deployment, webhook verification, and Meta dashboard sample text -> Supabase database write verified. Real inbound text and media storage remain pending.
+Status: Vercel deployment, webhook verification, and Meta dashboard sample text -> Supabase database write verified. Security filters are restored. A manual credentialed media integration harness is implemented; its first credentialed run and real inbound delivery remain pending.
 
 This runbook intentionally separates account-level manual actions from code changes.
 
@@ -145,7 +145,29 @@ Verified:
 - `messages` webhook field is subscribed.
 - Meta dashboard `messages` test reaches the custom POST endpoint.
 
-## Phase E - End-to-end test
+## Phase E - Controlled credentialed integration
+
+Before a real inbound test, the repository can run a synthetic provider-level integration without disabling security filters.
+
+Setup and workflow:
+
+`docs/INTEGRATION_TESTING.md`
+
+The manual GitHub Actions workflow checks:
+
+- health and security-filter presence
+- invalid signature rejection
+- sender allowlist enforcement
+- destination Phone Number ID enforcement
+- text persistence and idempotency
+- Meta media upload/retrieve/download
+- private Supabase Storage
+- document ingestion and byte integrity
+- fixture cleanup
+
+This suite does not send a WhatsApp message to a person and does not replace the final real-inbound acceptance test.
+
+## Phase F - Real end-to-end test
 
 ### E1. Dashboard sample text
 
@@ -195,7 +217,7 @@ Pending.
 
 The same WhatsApp message ID must not create a second row if Meta retries the event.
 
-## Phase F - Evidence before declaring success
+## Phase G - Evidence before declaring success
 
 Milestone 1 is complete only when all of these are true:
 
@@ -212,11 +234,13 @@ Verified now:
 - CI/deployment/health
 - custom webhook verification
 - dashboard sample text persisted into Supabase
+- sender allowlist and destination Phone Number ID restored and present in live health
 
 Still pending:
 
+- first successful credentialed integration workflow/report
 - real inbound text on the custom webhook
-- real PDF/media download and private Storage upload
+- real inbound PDF/media delivery from Meta
 
 ## Known temporary limitation
 
