@@ -261,3 +261,54 @@ Responsibilities:
 The workflow is scheduled for 21:00 UTC daily. GitHub scheduling may be delayed, so the 24-hour value is a cutoff target rather than a guaranteed exact deletion time.
 
 The database schema is unchanged. After successful deletion, the existing message row remains and only `storage_path` is cleared. The extraction schema for essential invoice data is intentionally not yet defined.
+
+
+## Internal operations dashboard
+
+A mobile-first internal verification UI is implemented at:
+
+`/ops`
+
+### Authentication
+
+`lib/ops-auth.ts` provides:
+
+- timing-safe access-key comparison
+- optional dedicated `OPS_ACCESS_KEY`
+- temporary fallback to `WHATSAPP_VERIFY_TOKEN` when no dedicated dashboard key is configured
+- HMAC-signed, expiring session cookies using the existing server-side Meta app secret
+- HttpOnly + SameSite=Strict cookie settings
+- same-origin validation for state-changing POST requests
+
+No Supabase secret or Meta access token is sent to the browser.
+
+### Data access
+
+`lib/ops-data.ts` performs server-only reads through the existing Supabase admin client and validates returned row shapes with Zod.
+
+The dashboard renders the latest accepted messages, high-level counts, masked sender references, processing state, file availability, and approximate 24-hour cleanup eligibility.
+
+### File preview
+
+`GET /api/ops/media/[id]`:
+
+- requires a valid operations session
+- validates the message id
+- resolves the current private Storage path
+- creates a 5-minute Supabase signed URL server-side
+- redirects the authenticated browser to that temporary URL
+
+The bucket remains private.
+
+### Manual deletion
+
+`POST /api/ops/media/[id]/delete`:
+
+- requires a valid operations session
+- requires same-origin POST
+- allows deletion only for successfully stored media
+- removes the Storage object first
+- clears `storage_path` only after Storage deletion succeeds
+- preserves the WhatsApp message row and metadata
+
+This web dashboard is internal only. It is not a customer portal.
