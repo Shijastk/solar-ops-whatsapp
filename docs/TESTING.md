@@ -295,3 +295,26 @@ Automated tests cover:
 - failure reporting when database finalization fails
 
 The scheduled provider cleanup itself uses real Supabase credentials and must not be described as observed live until a scheduled or manual maintenance run has completed successfully.
+
+
+## Operations dashboard tests
+
+Automated tests now cover:
+
+- operations access-key validation
+- dedicated-key precedence over the temporary fallback
+- signed session creation
+- session expiry rejection
+- session tamper rejection
+
+The production build also verifies the dashboard and operations API routes compile under the current Next.js version.
+
+Live Supabase inspection on 2026-09-21 confirmed:
+
+- 3 accepted message rows currently exist
+- 1 document row is stored
+- that document row has a non-null Storage path
+- the private `whatsapp-media` bucket currently contains 1 object
+- the bucket is confirmed private
+
+The authenticated browser preview itself still requires a user login interaction; do not claim a human-visible preview was observed until it is opened successfully through `/ops`.
