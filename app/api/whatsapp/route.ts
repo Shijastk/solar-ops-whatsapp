@@ -84,9 +84,22 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof ZodError) {
-      console.error("WhatsApp environment configuration is invalid");
+      const invalidFields = Array.from(
+        new Set(
+          error.issues
+            .map((issue) => issue.path[0])
+            .filter((field): field is string => typeof field === "string"),
+        ),
+      ).sort();
+
+      console.error("WhatsApp environment configuration is invalid", {
+        invalidFields,
+      });
       return Response.json(
-        { error: "Webhook is not fully configured" },
+        {
+          error: "Webhook is not fully configured",
+          invalidFields,
+        },
         { status: 503 },
       );
     }
