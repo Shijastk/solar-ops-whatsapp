@@ -8,7 +8,15 @@ Meta's built-in test environment has already demonstrated:
 - inbound PDF/document
 - Meta displaying the webhook payload in its test viewer
 
-The custom repository webhook has not yet been proven end-to-end against Vercel + Supabase.
+The custom repository webhook has now been reached successfully by Meta.
+
+Verified custom webhook events so far:
+
+- Meta GET verification returned HTTP 200.
+- Meta dashboard `messages` test reached `POST /api/whatsapp`.
+- That POST currently returns HTTP 503 because the deployed ingestion environment is invalid: `MAX_MEDIA_BYTES` is empty/missing in Vercel.
+
+The complete Meta -> Vercel -> Supabase data path is therefore not yet accepted.
 
 Automated repository tests and GitHub Actions quality gates are active. A workflow must be observed passing before it is described as successful.
 
@@ -40,7 +48,7 @@ It must not contain:
 
 The test runner is Vitest in Node environment.
 
-Initial automated coverage focuses on deterministic boundaries that can be tested without real provider credentials:
+Automated coverage includes:
 
 - Meta webhook HMAC signature verification
 - WhatsApp text payload normalization
@@ -50,6 +58,8 @@ Initial automated coverage focuses on deterministic boundaries that can be teste
 - webhook POST rejection for invalid signatures
 - invalid JSON behavior after a valid signature
 - Meta Graph API default configuration
+- full runtime environment validation
+- safe reporting of invalid environment field names without exposing values
 
 External Meta/Supabase calls are not treated as proven by unit tests.
 
@@ -102,7 +112,12 @@ Expected after environment configuration:
 - HTTP 200
 - `ok: true`
 - `configured: true`
+- `configuration.validation.webhook = true`
+- `configuration.validation.ingestion = true`
+- `configuration.validation.invalidFields = []`
 - no secret values returned
+
+If a configuration value is invalid, the endpoint may return HTTP 503 and only the affected environment variable names under `invalidFields`.
 
 ### Test B - Meta verification
 
@@ -183,7 +198,6 @@ The following cannot be honestly proven by the initial unit suite alone:
 - Meta media download against the live Graph API
 - sender allowlist behavior through a complete live webhook request
 - media-size rejection against a real download
-- Vercel runtime behavior
 - complete Meta -> Vercel -> Supabase delivery
 
 These are covered by the manual end-to-end milestone test until a safe credentialed integration-test environment is approved.
