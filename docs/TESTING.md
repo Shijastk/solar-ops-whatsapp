@@ -318,3 +318,21 @@ Live Supabase inspection on 2026-09-21 confirmed:
 - the bucket is confirmed private
 
 The authenticated browser preview itself still requires a user login interaction; do not claim a human-visible preview was observed until it is opened successfully through `/ops`.
+
+
+## Structured parsing and chat tests
+
+Automated coverage now includes:
+
+- generated-PDF selectable text extraction
+- generic anchor-based document parsing
+- product description / HSN / quantity / unit / rate / amount parsing
+- date and product normalization
+- weak text layer -> `needs_ocr`
+- no phone-number invention from unrelated document numbers
+- WhatsApp status webhook normalization
+- 24-hour manual-reply window boundary
+- Meta text-reply request body with reply context
+- all existing webhook/signature/ingestion regressions
+
+Repository fixtures use synthetic names and identifiers. Real customer PDFs are not committed as tests.
