@@ -114,13 +114,17 @@ verify current official documentation or clearly mark the item as unverified.
 
 Milestone 1 inbound capture is complete.
 
-The user has approved temporary media retention and the direction of extracting only useful business data from documents. The current implementation may add safe media-retention infrastructure.
+The user has approved temporary media retention, structured PDF parsing, the internal operations dashboard, and manual operator-triggered WhatsApp text replies.
 
-Do not silently choose the invoice extraction schema. The exact fields that matter, correction flow, company-identification rules, and stock-in/out semantics remain business decisions that require explicit confirmation before OCR/parser output can mutate operational data.
+Parser output is a review draft. Extract only values supported by the document; missing fields remain null. Never infer a phone number, destination, quantity, or other business fact from unrelated digits/text.
 
-The user has explicitly approved an internal operational dashboard for verification. Do not turn it into a customer-facing portal or expose internal data publicly.
+A complete draft may be marked approved, but approval must not mutate stock until stock IN/OUT, opening-balance, returns, and correction rules are explicitly defined.
 
-Do not add automatic stock mutation, outbound WhatsApp messaging, billing, paid services, or customer portals unless explicitly approved.
+Manual WhatsApp replies may be sent only from the protected internal UI and only while the latest inbound message keeps Meta's 24-hour customer-service window open. Automatic replies and template messaging remain out of scope.
+
+Do not turn the internal dashboard into a customer-facing portal or expose internal data publicly.
+
+Do not add automatic stock mutation, billing, paid services, or customer portals unless explicitly approved.
 
 ## 10. Documentation maintenance
 
