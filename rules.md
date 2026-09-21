@@ -6,13 +6,17 @@ The repository is the source of truth for code.
 
 The documentation under `docs/` is the source of truth for intended behavior.
 
-If code and documentation disagree, do not guess which one is correct. Identify the mismatch and ask the user before making a behavior-changing decision.
+Automated tests are executable checks for selected requirements, not a replacement for requirements or live provider integration testing.
+
+If code, tests, and documentation disagree, do not guess which one is correct. Identify the mismatch and ask the user before making a behavior-changing decision.
 
 ## 2. No hallucinated codebase
 
-Never claim a file, function, endpoint, table, field, integration, test, or deployment exists without reading/verifying it.
+Never claim a file, function, endpoint, table, field, integration, test, deployment, or workflow result exists without reading/verifying it.
 
 Before discussing how an implementation currently works, inspect the relevant file.
+
+Before claiming code is healthy, inspect the actual CI result for the relevant commit when CI is available.
 
 ## 3. Ask when uncertain
 
@@ -63,6 +67,7 @@ Avoid:
 - Do not store temporary Meta download URLs as permanent file URLs.
 - Keep sender allowlisting available for the prototype.
 - Do not log secret values.
+- Never put real webhook payloads, phone numbers, customer documents, or credentials on GitHub Pages.
 
 ## 6. Data integrity
 
@@ -71,7 +76,27 @@ Avoid:
 - Media download/storage failure must be visible as a failed processing state.
 - Do not automatically mutate future stock data from unverified OCR output.
 
-## 7. External APIs
+## 7. Testing discipline
+
+Every behavior change must be considered for automated regression coverage.
+
+The CI quality gate must run:
+
+- TypeScript typecheck
+- ESLint
+- unit tests
+- Next.js production build
+
+Do not:
+
+- claim tests passed without observing a successful run
+- delete/skip tests just to silence a failure
+- treat a GitHub Pages deployment as a backend integration test
+- treat mocked/unit tests as proof that Meta, Vercel, or Supabase are configured correctly
+
+Live provider behavior requires the documented end-to-end test.
+
+## 8. External APIs
 
 Provider behavior changes.
 
@@ -81,15 +106,16 @@ Before introducing or changing:
 - Meta webhook fields
 - Supabase key conventions
 - Vercel runtime assumptions
+- GitHub Pages/Actions behavior
 
 verify current official documentation or clearly mark the item as unverified.
 
-## 8. Scope control
+## 9. Scope control
 
 Milestone 1 is inbound capture only.
 
 Do not add OCR, stock logic, dashboards, outbound WhatsApp messaging, billing, or customer portals unless the user explicitly approves the next milestone.
 
-## 9. Documentation maintenance
+## 10. Documentation maintenance
 
-Whenever a change affects architecture, schema, requirements, environment variables, deployment, or an important decision, update the matching docs in the same change.
+Whenever a change affects architecture, schema, requirements, environment variables, deployment, testing, or an important decision, update the matching docs in the same change.
