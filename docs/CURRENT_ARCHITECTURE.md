@@ -188,7 +188,7 @@ Expected bucket:
 
 The bucket was created as private by the user during live setup.
 
-The credentialed synthetic-media harness has verified upload/download through the private bucket, including SHA-256 byte-integrity checks and cleanup. A real Meta-delivered inbound PDF remains the final media acceptance test.
+The credentialed synthetic-media harness has verified upload/download through the private bucket, including SHA-256 byte-integrity checks and cleanup. A real Meta-delivered inbound PDF has also been verified through the deployed webhook.
 
 Current path strategy is approximately:
 
