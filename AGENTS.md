@@ -43,7 +43,7 @@ When uncertain, stop and state the exact concern to the user before implementing
 - Avoid unnecessary abstractions.
 - Avoid adding dependencies unless they remove substantial complexity.
 - Keep external provider code behind small modules.
-- Update documentation whenever architecture, schema, environment variables, or decisions change.
+- Update documentation whenever architecture, schema, environment variables, testing strategy, or decisions change.
 - Never commit real credentials, phone numbers, access tokens, app secrets, or Supabase secret keys.
 - Do not expose server-only secrets to client components.
 
@@ -65,13 +65,29 @@ Not part of Milestone 1 unless the user explicitly approves it:
 - paid automation services
 - production phone number migration
 
+## Testing rule
+
+Automated tests are part of the source of truth for expected code behavior, but a test file existing does not prove the code is healthy.
+
+For every code change:
+
+1. Read the relevant existing tests before editing implementation.
+2. Add or update tests when behavior changes.
+3. Run or observe the actual CI quality gate.
+4. Do not claim success if CI is pending, skipped, or failing.
+5. Do not weaken/delete a failing test simply to make CI green unless the requirement itself was intentionally changed and documented.
+
+GitHub Pages is only a static quality-report surface. It does not prove the server-side WhatsApp runtime works.
+
 ## Definition of done for a change
 
 A change is not complete until:
 
 1. The current repository state was inspected.
 2. The implementation matches `docs/REQUIREMENTS.md`.
-3. Relevant docs are updated.
-4. Typecheck, lint, and build are expected to pass; when execution is available, run them.
-5. No secrets were committed.
-6. Any uncertainty or unverified provider assumption is explicitly documented.
+3. Relevant tests were added or updated when behavior changed.
+4. Relevant docs are updated.
+5. Typecheck, lint, unit tests, and production build pass in the actual CI quality gate when CI is available.
+6. No secrets were committed.
+7. Any uncertainty or unverified provider assumption is explicitly documented.
+8. Provider-dependent behavior is not described as end-to-end verified until the documented live integration test is performed.
