@@ -276,3 +276,48 @@ The dashboard should show, without exposing secrets:
 ### N10 - Mobile-first web UI
 
 The verification dashboard must be usable on a phone-sized viewport so the same information architecture can later inform the mobile app.
+
+
+## Milestone 2C - Structured document parsing and manual chat
+
+Status: implemented in source; provider/live validation follows the normal quality and deployment gates.
+
+### R22 - PDF text extraction
+
+For inbound PDF documents, extract the existing PDF text layer without depending on one exact visual template. Apply bounded page, text, image-allocation, and timeout limits.
+
+Retain the bounded extracted text with the structured draft so the document can be reviewed or reparsed after the raw PDF is deleted.
+
+If no usable text layer exists, mark the draft `needs_ocr`; never invent values.
+
+### R23 - Structured review draft
+
+Use labels, document semantics, and reconstructed text lines rather than fixed page coordinates.
+
+Structured fields may include document/supplier/e-Way data, consignee and buyer details, dispatch/vehicle details, totals, and product description/HSN/quantity/unit/rate/amount. Missing fields remain null and are surfaced for review.
+
+### R24 - Review before stock
+
+Parser output is saved as a draft. Only a complete parser draft may be marked `approved`.
+
+Approval is a data-review state only. It must not change stock/current stock until stock-direction and opening-balance rules are explicitly approved.
+
+### R25 - WhatsApp-style internal UI
+
+The protected `/ops` surface should present inbound and outbound messages as a chat while keeping bill parse/review controls inside document messages.
+
+### R26 - Manual text replies
+
+An authenticated operator may manually send a text reply from the internal UI.
+
+The recipient and reply-context message ID are derived server-side from the stored inbound message. Free-form replies are blocked when the latest inbound message from that WhatsApp user is older than 24 hours.
+
+No template-message path is implemented in this milestone.
+
+### R27 - Outbound status tracking
+
+Persist outbound messages and update them from Meta status webhooks. Supported states are queued, sent, delivered, read, failed, and deleted. Older callbacks must not overwrite a newer status timestamp.
+
+### N11 - No extra paid parsing provider
+
+Selectable-text PDF parsing is local/server-side. No OCR or LLM provider is introduced for this phase.
