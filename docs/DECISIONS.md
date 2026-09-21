@@ -102,3 +102,12 @@ Safety constraints:
 - cleanup is mandatory in the GitHub workflow
 - reports are redacted artifacts and are never published to Pages
 - a real inbound WhatsApp delivery remains a separate acceptance test
+
+
+## D015 - Publish a first-party privacy policy on the application domain
+
+Decision: Serve the Solar Ops privacy policy from the same deployed application at `/privacy`.
+
+Reason: Meta's publish flow requires a public privacy-policy URL, and hosting the policy on the existing Vercel application avoids a separate service or dependency.
+
+The policy must describe actual current behavior only. It must disclose the WhatsApp/Meta, Vercel, and Supabase processing path, avoid unsupported legal promises, and never include credentials or private operational data.
