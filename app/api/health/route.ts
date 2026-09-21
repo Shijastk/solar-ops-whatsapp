@@ -4,7 +4,8 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const configuration = getHealthConfiguration();
-  const configured = Object.values(configuration).every(Boolean);
+  const configured =
+    configuration.validation.webhook && configuration.validation.ingestion;
 
   return Response.json(
     {
