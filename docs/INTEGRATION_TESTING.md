@@ -76,7 +76,7 @@ This is deliberately broader than the normal CI suite.
 
 The harness creates a **synthetic signed webhook** using the configured Meta app secret. That proves the deployed webhook, signature verification, security filters, Meta media API, Supabase database, and private Storage work together.
 
-It does **not** prove Meta itself delivered a real inbound WhatsApp message to the custom callback. Real inbound delivery remains a separate acceptance test when the Meta app state permits it.
+This harness does **not** prove Meta itself delivered a real inbound WhatsApp message because it generates the signed webhook request. That separate real-inbound acceptance test was completed successfully on 2026-09-21 for both text and a PDF/document.
 
 ## Required GitHub Actions secrets
 
@@ -205,4 +205,6 @@ Historical diagnostic progression:
 - replacement system-user token before WABA asset assignment: HTTP 400, OAuthException code 100, Authorization Error
 - after WABA asset assignment: PASS
 
-This provider-level integration is now verified for synthetic signed events. It does not replace the final real-inbound Meta callback test.
+This provider-level integration is verified for synthetic signed events. Real inbound Meta callback delivery was separately verified on 2026-09-21.
+
+The current harness intentionally remains inbound-only and does not test the newly added manual outbound reply path. Outbound sending must not be described as provider-verified until an explicit safe live reply test is performed.

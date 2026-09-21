@@ -12,7 +12,7 @@ const sections = [
     title: "1. What Solar Ops does",
     paragraphs: [
       "Solar Ops is an internal operations prototype that receives WhatsApp messages and supported media through the WhatsApp Business Platform so operational communications can be stored and handled securely.",
-      "The current milestone is receive-only. Solar Ops does not automatically send marketing messages or advertising through WhatsApp.",
+      "Solar Ops may allow an authorized operator to manually reply to an operational WhatsApp message from the protected internal dashboard. It does not automatically send marketing messages or advertising through WhatsApp.",
     ],
   },
   {
@@ -25,7 +25,7 @@ const sections = [
   {
     title: "3. Why we process this information",
     paragraphs: [
-      "We process this information to receive and preserve operational communications, maintain message history, prevent duplicate processing, securely retain supported media, troubleshoot delivery problems, and validate the reliability and security of the Solar Ops workflow.",
+      "We process this information to receive and preserve operational communications, maintain message history, prevent duplicate processing, extract useful structured fields from supported business documents for operator review, securely retain raw media temporarily, support authorized manual replies, troubleshoot delivery problems, and validate the reliability and security of the Solar Ops workflow.",
       "We do not use WhatsApp message content for advertising, profiling, or sale to third parties.",
     ],
   },
@@ -39,8 +39,8 @@ const sections = [
   {
     title: "5. Storage and retention",
     paragraphs: [
-      "Operational message metadata is stored in the Solar Ops database. Supported media is copied from temporary Meta download locations into private Supabase Storage so the system does not depend on temporary attachment links.",
-      "Operational records are retained only for as long as they are needed for the relevant operational purpose, security, troubleshooting, or applicable legal obligations. Test fixtures used by the automated integration suite are designed to be deleted after each test run.",
+      "Operational message metadata, operator-approved document fields, bounded extracted document text, and manual reply history may be stored in the Solar Ops database. Supported raw media is copied from temporary Meta download locations into private Supabase Storage and is intended to be temporary working data rather than permanent archival storage.",
+      "Successfully processed raw media is cleanup-targeted after approximately 24 hours, although scheduler timing may delay deletion. Structured operational records may be retained longer when needed for the operational purpose, security, troubleshooting, or applicable legal obligations. Test fixtures used by the automated integration suite are designed to be deleted after each test run.",
     ],
   },
   {

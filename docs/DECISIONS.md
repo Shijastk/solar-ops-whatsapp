@@ -142,7 +142,7 @@ Implementation choice:
 - failed deletions leave the path intact for retry
 - reports contain counts/timing only, never filenames, paths, phone numbers, or customer document content
 
-The current workflow does not define invoice/OCR fields. Structured extraction semantics remain a separate explicit decision.
+Structured selectable-text PDF fields are now defined in Milestone 2C. OCR for scanned documents and inventory mutation semantics remain separate explicit decisions.
 
 
 ## D018 - Build a protected mobile-first web dashboard before the mobile app
@@ -161,3 +161,26 @@ Security decisions:
 - allow manual raw-file deletion while preserving message metadata
 
 Prototype authentication uses an optional dedicated `OPS_ACCESS_KEY`. If that is not configured, the existing webhook verify token is accepted only as a temporary bootstrap fallback. A future mobile app should move to dedicated user authentication rather than depending on this fallback.
+
+
+## D019 - Parse by semantic anchors, not one fixed bill template
+
+Decision: Reconstruct PDF text lines and parse labels/anchors instead of binding extraction to fixed page coordinates.
+
+Reason: A company may keep a broadly similar format while spacing, page flow, optional fields, customer data, item count, or document variants change.
+
+The bounded extracted text is retained because it is much smaller than the raw PDF and allows later review/reparsing after raw-file cleanup. Image-only PDFs are marked `needs_ocr`.
+
+## D020 - Parser approval does not equal stock mutation
+
+Decision: Structured parser drafts can be reviewed and marked approved, but approval does not alter inventory.
+
+Reason: Source documents identify goods and quantities but do not fully define this godown's opening-balance, stock-IN, stock-OUT, return, cancellation, and correction rules.
+
+## D021 - Manual WhatsApp replies only inside the service window
+
+Decision: Add operator-triggered text replies from the protected UI using the inbound message as Meta reply context.
+
+The backend derives recipient/context from stored rows, enforces the latest-inbound 24-hour service window, persists outbound state, and consumes delivery-status webhooks.
+
+Automatic replies and template messaging outside the service window are not part of this milestone.

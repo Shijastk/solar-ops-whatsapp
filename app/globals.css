@@ -701,3 +701,682 @@ ul {
     width: 100%;
   }
 }
+
+
+/* WhatsApp-style internal operations UI */
+.waShell {
+  min-height: 100vh;
+  padding: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(74, 222, 128, 0.08), transparent 30rem),
+    #07110d;
+}
+
+.waTopbar,
+.waStats,
+.waApp {
+  width: min(1280px, 100%);
+  margin-inline: auto;
+}
+
+.waTopbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.waTopbar strong {
+  display: block;
+  font-size: 20px;
+}
+
+.waTopActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.waTopActions form {
+  margin: 0;
+}
+
+.waTopActions button,
+.waListHeader a {
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,.04);
+  color: #dce9e2;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.waOnline,
+.waOffline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #9eaea6;
+  font-size: 12px;
+}
+
+.waOnline::before,
+.waOffline::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  content: "";
+}
+
+.waOnline::before {
+  background: #4ade80;
+}
+
+.waOffline::before {
+  background: #f87171;
+}
+
+.waNotice {
+  width: min(1280px, 100%);
+  margin: 0 auto 10px;
+  border: 1px solid rgba(134,239,172,.18);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(134,239,172,.06);
+  color: #ccefd7;
+  font-size: 13px;
+}
+
+.waStats {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 10px;
+  scrollbar-width: none;
+}
+
+.waStats::-webkit-scrollbar {
+  display: none;
+}
+
+.waStats span {
+  flex: 0 0 auto;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(255,255,255,.03);
+  color: #aebdb5;
+  font-size: 11px;
+}
+
+.waApp {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  height: calc(100vh - 126px);
+  min-height: 620px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 20px;
+  background: #0a1510;
+  box-shadow: 0 20px 70px rgba(0,0,0,.25);
+}
+
+.waConversationList {
+  overflow-y: auto;
+  border-right: 1px solid rgba(255,255,255,.08);
+  background: #0b1712;
+}
+
+.waListHeader {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  background: rgba(11,23,18,.96);
+  backdrop-filter: blur(14px);
+}
+
+.waListHeader h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.waConversation {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: center;
+  padding: 13px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.055);
+  color: inherit;
+  text-decoration: none;
+}
+
+.waConversation:hover,
+.waConversationActive {
+  background: rgba(255,255,255,.055);
+}
+
+.waConversation > div:nth-child(2) {
+  min-width: 0;
+}
+
+.waConversation strong,
+.waConversation span,
+.waConversation p {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waConversation strong {
+  font-size: 14px;
+}
+
+.waConversation span,
+.waConversation p,
+.waConversation time {
+  color: #819087;
+  font-size: 11px;
+}
+
+.waConversation p {
+  margin: 4px 0 0;
+}
+
+.waAvatar {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  background: #183629;
+  color: #bbf7d0;
+  font-weight: 800;
+}
+
+.waEmptyList,
+.waNoChat {
+  padding: 28px;
+  color: #819087;
+  text-align: center;
+}
+
+.waChat {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto 1fr auto;
+  background:
+    linear-gradient(rgba(7,17,13,.86), rgba(7,17,13,.86)),
+    radial-gradient(circle at 20% 10%, rgba(255,255,255,.04), transparent 20rem);
+}
+
+.waChatHeader {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  background: #0d1c15;
+}
+
+.waChatHeader strong,
+.waChatHeader span {
+  display: block;
+}
+
+.waChatHeader span {
+  margin-top: 2px;
+  color: #819087;
+  font-size: 11px;
+}
+
+.waTimeline {
+  overflow-y: auto;
+  padding: 20px clamp(12px, 3vw, 34px);
+}
+
+.waRow {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.waRowInbound {
+  justify-content: flex-start;
+}
+
+.waRowOutbound {
+  justify-content: flex-end;
+}
+
+.waBubble {
+  width: fit-content;
+  max-width: min(720px, 86%);
+  border-radius: 15px;
+  padding: 10px 11px 7px;
+  box-shadow: 0 4px 18px rgba(0,0,0,.13);
+}
+
+.waInboundBubble {
+  border-top-left-radius: 4px;
+  background: #14251d;
+}
+
+.waOutboundBubble {
+  border-top-right-radius: 4px;
+  background: #0f442c;
+}
+
+.waMessageText {
+  margin: 0;
+  color: #edf5f0;
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.waBubble footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+  color: #789087;
+  font-size: 10px;
+}
+
+.waOutboundBubble footer {
+  color: #a7c7b5;
+}
+
+.waDocument {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 260px;
+  border-radius: 11px;
+  padding: 10px;
+  background: rgba(0,0,0,.16);
+}
+
+.waDocumentIcon {
+  display: grid;
+  width: 42px;
+  height: 48px;
+  place-items: center;
+  border-radius: 8px;
+  background: #e7f6ed;
+  color: #173326;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.waDocument strong,
+.waDocument span {
+  display: block;
+}
+
+.waDocument strong {
+  overflow: hidden;
+  max-width: 470px;
+  color: #f0f6f2;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waDocument span {
+  margin-top: 4px;
+  color: #82978c;
+  font-size: 10px;
+}
+
+.waBubbleActions,
+.waParseActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.waBubbleActions a,
+.waBubbleActions summary,
+.waInlineAction button,
+.waApproveButton,
+.waSecondaryAction {
+  border: 0;
+  border-radius: 9px;
+  padding: 7px 10px;
+  background: rgba(255,255,255,.07);
+  color: #bbf7d0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.waBubbleActions span {
+  color: #819087;
+  font-size: 10px;
+}
+
+.waDelete {
+  position: relative;
+}
+
+.waDelete summary {
+  list-style: none;
+}
+
+.waDelete summary::-webkit-details-marker {
+  display: none;
+}
+
+.waDelete form {
+  display: grid;
+  gap: 7px;
+  margin-top: 7px;
+  border: 1px solid rgba(248,113,113,.2);
+  border-radius: 10px;
+  padding: 9px;
+  background: #171c19;
+}
+
+.waDelete form span {
+  color: #a9b8b0;
+  font-size: 10px;
+}
+
+.waDelete form button {
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: rgba(248,113,113,.13);
+  color: #fecaca;
+  cursor: pointer;
+}
+
+.waParseCard {
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(134,239,172,.12);
+  border-radius: 12px;
+  background: rgba(0,0,0,.16);
+}
+
+.waParseHeader,
+.waParsedTotals {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 11px;
+}
+
+.waParseHeader > div span,
+.waParseHeader > div strong {
+  display: block;
+}
+
+.waParseHeader > div span {
+  color: #76aa8b;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.waParseHeader > div strong {
+  margin-top: 3px;
+  font-size: 12px;
+}
+
+.waParseState {
+  border-radius: 999px;
+  padding: 5px 7px;
+  background: rgba(255,255,255,.06);
+  color: #aebdb5;
+  font-size: 9px;
+  text-transform: capitalize;
+}
+
+.waParseState-approved,
+.waParseState-ready_for_review {
+  background: rgba(74,222,128,.09);
+  color: #bbf7d0;
+}
+
+.waParseState-needs_review,
+.waParseState-needs_ocr,
+.waParseState-failed {
+  background: rgba(251,191,36,.08);
+  color: #fde68a;
+}
+
+.waParsedGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: rgba(255,255,255,.045);
+}
+
+.waParsedGrid div {
+  min-width: 0;
+  padding: 9px 10px;
+  background: #101e18;
+}
+
+.waParsedGrid dt {
+  color: #688077;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.waParsedGrid dd {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: #d8e5de;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waParsedAddress,
+.waParseWarning {
+  margin: 0;
+  padding: 9px 10px;
+  color: #a9b8b0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.waParseWarning {
+  color: #fde68a;
+}
+
+.waItems {
+  border-top: 1px solid rgba(255,255,255,.05);
+}
+
+.waItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,.045);
+}
+
+.waItem strong,
+.waItem span {
+  display: block;
+}
+
+.waItem strong {
+  font-size: 11px;
+}
+
+.waItem span {
+  margin-top: 2px;
+  color: #70857a;
+  font-size: 9px;
+}
+
+.waItemQty {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.waParsedTotals {
+  font-size: 11px;
+}
+
+.waParsedTotals strong {
+  font-size: 13px;
+}
+
+.waParseActions {
+  padding: 0 10px 10px;
+}
+
+.waParseActions form,
+.waInlineAction {
+  margin: 0;
+}
+
+.waApproveButton {
+  background: #bdf6cf;
+  color: #092615;
+}
+
+.waSecondaryAction {
+  background: rgba(255,255,255,.06);
+}
+
+.waInlineAction {
+  margin-top: 9px;
+}
+
+.waSendError {
+  margin: 6px 0 0;
+  color: #fecaca;
+  font-size: 10px;
+}
+
+.waComposer {
+  border-top: 1px solid rgba(255,255,255,.07);
+  padding: 10px 12px;
+  background: #0d1c15;
+}
+
+.waComposer form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.waComposer textarea {
+  width: 100%;
+  min-height: 44px;
+  max-height: 120px;
+  resize: vertical;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 13px;
+  padding: 11px 13px;
+  background: #14251d;
+  color: #f1f7f4;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.waComposer textarea:focus {
+  border-color: rgba(134,239,172,.45);
+}
+
+.waComposer button {
+  min-width: 66px;
+  height: 44px;
+  border: 0;
+  border-radius: 13px;
+  background: #d7ffe4;
+  color: #082612;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.waComposer p {
+  margin: 0;
+  color: #819087;
+  font-size: 11px;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .waShell {
+    padding: 8px;
+  }
+
+  .waTopbar {
+    align-items: flex-start;
+  }
+
+  .waTopbar strong {
+    font-size: 16px;
+  }
+
+  .waOnline,
+  .waOffline {
+    display: none;
+  }
+
+  .waApp {
+    display: block;
+    height: auto;
+    min-height: 0;
+    border-radius: 16px;
+  }
+
+  .waConversationList {
+    max-height: 240px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+
+  .waChat {
+    min-height: calc(100vh - 250px);
+  }
+
+  .waTimeline {
+    min-height: 430px;
+    max-height: 62vh;
+    padding: 14px 9px;
+  }
+
+  .waBubble {
+    max-width: 94%;
+  }
+
+  .waDocument {
+    min-width: 0;
+  }
+
+  .waParsedGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .waTopActions button {
+    padding: 7px 9px;
+    font-size: 11px;
+  }
+}

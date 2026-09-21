@@ -25,6 +25,26 @@ const messageSchema = z
   })
   .passthrough();
 
+const statusSchema = z
+  .object({
+    id: z.string().min(1),
+    status: z.enum(["sent", "delivered", "read", "failed", "deleted"]),
+    timestamp: z.string().min(1),
+    recipient_id: z.string().optional(),
+    errors: z
+      .array(
+        z
+          .object({
+            code: z.number().optional(),
+            title: z.string().optional(),
+            message: z.string().optional(),
+          })
+          .passthrough(),
+      )
+      .optional(),
+  })
+  .passthrough();
+
 const changeSchema = z
   .object({
     field: z.string(),
@@ -48,6 +68,7 @@ const changeSchema = z
           )
           .optional(),
         messages: z.array(messageSchema).optional(),
+        statuses: z.array(statusSchema).optional(),
       })
       .passthrough(),
   })
@@ -66,6 +87,15 @@ const webhookSchema = z
     ),
   })
   .passthrough();
+
+export type NormalizedWhatsAppStatus = {
+  messageId: string;
+  status: "sent" | "delivered" | "read" | "failed" | "deleted";
+  timestamp: Date;
+  recipientId?: string;
+  errorCode?: number;
+  errorTitle?: string;
+};
 
 export type NormalizedWhatsAppMessage = {
   wabaId?: string;
@@ -148,6 +178,45 @@ export function extractWhatsAppMessages(
           type: message.type,
           textBody: message.text?.body,
           media: mediaForMessage(message),
+        });
+      }
+    }
+  }
+
+  return output;
+}
+
+
+export function extractWhatsAppStatuses(
+  payload: unknown,
+): NormalizedWhatsAppStatus[] {
+  const parsed = webhookSchema.safeParse(payload);
+  if (!parsed.success || parsed.data.object !== "whatsapp_business_account") {
+    return [];
+  }
+
+  const output: NormalizedWhatsAppStatus[] = [];
+
+  for (const entry of parsed.data.entry) {
+    for (const change of entry.changes) {
+      if (change.field !== "messages" || !change.value.statuses) {
+        continue;
+      }
+
+      for (const status of change.value.statuses) {
+        const seconds = Number(status.timestamp);
+        if (!Number.isFinite(seconds)) {
+          continue;
+        }
+
+        output.push({
+          messageId: status.id,
+          status: status.status,
+          timestamp: new Date(seconds * 1000),
+          recipientId: status.recipient_id,
+          errorCode: status.errors?.[0]?.code,
+          errorTitle:
+            status.errors?.[0]?.title ?? status.errors?.[0]?.message,
         });
       }
     }

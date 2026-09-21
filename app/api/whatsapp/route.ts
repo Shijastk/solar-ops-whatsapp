@@ -1,8 +1,12 @@
 import { ZodError } from "zod";
 import { getWebhookEnv } from "@/lib/env";
 import { ingestWhatsAppMessage } from "@/lib/ingest";
+import { applyWhatsAppStatusUpdates } from "@/lib/replies";
 import { verifyMetaSignature } from "@/lib/signature";
-import { extractWhatsAppMessages } from "@/lib/whatsapp";
+import {
+  extractWhatsAppMessages,
+  extractWhatsAppStatuses,
+} from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,12 +67,21 @@ export async function POST(request: Request) {
     }
 
     const messages = extractWhatsAppMessages(payload);
+    const statuses = extractWhatsAppStatuses(payload);
+    const statusUpdates =
+      statuses.length > 0 ? await applyWhatsAppStatusUpdates(statuses) : 0;
 
     if (messages.length === 0) {
       console.info("WhatsApp webhook received no parseable messages", {
         messageCount: 0,
+        statusCount: statuses.length,
+        statusUpdates,
       });
-      return Response.json({ received: true, processed: 0 });
+      return Response.json({
+        received: true,
+        processed: 0,
+        statusUpdates,
+      });
     }
 
     const results = [];
@@ -85,11 +98,14 @@ export async function POST(request: Request) {
       messageTypes: messages.map((message) => message.type),
       storedCount: results.filter((item) => item.result === "stored").length,
       ignoredCount: results.filter((item) => item.result === "ignored").length,
+      statusCount: statuses.length,
+      statusUpdates,
     });
 
     return Response.json({
       received: true,
       processed: results.length,
+      statusUpdates,
       results,
     });
   } catch (error) {

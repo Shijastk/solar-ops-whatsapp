@@ -91,17 +91,18 @@ The prototype maximum media size is configured as 15 MiB:
 
 This is a project safety choice, not a claimed Meta platform limit.
 
-## K009 - No OCR or inventory semantics
+## K009 - OCR and inventory semantics remain partially open
 
-There is no defined rule yet for:
+Structured PDF fields and a human approval state are now defined for selectable-text documents.
 
-- which invoice fields matter
-- how company identity is determined
-- what constitutes stock in/out
-- how corrections work
-- who approves extracted data
+Still undefined:
 
-These decisions must be defined with the user before adding OCR/inventory automation.
+- what constitutes warehouse stock IN vs stock OUT
+- opening-balance source
+- return/cancellation/reversal behavior
+- whether and when approved document data is allowed to mutate inventory
+
+Image-only/scanned PDFs also still require a future OCR decision.
 
 ## K010 - GitHub Pages is configured in code but not enabled in repository settings
 
@@ -186,23 +187,11 @@ The public policy is live at:
 The URL was entered into Meta App Settings and the app was published successfully.
 
 
-## K017 - Structured invoice extraction fields are not defined yet
+## K017 - Structured document draft schema is defined; stock authority is not
 
-The user approved the direction of keeping only useful data and deleting raw media after short retention.
+Resolved portion: selectable-text PDFs now produce bounded extracted text plus structured review fields for document identity, parties, e-Way metadata, dispatch data, totals, and product line items.
 
-The system intentionally does not yet decide which invoice fields are authoritative.
-
-Before implementing OCR/parser output as operational data, define at least:
-
-- company identity rule
-- invoice/bill identifier
-- date semantics
-- product/description fields
-- quantity/unit semantics
-- correction/approval behavior
-- whether any extracted field is allowed to affect stock
-
-Do not infer these rules from a single sample bill.
+Remaining boundary: an approved parser draft is not automatically authoritative for warehouse stock. Stock mutation stays disabled until the business rules in K022 are explicitly defined.
 
 ## K018 - Media retention timing is approximate
 
@@ -224,3 +213,28 @@ This is acceptable for the current single-operator verification prototype, but b
 The private bucket, stored document row, and Storage object are live-verified.
 
 The signed-preview implementation follows Supabase's current private-bucket signed URL API and is covered by the production build, but a human opening the file through the authenticated `/ops` dashboard remains the final UI-level preview check.
+
+
+## K021 - OCR fallback is intentionally not implemented yet
+
+Selectable-text PDFs are parsed locally. Scanned/image-only PDFs are marked `needs_ocr`.
+
+No paid OCR provider or heavy local OCR runtime has been added without a validated need.
+
+## K022 - Inventory semantics remain a business-rule blocker
+
+Product quantities can be parsed and approved as document data, but current-stock mutation remains intentionally disabled.
+
+Before implementing a stock ledger, define opening balance, which document types mean stock IN/OUT, and return/cancellation/correction behavior.
+
+## K023 - Manual reply scope is limited to the open service window
+
+The UI supports free-form operator replies only when the latest inbound message from that WhatsApp user is within 24 hours.
+
+Approved Meta template messaging outside that window is not implemented.
+
+## K024 - Vercel production deployment is quota-delayed
+
+The production deployment attempt after the operations-dashboard merge was rejected by Vercel with a build-rate-limit instruction to retry in 24 hours.
+
+Repository CI can verify source quality, but new behavior must not be described as live on the stable production alias until a production deployment reaches READY.

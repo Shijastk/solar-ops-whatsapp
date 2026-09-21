@@ -1,6 +1,6 @@
 # Solar Ops WhatsApp Ingestion
 
-Production-oriented prototype for receiving WhatsApp Cloud API messages and storing operational media in a private Supabase bucket.
+Internal operations prototype for receiving WhatsApp Cloud API messages, temporarily storing private media, extracting structured PDF data for review, and supporting authorized manual replies.
 
 ## Stack
 
@@ -119,19 +119,27 @@ Credentialed provider integration is manual-only:
 npm run test:integration
 ```
 
-The GitHub Actions workflow `Credentialed Integration` uses synthetic data to test the deployed webhook, security filters, Meta media upload/retrieval/download, Supabase database persistence, private Storage, byte integrity, idempotency, and cleanup. It never sends a WhatsApp message to a person. See `docs/INTEGRATION_TESTING.md`.
+The GitHub Actions workflow `Credentialed Integration` uses synthetic data to test the deployed inbound webhook, security filters, Meta media upload/retrieval/download, Supabase database persistence, private Storage, byte integrity, idempotency, and cleanup. The integration workflow itself never sends a WhatsApp message to a person. See `docs/INTEGRATION_TESTING.md`.
 
 ## Scope
 
-Milestone 1 intentionally does **not** include:
+Milestone 1 inbound capture is complete.
 
-- OCR
-- invoice extraction
-- stock updates
-- customer dashboards
+Current source also includes:
+
+- deterministic selectable-text PDF extraction
+- structured document review drafts
+- WhatsApp-style internal operations UI
+- authorized manual text replies within the active customer-service window
+- outbound delivery-status tracking
+
+Still intentionally excluded:
+
+- OCR for image-only/scanned PDFs
+- automatic stock mutation
 - automatic WhatsApp replies
-
-Those are added only after reliable inbound capture is proven.
+- template messaging outside the service window
+- customer-facing dashboards
 
 
 ## Temporary media retention
@@ -148,7 +156,7 @@ npm run maintenance:media-retention
 
 The cleanup report contains counts only and must not contain customer filenames, Storage paths, phone numbers, payloads, or document contents.
 
-The long-term direction is to retain useful structured bill/invoice data rather than raw files. Exact extraction fields are intentionally not implemented yet because those business semantics must be defined explicitly before parser/OCR output is treated as operational data.
+Useful structured bill/document data is now retained separately from raw files. Parser approval remains a review state only and does not update stock automatically.
 
 
 ## Operations dashboard
@@ -157,7 +165,7 @@ The internal verification dashboard is available at:
 
 `/ops`
 
-It is mobile-first and shows recent accepted WhatsApp messages, storage state, file size/type, masked sender reference, runtime status, and temporary-file availability.
+It is mobile-first and presents conversations in a WhatsApp-style view with inbound/outbound messages, parsed document details, review state, private file actions, and manual reply controls when the service window is open.
 
 Security:
 

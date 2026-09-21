@@ -102,4 +102,4 @@ The intended lifecycle is now:
 3. Retain useful structured/operational data long-term.
 4. Automatically delete the raw Storage object after approximately 24 hours when processing succeeded.
 
-The current retention implementation preserves existing message metadata but does not yet invent or extract invoice fields. The exact essential-data schema remains a separate business decision.
+The current source now extracts deterministic structured fields from selectable-text PDFs into review drafts, while retaining raw media only temporarily. Parser approval is intentionally separate from stock mutation because warehouse stock-direction and opening-balance rules are still a business decision.

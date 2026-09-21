@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { extname } from "node:path";
+import { processPdfBytesForMessage } from "@/lib/document-processing";
 import { getIngestionEnv } from "@/lib/env";
 import { downloadWhatsAppMedia } from "@/lib/meta";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -101,14 +102,18 @@ export async function ingestWhatsAppMessage(
     error_message: null,
   };
 
-  const { error: upsertError } = await supabase
+  const { data: persistedMessage, error: upsertError } = await supabase
     .from("whatsapp_messages")
     .upsert(baseRow, {
       onConflict: "whatsapp_message_id",
-    });
+    })
+    .select("id")
+    .single();
 
-  if (upsertError) {
-    throw new Error(`Failed to persist WhatsApp message: ${upsertError.message}`);
+  if (upsertError || !persistedMessage) {
+    throw new Error(
+      `Failed to persist WhatsApp message: ${upsertError?.message ?? "missing message row"}`,
+    );
   }
 
   if (!message.media || !MEDIA_TYPES.has(message.type)) {
@@ -162,6 +167,24 @@ export async function ingestWhatsAppMessage(
       throw new Error(
         `Failed to finalize WhatsApp message: ${updateError.message}`,
       );
+    }
+
+    if (media.mimeType.toLowerCase() === "application/pdf") {
+      try {
+        const parsed = await processPdfBytesForMessage(
+          persistedMessage.id,
+          media.bytes,
+        );
+        console.info("WhatsApp PDF parse summary", {
+          status: parsed.status,
+          itemCount: parsed.itemCount,
+          skippedApproved: parsed.skippedApproved,
+        });
+      } catch {
+        console.warn("WhatsApp PDF parsing did not complete", {
+          messageStored: true,
+        });
+      }
     }
 
     return "stored";

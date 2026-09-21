@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { extractWhatsAppMessages } from "../lib/whatsapp";
+import {
+  extractWhatsAppMessages,
+  extractWhatsAppStatuses,
+} from "../lib/whatsapp";
 
 const sender = "919999999999";
 
@@ -131,5 +134,74 @@ describe("extractWhatsAppMessages", () => {
     );
 
     expect(result).toEqual([]);
+  });
+});
+
+
+describe("extractWhatsAppStatuses", () => {
+  it("normalizes outbound message status callbacks", () => {
+    const result = extractWhatsAppStatuses({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "waba-test",
+          changes: [
+            {
+              field: "messages",
+              value: {
+                messaging_product: "whatsapp",
+                statuses: [
+                  {
+                    id: "wamid.out-1",
+                    status: "delivered",
+                    timestamp: "1789967000",
+                    recipient_id: sender,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      messageId: "wamid.out-1",
+      status: "delivered",
+      recipientId: sender,
+    });
+    expect(result[0].timestamp).toBeInstanceOf(Date);
+  });
+
+  it("keeps safe failure diagnostics without requiring optional fields", () => {
+    const result = extractWhatsAppStatuses({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          changes: [
+            {
+              field: "messages",
+              value: {
+                statuses: [
+                  {
+                    id: "wamid.failed-1",
+                    status: "failed",
+                    timestamp: "1789967001",
+                    errors: [{ code: 131000, title: "Test failure" }],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result[0]).toMatchObject({
+      status: "failed",
+      errorCode: 131000,
+      errorTitle: "Test failure",
+    });
   });
 });

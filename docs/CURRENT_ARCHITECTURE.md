@@ -211,19 +211,19 @@ Do not rename these without updating source, `.env.example`, README, and documen
 
 ## Important boundary
 
-There is currently no implemented:
+Current source implements deterministic PDF document parsing and manual operator replies, but still has no:
 
-- OCR pipeline
-- stock/inventory model
-- company model
+- OCR pipeline for scanned/image-only PDFs
+- stock/inventory mutation model
+- company master-data model
 - driver model
 - porter model
-- invoice parser
-- authentication UI
 - customer dashboard
-- automated WhatsApp reply path
+- automatic WhatsApp reply path
+- template-message path outside the customer-service window
+- production-grade multi-user authentication
 
-Do not describe any of those as existing features.
+Do not describe those missing capabilities as existing features.
 
 
 ## Temporary media retention
@@ -260,7 +260,7 @@ Responsibilities:
 
 The workflow is scheduled for 21:00 UTC daily. GitHub scheduling may be delayed, so the 24-hour value is a cutoff target rather than a guaranteed exact deletion time.
 
-The database schema is unchanged. After successful deletion, the existing message row remains and only `storage_path` is cleared. The extraction schema for essential invoice data is intentionally not yet defined.
+The retention workflow itself does not require changing the existing `whatsapp_messages` row shape. After successful deletion, the message row remains and only `storage_path` is cleared. Separate additive tables now hold structured document drafts/items and outbound-message state.
 
 
 ## Internal operations dashboard
@@ -312,3 +312,34 @@ The bucket remains private.
 - preserves the WhatsApp message row and metadata
 
 This web dashboard is internal only. It is not a customer portal.
+
+The stable production alias may still be serving the earlier deployed revision until Vercel allows the next production build. Repository CI success does not by itself prove the new Milestone 2C source is live.
+
+
+## Structured document parsing
+
+`lib/pdf-extract.ts` uses `unpdf` to extract positioned PDF text and reconstruct text lines without binding parsing to exact page coordinates. Untrusted PDF work is bounded by page count, extracted-text length, image allocation, and a timeout.
+
+`lib/document-parser.ts` applies deterministic labels/anchors. Missing values remain null. Documents without a usable text layer become `needs_ocr`.
+
+`lib/document-processing.ts` stores bounded extracted text plus structured data in `document_drafts` and `document_items`. Approved drafts are not silently overwritten.
+
+New PDFs are parsed after successful private Storage persistence. Parser failure does not turn a successfully stored WhatsApp document into an ingestion failure.
+
+No stock table is changed by parsing or approval.
+
+## Manual WhatsApp replies
+
+`lib/meta-messages.ts` sends operator-authored text replies through Meta's phone-number `/messages` endpoint and includes the stored inbound WhatsApp message ID as reply context.
+
+`lib/replies.ts` derives recipients server-side, enforces the latest-inbound 24-hour service window, uses request IDs for send idempotency, persists outbound state, and applies timestamped Meta status webhooks.
+
+Outbound state is stored in `whatsapp_outbound_messages`.
+
+The main webhook processes both inbound messages and outbound message-status notifications.
+
+## WhatsApp-style operations UI
+
+The protected `/ops` surface groups messages by hashed conversation keys and renders inbound/outbound bubbles. Document messages can expose structured fields/items plus parse, approve, private-view, and delete actions. The composer is enabled only while the 24-hour service window is open.
+
+Full phone numbers are not placed in dashboard URLs.
