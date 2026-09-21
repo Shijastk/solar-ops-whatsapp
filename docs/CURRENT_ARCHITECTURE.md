@@ -312,3 +312,32 @@ The bucket remains private.
 - preserves the WhatsApp message row and metadata
 
 This web dashboard is internal only. It is not a customer portal.
+
+
+## Structured document parsing
+
+`lib/pdf-extract.ts` uses `unpdf` to extract positioned PDF text and reconstruct text lines without binding parsing to exact page coordinates. Untrusted PDF work is bounded by page count, extracted-text length, image allocation, and a timeout.
+
+`lib/document-parser.ts` applies deterministic labels/anchors. Missing values remain null. Documents without a usable text layer become `needs_ocr`.
+
+`lib/document-processing.ts` stores bounded extracted text plus structured data in `document_drafts` and `document_items`. Approved drafts are not silently overwritten.
+
+New PDFs are parsed after successful private Storage persistence. Parser failure does not turn a successfully stored WhatsApp document into an ingestion failure.
+
+No stock table is changed by parsing or approval.
+
+## Manual WhatsApp replies
+
+`lib/meta-messages.ts` sends operator-authored text replies through Meta's phone-number `/messages` endpoint and includes the stored inbound WhatsApp message ID as reply context.
+
+`lib/replies.ts` derives recipients server-side, enforces the latest-inbound 24-hour service window, uses request IDs for send idempotency, persists outbound state, and applies timestamped Meta status webhooks.
+
+Outbound state is stored in `whatsapp_outbound_messages`.
+
+The main webhook processes both inbound messages and outbound message-status notifications.
+
+## WhatsApp-style operations UI
+
+The protected `/ops` surface groups messages by hashed conversation keys and renders inbound/outbound bubbles. Document messages can expose structured fields/items plus parse, approve, private-view, and delete actions. The composer is enabled only while the 24-hour service window is open.
+
+Full phone numbers are not placed in dashboard URLs.
