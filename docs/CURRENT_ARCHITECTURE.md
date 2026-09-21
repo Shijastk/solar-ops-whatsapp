@@ -27,9 +27,11 @@ Verified state:
 - production deployment: `READY`
 - `/api/health`: HTTP 200
 - `configured: true`
-- no Vercel runtime errors observed in the one-hour verification window
+- Meta custom webhook verification succeeds
+- Meta dashboard sample text reaches `POST /api/whatsapp`
+- the sample text is persisted into `public.whatsapp_messages`
 
-This proves the deployed application and runtime configuration are reachable. It does not yet prove Meta -> Vercel -> Supabase end-to-end ingestion.
+This proves the deployed text-ingestion database path for Meta's dashboard sample. Real inbound WhatsApp delivery and live media download/private Storage upload remain pending.
 
 ## Current modules
 
@@ -127,7 +129,9 @@ Expected bucket:
 
 `whatsapp-media`
 
-The bucket must be private.
+The bucket was created as private by the user during live setup.
+
+A real media upload into the bucket has not yet been verified.
 
 Current path strategy is approximately:
 
