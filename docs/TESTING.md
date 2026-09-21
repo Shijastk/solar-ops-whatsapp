@@ -280,3 +280,18 @@ Observed Vercel runtime evidence:
 The media ingestion implementation returns `stored` only after the Meta media download, private Supabase Storage upload, and database update have succeeded.
 
 Together with the previously successful credentialed integration suite for replay/idempotency, private-bucket verification, media upload/retrieval/download, Storage byte integrity, and cleanup, Milestone 1 is complete.
+
+
+## Media retention tests
+
+Automated tests cover:
+
+- default 24-hour retention configuration
+- invalid retention configuration rejection
+- cutoff calculation
+- deletion of eligible Storage objects
+- clearing `storage_path` only after successful object deletion
+- retry behavior when Storage deletion fails
+- failure reporting when database finalization fails
+
+The scheduled provider cleanup itself uses real Supabase credentials and must not be described as observed live until a scheduled or manual maintenance run has completed successfully.
