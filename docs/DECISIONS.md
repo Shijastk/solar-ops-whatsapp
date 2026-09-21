@@ -125,3 +125,21 @@ Observed result on 2026-09-21:
 - a real inbound text was delivered to the custom webhook and stored
 - a real inbound PDF/document was delivered to the custom webhook and stored
 - therefore Milestone 1 acceptance is complete
+
+
+## D017 - Raw WhatsApp media is temporary
+
+Decision: Keep successfully processed WhatsApp media in private Supabase Storage only temporarily, with a default retention target of 24 hours.
+
+Reason: The operational value is in the useful data derived from a bill/document, not in retaining every raw PDF indefinitely. Short retention controls Storage growth and reduces unnecessary data retention.
+
+Implementation choice:
+
+- a daily GitHub Actions maintenance workflow reuses the existing protected Supabase credentials
+- it queries only successfully stored rows older than the cutoff
+- it deletes the private Storage object first
+- only after successful object deletion does it clear the database `storage_path`
+- failed deletions leave the path intact for retry
+- reports contain counts/timing only, never filenames, paths, phone numbers, or customer document content
+
+The current workflow does not define invoice/OCR fields. Structured extraction semantics remain a separate explicit decision.
