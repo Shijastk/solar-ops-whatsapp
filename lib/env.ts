@@ -10,7 +10,7 @@ const webhookEnvSchema = z.object({
 const ingestionEnvSchema = z.object({
   WHATSAPP_ACCESS_TOKEN: nonEmpty,
   WHATSAPP_PHONE_NUMBER_ID: nonEmpty.optional(),
-  META_GRAPH_API_VERSION: z.string().trim().regex(/^v\d+\.\d+$/).default("v23.0"),
+  META_GRAPH_API_VERSION: z.string().trim().regex(/^v\d+\.\d+$/).default("v26.0"),
   ALLOWED_WHATSAPP_SENDERS: z.string().optional(),
   SUPABASE_URL: z.string().url(),
   SUPABASE_SECRET_KEY: nonEmpty,
