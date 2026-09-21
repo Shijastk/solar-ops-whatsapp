@@ -56,11 +56,13 @@ Milestone 1 is complete:
 
 The user has approved the next direction: keep raw inbound media only temporarily, retain useful structured data long-term, and avoid wasting Storage.
 
-Current Milestone 2A scope:
+Current Milestone 2 scope:
 
 - temporary raw-media retention
 - automatic deletion of successfully stored media after approximately 24 hours
 - preserve message metadata after file deletion
+- internal mobile-first web dashboard for operational verification
+- authenticated temporary preview of private files
 - prepare for later invoice/document extraction
 
 Do not invent invoice fields, OCR semantics, stock-in/out rules, or automatic inventory mutations. Those business rules are still undefined and must be explicitly decided before implementation.
