@@ -142,7 +142,7 @@ Implementation choice:
 - failed deletions leave the path intact for retry
 - reports contain counts/timing only, never filenames, paths, phone numbers, or customer document content
 
-The current workflow does not define invoice/OCR fields. Structured extraction semantics remain a separate explicit decision.
+Structured selectable-text PDF fields are now defined in Milestone 2C. OCR for scanned documents and inventory mutation semantics remain separate explicit decisions.
 
 
 ## D018 - Build a protected mobile-first web dashboard before the mobile app
