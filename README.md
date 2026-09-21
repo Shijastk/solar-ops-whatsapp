@@ -9,6 +9,24 @@ Production-oriented prototype for receiving WhatsApp Cloud API messages and stor
 - Meta WhatsApp Cloud API
 - Supabase Postgres + private Storage
 - Vercel Functions
+- GitHub Actions + Vitest quality gate
+
+## Project instructions
+
+Before changing code, coding agents must read:
+
+- `AGENTS.md`
+- `CONTEXT.md`
+- `rules.md`
+- `docs/REQUIREMENTS.md`
+- `docs/CURRENT_ARCHITECTURE.md`
+- `docs/DECISIONS.md`
+- `docs/TESTING.md`
+- `docs/KNOWN_ISSUES.md`
+
+For the account-level deployment sequence, use:
+
+`docs/LIVE_SETUP.md`
 
 ## Security
 
@@ -20,97 +38,88 @@ Production-oriented prototype for receiving WhatsApp Cloud API messages and stor
 - Does not expose temporary Meta media URLs.
 - Uses the WhatsApp message ID as an idempotency key.
 
-## 1. Supabase
+## Supabase
 
-Create a Supabase project.
+Run:
 
-Open **SQL Editor**, paste `supabase/schema.sql`, and run it.
+`supabase/schema.sql`
 
-Then create a private Storage bucket:
+in Supabase SQL Editor.
+
+Create a private Storage bucket:
 
 - Bucket: `whatsapp-media`
 - Public: **OFF**
 
-Get these values from Supabase:
-
-- Project URL
-- Server-side secret key (`sb_secret_...` when available)
-
-Never expose the secret key in frontend code or commit it to GitHub.
-
-## 2. Vercel environment variables
-
-Add these in **Project -> Settings -> Environment Variables**:
+## Required server environment variables
 
 ```text
-WHATSAPP_VERIFY_TOKEN=<create-a-long-random-value>
-WHATSAPP_ACCESS_TOKEN=<meta-token>
-WHATSAPP_PHONE_NUMBER_ID=<meta-test-number-id>
-META_APP_SECRET=<Meta App Settings -> Basic -> App Secret>
+WHATSAPP_VERIFY_TOKEN=
+WHATSAPP_ACCESS_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+META_APP_SECRET=
 META_GRAPH_API_VERSION=v26.0
+ALLOWED_WHATSAPP_SENDERS=
 
-ALLOWED_WHATSAPP_SENDERS=<your-number-digits-only>
-
-SUPABASE_URL=https://<project>.supabase.co
-SUPABASE_SECRET_KEY=<server-side-secret>
+SUPABASE_URL=
+SUPABASE_SECRET_KEY=
 SUPABASE_STORAGE_BUCKET=whatsapp-media
 MAX_MEDIA_BYTES=15728640
 ```
 
-Meta Graph API is intentionally pinned to `v26.0` for this prototype based on the Meta version table verified on 2026-09-21. Re-check the version before production rollout or when Meta publishes an expiration date for v26.0.
+Meta Graph API is intentionally pinned to `v26.0` based on the version table verified for this project on 2026-09-21. Re-check before production rollout or when Meta publishes a v26.0 expiration date.
 
-For the test sender, use digits only, for example:
+Never commit real environment values.
 
-```text
-919876543210
-```
+## Meta webhook
 
-After adding/changing Vercel environment variables, redeploy.
-
-## 3. Meta webhook
-
-Once deployed, use:
+After Vercel deployment:
 
 ```text
 https://<your-vercel-domain>/api/whatsapp
 ```
 
-as the callback URL.
+The Meta Verify Token must exactly match `WHATSAPP_VERIFY_TOKEN`.
 
-The **Verify Token** in Meta must exactly match `WHATSAPP_VERIFY_TOKEN`.
+Subscribe to the `messages` field.
 
-Subscribe the WhatsApp Business Account webhook to the `messages` field.
+## End-to-end success criteria
 
-## 4. Test
+1. `/api/health` returns `configured: true`.
+2. An inbound WhatsApp text creates a database row.
+3. An inbound PDF creates a database row.
+4. The PDF is stored in private `whatsapp-media`.
+5. The row contains the internal Storage path.
+6. GitHub Actions CI passes for the tested commit.
 
-1. Open `/api/health`. It should return `configured: true`.
-2. Send `Hello` from the allowed WhatsApp number.
-3. Forward a PDF or image to the Meta test number.
-4. Check `public.whatsapp_messages` in Supabase.
-5. Check the private `whatsapp-media` Storage bucket.
+Full sequence:
 
-Expected result:
-
-- Text message -> database row with `processing_status = stored`.
-- PDF/image/audio/video/sticker -> database row + private Storage object.
-- Repeated webhook delivery -> same message ID is upserted instead of creating duplicate rows.
+`docs/LIVE_SETUP.md`
 
 ## Local development
 
 ```bash
-npm install
+npm ci
 cp .env.example .env.local
 npm run dev
 ```
 
-Quality checks:
+Quality gate:
 
 ```bash
-npm run typecheck
-npm run lint
-npm run build
+npm run verify
 ```
 
-## Notes
+CI separately runs typecheck, lint, Vitest, and the Next.js production build.
 
-This repository intentionally does **not** send WhatsApp replies. The first milestone is reliable inbound capture only. OCR, invoice extraction, stock updates and dashboards should be added after the ingestion path is proven stable.
+## Scope
+
+Milestone 1 intentionally does **not** include:
+
+- OCR
+- invoice extraction
+- stock updates
+- customer dashboards
+- automatic WhatsApp replies
+
+Those are added only after reliable inbound capture is proven.
