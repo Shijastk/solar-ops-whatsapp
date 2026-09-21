@@ -1,10 +1,16 @@
 # Known Issues and Open Concerns
 
-## K001 - Custom Meta -> Vercel -> Supabase path not yet tested end-to-end
+## K001 - Custom Meta -> Vercel -> Supabase path not yet complete
 
-The Vercel project is deployed and healthy, but the custom WhatsApp webhook has not yet been verified by Meta and proven to write a real inbound text/PDF into Supabase.
+The Meta custom webhook is now verified and Meta's dashboard test reaches the deployed Vercel POST endpoint.
 
-Do not call Milestone 1 complete.
+Current blocker:
+
+- `MAX_MEDIA_BYTES` is empty/missing in Vercel.
+- Full runtime validation therefore reports ingestion configuration invalid.
+- Meta's `messages` dashboard test currently receives HTTP 503 from the webhook.
+
+Do not call Milestone 1 complete until this value is corrected and the live Supabase write/media path is proven.
 
 ## K002 - Vercel deployment is established
 
@@ -16,12 +22,15 @@ Verified:
 - framework is Next.js
 - production deployment state is `READY`
 - stable alias is `https://solar-ops-whatsapp.vercel.app`
-- `/api/health` returns HTTP 200 with `configured: true`
-- no runtime errors were reported in the one-hour verification window
+- Meta webhook GET verification reached the deployed route and returned HTTP 200
+- Meta dashboard POST test reached the deployed route
+- no platform/runtime routing failure is blocking access to the endpoint
 
-## K003 - Supabase credentials are configured, but live writes are not yet verified
+The current HTTP 503 is application configuration validation, not a Vercel routing failure.
 
-The health endpoint confirms the required Supabase environment variables are present in the deployed runtime.
+## K003 - Supabase credentials are present, but live writes are not yet verified
+
+The deployed runtime reports Supabase configuration fields as present.
 
 That does not yet prove:
 
@@ -30,7 +39,7 @@ That does not yet prove:
 - the webhook can write rows
 - the webhook can upload media
 
-Those will be verified by the first live inbound text/PDF test.
+Those will be verified after the current environment validation blocker is fixed.
 
 ## K004 - Meta access token lifecycle
 
@@ -48,14 +57,14 @@ Before production rollout, or when Meta publishes an expiration date, re-check t
 
 ## K006 - Automated quality workflow is active
 
-The GitHub Actions CI workflow has been observed completing successfully after the automated test suite was added.
+The GitHub Actions CI workflow has been observed completing successfully after the runtime-diagnostics changes.
 
-The verified run included:
+The quality gate includes:
 
-- TypeScript typecheck: success
-- ESLint: success
-- Vitest: 4 test files / 17 tests passed
-- Next.js production build: success
+- TypeScript typecheck
+- ESLint
+- Vitest
+- Next.js production build
 
 This does not make future commits automatically trusted. The CI result for each relevant commit must still be checked before claiming success.
 
@@ -69,11 +78,15 @@ Do not change this architecture without user approval because it introduces queu
 
 ## K008 - Media limits
 
-The current default maximum media size is 15 MiB.
+The intended prototype default maximum media size is 15 MiB.
 
-This is a project safety choice, not a claimed Meta platform limit.
+The current Vercel environment contains an empty/missing `MAX_MEDIA_BYTES` value, which is the active configuration blocker.
 
-Change it only intentionally.
+Set it to:
+
+`15728640`
+
+This value is a project safety choice, not a claimed Meta platform limit.
 
 ## K009 - No OCR or inventory semantics
 
