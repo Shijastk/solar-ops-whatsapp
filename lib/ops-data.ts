@@ -1,0 +1,141 @@
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+
+export type OpsMessage = {
+  id: string;
+  sender_phone: string;
+  sender_name: string | null;
+  message_type: string;
+  text_body: string | null;
+  original_filename: string | null;
+  mime_type: string | null;
+  media_size_bytes: number | null;
+  storage_path: string | null;
+  processing_status: string;
+  received_at: string;
+  processed_at: string | null;
+};
+
+export type OpsSummary = {
+  totalMessages: number;
+  storedMessages: number;
+  availableFiles: number;
+  failedMessages: number;
+};
+
+const MESSAGE_SELECT = [
+  "id",
+  "sender_phone",
+  "sender_name",
+  "message_type",
+  "text_body",
+  "original_filename",
+  "mime_type",
+  "media_size_bytes",
+  "storage_path",
+  "processing_status",
+  "received_at",
+  "processed_at",
+].join(",");
+
+export async function listOpsMessages(limit = 100): Promise<OpsMessage[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("whatsapp_messages")
+    .select(MESSAGE_SELECT)
+    .order("received_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Failed to load WhatsApp messages: ${error.message}`);
+  }
+
+  return (data ?? []) as OpsMessage[];
+}
+
+async function countMessages(
+  configure?: (
+    query: ReturnType<ReturnType<typeof getSupabaseAdmin>["from"]>,
+  ) => unknown,
+): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  let query = supabase
+    .from("whatsapp_messages")
+    .select("id", { count: "exact", head: true });
+
+  if (configure) {
+    query = configure(query) as typeof query;
+  }
+
+  const { count, error } = await query;
+  if (error) {
+    throw new Error(`Failed to count WhatsApp messages: ${error.message}`);
+  }
+
+  return count ?? 0;
+}
+
+export async function getOpsSummary(): Promise<OpsSummary> {
+  const supabase = getSupabaseAdmin();
+
+  const [
+    totalResult,
+    storedResult,
+    availableResult,
+    failedResult,
+  ] = await Promise.all([
+    supabase
+      .from("whatsapp_messages")
+      .select("id", { count: "exact", head: true }),
+    supabase
+      .from("whatsapp_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("processing_status", "stored"),
+    supabase
+      .from("whatsapp_messages")
+      .select("id", { count: "exact", head: true })
+      .not("storage_path", "is", null),
+    supabase
+      .from("whatsapp_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("processing_status", "failed"),
+  ]);
+
+  const results = [
+    ["total", totalResult],
+    ["stored", storedResult],
+    ["available files", availableResult],
+    ["failed", failedResult],
+  ] as const;
+
+  for (const [label, result] of results) {
+    if (result.error) {
+      throw new Error(
+        `Failed to count ${label} WhatsApp messages: ${result.error.message}`,
+      );
+    }
+  }
+
+  return {
+    totalMessages: totalResult.count ?? 0,
+    storedMessages: storedResult.count ?? 0,
+    availableFiles: availableResult.count ?? 0,
+    failedMessages: failedResult.count ?? 0,
+  };
+}
+
+export async function getOpsMessageById(
+  id: string,
+): Promise<OpsMessage | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("whatsapp_messages")
+    .select(MESSAGE_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load WhatsApp message: ${error.message}`);
+  }
+
+  return (data as OpsMessage | null) ?? null;
+}
