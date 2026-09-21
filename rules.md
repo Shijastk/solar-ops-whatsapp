@@ -119,3 +119,21 @@ Do not add OCR, stock logic, dashboards, outbound WhatsApp messaging, billing, o
 ## 10. Documentation maintenance
 
 Whenever a change affects architecture, schema, requirements, environment variables, deployment, testing, or an important decision, update the matching docs in the same change.
+
+
+## 11. Credentialed integration safety
+
+The provider integration suite is intentionally separate from normal CI.
+
+Rules:
+
+- It must run only by explicit manual action such as `workflow_dispatch`; never on every push or pull request.
+- It must use synthetic text and a generated synthetic PDF. Never use customer invoices, photos, voice notes, or other real business documents.
+- It must not call the WhatsApp `/messages` send endpoint or send a WhatsApp message to a person.
+- It must refuse to proceed when the deployed sender allowlist or destination Phone Number ID protection is absent.
+- Credentials and sender/destination identifiers must come from protected environment/repository secrets, not workflow inputs or committed files.
+- The workflow must force cleanup of synthetic Supabase rows, Storage objects, and Meta media fixtures.
+- Reports may contain only pass/fail state, timings, safe summaries, public target origin, API version, and cleanup status.
+- Reports must never contain tokens, app secrets, phone numbers, Phone Number IDs, media IDs, raw webhook payloads, Supabase credentials, or customer data.
+- Generated credentialed reports are workflow artifacts, not GitHub Pages content.
+- Do not claim Meta/Vercel/Supabase integration is verified until an actual credentialed run completes successfully and its report is inspected.
