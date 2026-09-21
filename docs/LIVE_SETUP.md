@@ -1,6 +1,6 @@
 # Live Setup Runbook
 
-Status: Vercel deployment and health check verified. Meta custom webhook + Supabase end-to-end capture still pending.
+Status: Vercel deployment, webhook verification, and Meta dashboard sample text -> Supabase database write verified. Real inbound text and media storage remain pending.
 
 This runbook intentionally separates account-level manual actions from code changes.
 
@@ -30,13 +30,11 @@ Open this repository file:
 
 Run the complete SQL file.
 
-Expected table:
+Verified complete on 2026-09-21.
+
+Expected/verified table:
 
 `public.whatsapp_messages`
-
-Important expected constraint:
-
-`whatsapp_message_id` must be unique.
 
 ### A3. Create private Storage bucket
 
@@ -49,11 +47,11 @@ Use:
 - Bucket name: `whatsapp-media`
 - Public bucket: **OFF**
 
-Do not make this bucket public.
+Verified created by the user on 2026-09-21.
 
 ### A4. Collect server-side values
 
-Keep these values ready for Vercel:
+Keep these values in Vercel only:
 
 - `SUPABASE_URL`
 - `SUPABASE_SECRET_KEY`
@@ -80,9 +78,9 @@ Stable production alias:
 
 ### B2. Environment variables
 
-Verified through the non-secret health endpoint that the required runtime configuration is present.
+Runtime validation is currently healthy.
 
-Required configuration includes:
+Normal prototype configuration includes:
 
 ```text
 WHATSAPP_VERIFY_TOKEN
@@ -98,15 +96,18 @@ SUPABASE_STORAGE_BUCKET=whatsapp-media
 MAX_MEDIA_BYTES=15728640
 ```
 
-Secret values must remain only in Vercel/account configuration.
+Important temporary test state:
+
+- `ALLOWED_WHATSAPP_SENDERS` was removed temporarily.
+- `WHATSAPP_PHONE_NUMBER_ID` was removed temporarily.
+
+Restore both values before broader live/production testing.
 
 ### B3. Deployment
 
 Verified production deployment state:
 
 `READY`
-
-No Vercel runtime errors were reported in the one-hour verification window.
 
 ## Phase C - Pre-Meta health check
 
@@ -116,55 +117,65 @@ Endpoint:
 
 `https://solar-ops-whatsapp.vercel.app/api/health`
 
-Observed:
+Observed after the current temporary test configuration:
 
 - HTTP 200
 - `ok: true`
 - `configured: true`
+- webhook validation true
+- ingestion validation true
+- no invalid fields
 - no secret values returned
 
 ## Phase D - Meta webhook
 
-This is the current next step.
+Verified complete on 2026-09-21.
 
-In the existing Meta app:
+Meta app:
 
 `Solar Ops Prototype`
 
-Configure the WhatsApp webhook callback URL as:
+Callback:
 
 `https://solar-ops-whatsapp.vercel.app/api/whatsapp`
 
-Use the exact same value for the Meta Verify Token as the Vercel environment variable:
+Verified:
 
-`WHATSAPP_VERIFY_TOKEN`
-
-Do not reveal or paste that token into chat.
-
-Subscribe to the WhatsApp `messages` webhook field.
-
-Expected:
-
-Meta webhook verification succeeds.
+- Meta GET verification returned HTTP 200.
+- `messages` webhook field is subscribed.
+- Meta dashboard `messages` test reaches the custom POST endpoint.
 
 ## Phase E - End-to-end test
 
-### E1. Text message
+### E1. Dashboard sample text
 
-From the allowed test sender, send:
+Verified on 2026-09-21.
 
-`Hello`
+Observed:
 
-Expected in Supabase:
+- Meta dashboard sent one text message event.
+- Vercel returned HTTP 200.
+- processing summary: one text, stored 1, ignored 0.
+- user confirmed a row appeared in `public.whatsapp_messages`.
+
+This proves the custom dashboard test -> Vercel -> Supabase database write path.
+
+It is not equivalent to a real inbound WhatsApp message through the custom webhook.
+
+### E2. Real inbound text
+
+Pending.
+
+Expected:
 
 - one row in `public.whatsapp_messages`
 - `message_type = text`
-- `text_body = Hello`
+- text body stored
 - `processing_status = stored`
 
-### E2. PDF
+### E3. PDF/media
 
-Forward a small non-sensitive PDF to the Meta test WhatsApp number.
+Pending.
 
 Expected:
 
@@ -178,7 +189,9 @@ Expected in Storage:
 
 - the PDF exists inside private bucket `whatsapp-media`
 
-### E3. Duplicate behavior
+### E4. Duplicate behavior
+
+Pending.
 
 The same WhatsApp message ID must not create a second row if Meta retries the event.
 
@@ -194,7 +207,16 @@ Milestone 1 is complete only when all of these are true:
 6. A real inbound PDF is stored in private Supabase Storage.
 7. The related database row contains its Storage path.
 
-Current verified items: 1, 2, and 3.
+Verified now:
+
+- CI/deployment/health
+- custom webhook verification
+- dashboard sample text persisted into Supabase
+
+Still pending:
+
+- real inbound text on the custom webhook
+- real PDF/media download and private Storage upload
 
 ## Known temporary limitation
 
