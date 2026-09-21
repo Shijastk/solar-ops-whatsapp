@@ -1,6 +1,6 @@
 # Live Setup Runbook
 
-Status: required before Milestone 1 can be called end-to-end complete.
+Status: Vercel deployment and health check verified. Meta custom webhook + Supabase end-to-end capture still pending.
 
 This runbook intentionally separates account-level manual actions from code changes.
 
@@ -62,76 +62,70 @@ Do not send them in chat.
 
 ## Phase B - Vercel
 
-The current connected Vercel tools in this session can inspect existing projects, but no project-creation action is available. Therefore the first project import is a manual account-level action.
-
 ### B1. Import the GitHub repository
 
-In Vercel:
+Verified complete on 2026-09-21.
 
-`Add New -> Project -> Import Git Repository`
+Project:
 
-Select:
+`solar-ops-whatsapp`
 
-`Shijastk/solar-ops-whatsapp`
-
-Expected framework:
+Framework:
 
 `Next.js`
 
-Do not override the build command unless a real build issue requires it.
+Stable production alias:
 
-### B2. Add environment variables
+`https://solar-ops-whatsapp.vercel.app`
 
-Before the first live integration test, add:
+### B2. Environment variables
+
+Verified through the non-secret health endpoint that the required runtime configuration is present.
+
+Required configuration includes:
 
 ```text
-WHATSAPP_VERIFY_TOKEN=<your-long-random-value>
-WHATSAPP_ACCESS_TOKEN=<Meta test access token>
-WHATSAPP_PHONE_NUMBER_ID=<Meta test phone number ID>
-META_APP_SECRET=<Meta app secret>
+WHATSAPP_VERIFY_TOKEN
+WHATSAPP_ACCESS_TOKEN
+WHATSAPP_PHONE_NUMBER_ID
+META_APP_SECRET
 META_GRAPH_API_VERSION=v26.0
+ALLOWED_WHATSAPP_SENDERS
 
-ALLOWED_WHATSAPP_SENDERS=<test sender digits only>
-
-SUPABASE_URL=<Supabase project URL>
-SUPABASE_SECRET_KEY=<Supabase server-side secret>
+SUPABASE_URL
+SUPABASE_SECRET_KEY
 SUPABASE_STORAGE_BUCKET=whatsapp-media
 MAX_MEDIA_BYTES=15728640
 ```
 
-For `ALLOWED_WHATSAPP_SENDERS`, use digits only.
+Secret values must remain only in Vercel/account configuration.
 
-Example format:
+### B3. Deployment
 
-`919876543210`
+Verified production deployment state:
 
-Do not include `+`, spaces, or hyphens.
+`READY`
 
-### B3. Deploy
-
-Deploy the project.
-
-After deployment, record the public deployment hostname.
-
-Do not consider deployment alone proof that WhatsApp ingestion works.
+No Vercel runtime errors were reported in the one-hour verification window.
 
 ## Phase C - Pre-Meta health check
 
-Open:
+Verified complete on 2026-09-21.
 
-`https://<deployment-domain>/api/health`
+Endpoint:
 
-Expected:
+`https://solar-ops-whatsapp.vercel.app/api/health`
+
+Observed:
 
 - HTTP 200
 - `ok: true`
 - `configured: true`
-
-The endpoint must not reveal secret values.
-
-If it returns HTTP 503 or `configured: false`, fix Vercel environment variables before configuring Meta.
+- no secret values returned
 
 ## Phase D - Meta webhook
+
+This is the current next step.
 
 In the existing Meta app:
 
@@ -139,11 +133,13 @@ In the existing Meta app:
 
 Configure the WhatsApp webhook callback URL as:
 
-`https://<deployment-domain>/api/whatsapp`
+`https://solar-ops-whatsapp.vercel.app/api/whatsapp`
 
-Use the exact same value for the Meta Verify Token as:
+Use the exact same value for the Meta Verify Token as the Vercel environment variable:
 
 `WHATSAPP_VERIFY_TOKEN`
+
+Do not reveal or paste that token into chat.
 
 Subscribe to the WhatsApp `messages` webhook field.
 
@@ -197,6 +193,8 @@ Milestone 1 is complete only when all of these are true:
 5. A real inbound text is stored in Supabase.
 6. A real inbound PDF is stored in private Supabase Storage.
 7. The related database row contains its Storage path.
+
+Current verified items: 1, 2, and 3.
 
 ## Known temporary limitation
 
