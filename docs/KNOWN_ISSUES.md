@@ -1,22 +1,21 @@
 # Known Issues and Open Concerns
 
-## K001 - Custom Meta -> Vercel -> Supabase path partially proven
+## K001 - Custom Meta -> Vercel -> Supabase Milestone 1 path verified
 
-Verified on 2026-09-21:
+Resolved on 2026-09-21.
 
-- Meta custom webhook GET verification succeeds.
-- Meta dashboard `messages` POST reaches Vercel.
-- A dashboard sample text is parsed and stored successfully in `public.whatsapp_messages`.
-- The user visually confirmed the Supabase row exists.
+Verified:
 
-Not yet proven:
+- Meta custom webhook GET verification succeeds
+- Meta app is published
+- app subscription to the Test WhatsApp Business Account succeeds
+- real inbound WhatsApp text reaches the custom webhook and is stored
+- real inbound WhatsApp PDF/document reaches the custom webhook and is stored
+- private Supabase media Storage is verified
+- credentialed media byte-integrity and cleanup checks pass
+- replay/idempotency checks pass
 
-- a real inbound WhatsApp text reaches the custom webhook while the Meta app is unpublished
-- live media download from Meta
-- private Storage upload
-- complete real PDF path
-
-Do not call Milestone 1 complete yet.
+Milestone 1 is complete.
 
 ## K002 - Vercel deployment is established
 
@@ -167,21 +166,21 @@ The user configured the required `integration` environment secrets and the manua
 Secret values remain intentionally unreadable from repository code and reports. Do not copy credentials into workflow inputs, source files, issues, or chat.
 
 
-## K015 - Real inbound callback remains blocked by unpublished-app behavior
+## K015 - Real inbound callback verified after publishing and WABA subscription
 
-Meta's dashboard warning observed during setup states that while the app is unpublished, production data is not delivered to the custom webhook; only dashboard test webhooks are available.
+Resolved on 2026-09-21.
 
-The credentialed harness proves the server/provider/storage path without publishing the app, but Milestone 1 acceptance still requires a real inbound text and PDF to be delivered by Meta to the custom callback when the app state permits it.
+After publishing the Meta app and subscribing the app to the Test WhatsApp Business Account, real inbound webhook delivery began working.
+
+A real text and a real PDF/document were both delivered to the deployed custom webhook and stored successfully.
 
 
-## K016 - Meta privacy-policy URL still requires account-level entry
+## K016 - Meta privacy-policy publishing requirement completed
 
-The repository now provides a public privacy policy route at `/privacy`.
+Resolved on 2026-09-21.
 
-After the production deployment is verified, the user must enter:
+The public policy is live at:
 
 `https://solar-ops-whatsapp.vercel.app/privacy`
 
-under Meta App Settings -> Basic -> Privacy Policy URL and save it.
-
-Publishing requirements after that point must be read from the current Meta dashboard rather than assumed.
+The URL was entered into Meta App Settings and the app was published successfully.
