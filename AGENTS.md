@@ -61,18 +61,25 @@ Current Milestone 2 scope:
 - temporary raw-media retention
 - automatic deletion of successfully stored media after approximately 24 hours
 - preserve message metadata after file deletion
-- internal mobile-first web dashboard for operational verification
+- internal mobile-first WhatsApp-style operations UI
 - authenticated temporary preview of private files
-- prepare for later invoice/document extraction
+- deterministic PDF text extraction and structured document drafts
+- human approval of complete parser drafts
+- manual WhatsApp text replies from the internal UI while Meta's 24-hour customer-service window is open
+- outbound delivery-status tracking
 
-Do not invent invoice fields, OCR semantics, stock-in/out rules, or automatic inventory mutations. Those business rules are still undefined and must be explicitly decided before implementation.
+The user has approved parsing and manual operator replies.
+
+Still do not invent stock semantics. Parsed or approved document data must not silently mutate stock/current-stock records until the business rule for stock IN/OUT and opening balance is explicitly defined.
+
+Image-only/scanned PDFs that do not contain a usable text layer must be marked for OCR rather than guessed.
 
 Still out of scope unless explicitly approved:
 
 - automatic stock mutation
 - customer-facing portal
-- WhatsApp auto-replies
-- outbound notification system
+- automatic WhatsApp replies
+- template messaging outside the 24-hour service window
 - n8n
 - paid automation services
 - production phone number migration
