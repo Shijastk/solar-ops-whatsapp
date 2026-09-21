@@ -89,3 +89,17 @@ The operator should ideally perform only the action they already understand:
 `Forward to Solar Ops`
 
 Everything after that should be automated behind the scenes.
+
+
+## Approved next direction - temporary raw media
+
+After Milestone 1 acceptance, the user approved minimizing file storage.
+
+The intended lifecycle is now:
+
+1. Receive and process the WhatsApp document.
+2. Keep the raw file only temporarily.
+3. Retain useful structured/operational data long-term.
+4. Automatically delete the raw Storage object after approximately 24 hours when processing succeeded.
+
+The current retention implementation preserves existing message metadata but does not yet invent or extract invoice fields. The exact essential-data schema remains a separate business decision.
