@@ -85,3 +85,20 @@ Decision: Use GitHub Actions for automated typecheck, lint, tests, and productio
 Reason: GitHub Pages is static hosting and cannot execute the server-side WhatsApp webhook. Treating Pages as backend testing would give false confidence.
 
 Security condition: the Pages artifact may contain only generic quality metadata. It must never publish secrets, WhatsApp payloads, phone numbers, customer documents, or internal commercial data.
+
+
+## D014 - Manual credentialed provider integration harness
+
+Decision: Add a manual-only credentialed integration workflow that uses synthetic test data to exercise the deployed webhook, Meta media API, Supabase database, private Storage, idempotency, and cleanup.
+
+Reason: Unit tests and Meta's dashboard sample cannot prove the complete provider path. A controlled synthetic media fixture can test the real Meta media upload/retrieve/download APIs without publishing customer data or sending a WhatsApp message to a person.
+
+Safety constraints:
+
+- the workflow uses `workflow_dispatch` only
+- sender allowlist and destination Phone Number ID checks must remain enabled
+- credentials are supplied only through GitHub Actions secrets
+- a generated synthetic PDF is used instead of a real document
+- cleanup is mandatory in the GitHub workflow
+- reports are redacted artifacts and are never published to Pages
+- a real inbound WhatsApp delivery remains a separate acceptance test
