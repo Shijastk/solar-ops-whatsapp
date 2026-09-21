@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createOpsSession,
+  isSameOriginRequest,
   isValidOpsAccessKey,
   verifyOpsSession,
 } from "../lib/ops-auth";
@@ -54,6 +55,40 @@ describe("ops authentication", () => {
     expect(verifyOpsSession(session, now + 60_001)).toBe(false);
     expect(
       verifyOpsSession(`${session.slice(0, -1)}0`, now + 30_000),
+    ).toBe(false);
+  });
+
+  it("accepts same-origin POST context from Origin or Referer", () => {
+    expect(
+      isSameOriginRequest(
+        new Request("https://ops.example.test/api/ops/logout", {
+          headers: { origin: "https://ops.example.test" },
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      isSameOriginRequest(
+        new Request("https://ops.example.test/api/ops/logout", {
+          headers: { referer: "https://ops.example.test/ops" },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects cross-origin and missing-origin POST context", () => {
+    expect(
+      isSameOriginRequest(
+        new Request("https://ops.example.test/api/ops/logout", {
+          headers: { origin: "https://evil.example" },
+        }),
+      ),
+    ).toBe(false);
+
+    expect(
+      isSameOriginRequest(
+        new Request("https://ops.example.test/api/ops/logout"),
+      ),
     ).toBe(false);
   });
 });
