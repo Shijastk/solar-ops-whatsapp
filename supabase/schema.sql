@@ -63,7 +63,6 @@ execute function public.set_updated_at();
 -- Create the private Storage bucket in the Supabase dashboard:
 -- Storage -> New bucket -> "whatsapp-media" -> Public OFF.
 
-
 -- Structured document parsing and manual reply schema.
 -- Additive Solar Ops document parsing and manual reply schema.
 
@@ -75,15 +74,26 @@ create table if not exists public.document_drafts (
   document_type text,
   supplier_name text,
   supplier_gstin text,
+  supplier_address text,
   document_number text,
   document_date date,
   eway_bill_number text,
-  customer_name text,
-  customer_address text,
-  customer_pincode text,
-  customer_phone text,
+  consignee_name text,
+  consignee_address text,
+  consignee_gstin text,
+  consignee_pincode text,
+  consignee_phone text,
+  buyer_name text,
+  buyer_address text,
+  buyer_gstin text,
+  buyer_pincode text,
+  buyer_phone text,
   destination text,
+  dispatch_from_address text,
   vehicle_number text,
+  approximate_distance_km integer,
+  eway_generated_at_text text,
+  eway_valid_until_text text,
   supply_type text,
   transaction_type text,
   taxable_amount numeric(18,2),
@@ -91,9 +101,11 @@ create table if not exists public.document_drafts (
   sgst_amount numeric(18,2),
   total_amount numeric(18,2),
   page_count integer,
+  extracted_text text,
   text_sha256 text,
   text_length integer,
   missing_fields jsonb not null default '[]'::jsonb,
+  extra_fields jsonb not null default '{}'::jsonb,
   parse_error text,
   extracted_at timestamptz not null default now(),
   approved_at timestamptz,
