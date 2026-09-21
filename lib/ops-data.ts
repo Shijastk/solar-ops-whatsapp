@@ -1,19 +1,22 @@
+import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-export type OpsMessage = {
-  id: string;
-  sender_phone: string;
-  sender_name: string | null;
-  message_type: string;
-  text_body: string | null;
-  original_filename: string | null;
-  mime_type: string | null;
-  media_size_bytes: number | null;
-  storage_path: string | null;
-  processing_status: string;
-  received_at: string;
-  processed_at: string | null;
-};
+const opsMessageSchema = z.object({
+  id: z.string().uuid(),
+  sender_phone: z.string(),
+  sender_name: z.string().nullable(),
+  message_type: z.string(),
+  text_body: z.string().nullable(),
+  original_filename: z.string().nullable(),
+  mime_type: z.string().nullable(),
+  media_size_bytes: z.number().nullable(),
+  storage_path: z.string().nullable(),
+  processing_status: z.string(),
+  received_at: z.string(),
+  processed_at: z.string().nullable(),
+});
+
+export type OpsMessage = z.infer<typeof opsMessageSchema>;
 
 export type OpsSummary = {
   totalMessages: number;
@@ -49,7 +52,7 @@ export async function listOpsMessages(limit = 100): Promise<OpsMessage[]> {
     throw new Error(`Failed to load WhatsApp messages: ${error.message}`);
   }
 
-  return (data ?? []) as OpsMessage[];
+  return z.array(opsMessageSchema).parse(data ?? []);
 }
 
 export async function getOpsSummary(): Promise<OpsSummary> {
@@ -115,5 +118,5 @@ export async function getOpsMessageById(
     throw new Error(`Failed to load WhatsApp message: ${error.message}`);
   }
 
-  return (data as OpsMessage | null) ?? null;
+  return data ? opsMessageSchema.parse(data) : null;
 }
