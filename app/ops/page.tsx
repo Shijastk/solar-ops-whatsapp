@@ -248,14 +248,18 @@ export default async function OpsDashboardPage() {
                       >
                         View file
                       </a>
-                      <form
-                        action={`/api/ops/media/${message.id}/delete`}
-                        method="post"
-                      >
-                        <button className="opsDangerButton" type="submit">
-                          Delete now
-                        </button>
-                      </form>
+                      <details className="opsDeleteConfirm">
+                        <summary>Delete file</summary>
+                        <form
+                          action={`/api/ops/media/${message.id}/delete`}
+                          method="post"
+                        >
+                          <span>Raw file only; metadata stays.</span>
+                          <button className="opsDangerButton" type="submit">
+                            Confirm delete
+                          </button>
+                        </form>
+                      </details>
                     </div>
                   ) : null}
                 </article>
