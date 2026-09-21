@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -7,34 +8,29 @@ import {
   verifyOpsSession,
 } from "@/lib/ops-auth";
 import {
+  buildOpsConversations,
   getOpsSummary,
+  listOpsDraftsForMessages,
   listOpsMessages,
+  listOpsOutboundMessages,
+  type OpsDocumentDraft,
   type OpsMessage,
+  type OpsOutboundMessage,
 } from "@/lib/ops-data";
+import { isWithinCustomerServiceWindow } from "@/lib/replies";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Operations Dashboard | Solar Ops",
+  title: "Operations Chat | Solar Ops",
   robots: {
     index: false,
     follow: false,
   },
 };
 
-const MEDIA_TYPES = new Set([
-  "document",
-  "image",
-  "audio",
-  "video",
-  "sticker",
-]);
-
 function formatDate(value: string | null): string {
-  if (!value) {
-    return "—";
-  }
-
+  if (!value) return "—";
   return new Intl.DateTimeFormat("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -42,232 +38,448 @@ function formatDate(value: string | null): string {
   }).format(new Date(value));
 }
 
+function formatTime(value: string): string {
+  return new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "Asia/Kolkata",
+  }).format(new Date(value));
+}
+
 function formatBytes(value: number | null): string {
-  if (!value) {
-    return "—";
-  }
-
+  if (!value) return "—";
   if (value < 1024 * 1024) {
-    return `${Math.max(1, Math.round(value / 1024))} KB`;
+    return Math.max(1, Math.round(value / 1024)) + " KB";
   }
+  return (value / (1024 * 1024)).toFixed(1) + " MB";
+}
 
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+function formatMoney(value: number | null): string {
+  if (value === null) return "—";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 function maskSender(value: string): string {
   const digits = value.replace(/\D/g, "");
-  if (digits.length <= 4) {
-    return "••••";
-  }
-
-  return `•••• ${digits.slice(-4)}`;
+  return digits.length <= 4 ? "••••" : "•••• " + digits.slice(-4);
 }
 
-function mediaState(message: OpsMessage): {
-  label: string;
-  className: string;
-} {
-  if (!MEDIA_TYPES.has(message.message_type)) {
-    return {
-      label: message.processing_status === "failed" ? "Failed" : "Stored",
-      className:
-        message.processing_status === "failed"
-          ? "opsBadge opsBadgeDanger"
-          : "opsBadge opsBadgeGood",
-    };
-  }
-
-  if (message.processing_status === "failed") {
-    return { label: "Failed", className: "opsBadge opsBadgeDanger" };
-  }
-
-  if (message.storage_path) {
-    return { label: "File available", className: "opsBadge opsBadgeGood" };
-  }
-
-  return { label: "File deleted", className: "opsBadge opsBadgeMuted" };
-}
-
-function retentionText(message: OpsMessage): string | null {
-  if (!message.storage_path || !message.processed_at) {
-    return null;
-  }
-
-  const expiry = new Date(
-    new Date(message.processed_at).getTime() + 24 * 60 * 60 * 1000,
+function documentTitle(message: OpsMessage): string {
+  return (
+    message.original_filename ||
+    (message.message_type === "text" ? "WhatsApp text" : message.message_type)
   );
-
-  return `Cleanup eligible after ${formatDate(expiry.toISOString())}`;
 }
 
-export default async function OpsDashboardPage() {
+function documentStatus(draft: OpsDocumentDraft | undefined): string {
+  if (!draft) return "Not parsed";
+  if (draft.parse_status === "approved") return "Approved";
+  if (draft.parse_status === "ready_for_review") return "Ready to review";
+  if (draft.parse_status === "needs_review") return "Needs review";
+  if (draft.parse_status === "needs_ocr") return "Needs OCR";
+  if (draft.parse_status === "failed") return "Parse failed";
+  return draft.parse_status;
+}
+
+function isPdf(message: OpsMessage): boolean {
+  return (
+    message.mime_type?.toLowerCase() === "application/pdf" ||
+    message.original_filename?.toLowerCase().endsWith(".pdf") === true
+  );
+}
+
+function DraftCard({
+  message,
+  draft,
+}: {
+  message: OpsMessage;
+  draft: OpsDocumentDraft;
+}) {
+  return (
+    <div className="waParseCard">
+      <div className="waParseHeader">
+        <div>
+          <span>PARSED BILL</span>
+          <strong>{documentStatus(draft)}</strong>
+        </div>
+        <span className={"waParseState waParseState-" + draft.parse_status}>
+          {draft.parse_status.replaceAll("_", " ")}
+        </span>
+      </div>
+
+      <dl className="waParsedGrid">
+        <div>
+          <dt>Company</dt>
+          <dd>{draft.supplier_name || "—"}</dd>
+        </div>
+        <div>
+          <dt>Document</dt>
+          <dd>{draft.document_number || "—"}</dd>
+        </div>
+        <div>
+          <dt>Date</dt>
+          <dd>{draft.document_date || "—"}</dd>
+        </div>
+        <div>
+          <dt>e-Way bill</dt>
+          <dd>{draft.eway_bill_number || "—"}</dd>
+        </div>
+        <div>
+          <dt>Ship to</dt>
+          <dd>{draft.consignee_name || "—"}</dd>
+        </div>
+        <div>
+          <dt>Vehicle</dt>
+          <dd>{draft.vehicle_number || "—"}</dd>
+        </div>
+      </dl>
+
+      {draft.consignee_address ? (
+        <p className="waParsedAddress">{draft.consignee_address}</p>
+      ) : null}
+
+      {draft.items.length > 0 ? (
+        <div className="waItems">
+          {draft.items.map((item) => (
+            <div className="waItem" key={item.id}>
+              <div>
+                <strong>{item.description}</strong>
+                <span>{item.hsn_sac ? "HSN " + item.hsn_sac : "Product"}</span>
+              </div>
+              <div className="waItemQty">
+                <strong>
+                  {item.quantity ?? "—"} {item.unit ?? ""}
+                </strong>
+                <span>{formatMoney(item.amount)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="waParsedTotals">
+        <span>Total</span>
+        <strong>{formatMoney(draft.total_amount)}</strong>
+      </div>
+
+      {draft.missing_fields.length > 0 ? (
+        <p className="waParseWarning">
+          Missing: {draft.missing_fields.join(", ")}
+        </p>
+      ) : null}
+
+      <div className="waParseActions">
+        {draft.parse_status === "ready_for_review" ? (
+          <form action={"/api/ops/messages/" + message.id + "/approve"} method="post">
+            <button className="waApproveButton" type="submit">
+              Approve data
+            </button>
+          </form>
+        ) : null}
+        {draft.parse_status !== "approved" && message.storage_path ? (
+          <form action={"/api/ops/messages/" + message.id + "/parse"} method="post">
+            <button className="waSecondaryAction" type="submit">
+              Parse again
+            </button>
+          </form>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function InboundBubble({
+  message,
+  draft,
+}: {
+  message: OpsMessage;
+  draft: OpsDocumentDraft | undefined;
+}) {
+  return (
+    <article className="waRow waRowInbound" id={"message-" + message.id}>
+      <div className="waBubble waInboundBubble">
+        {message.text_body ? (
+          <p className="waMessageText">{message.text_body}</p>
+        ) : (
+          <div className="waDocument">
+            <div className="waDocumentIcon">PDF</div>
+            <div>
+              <strong>{documentTitle(message)}</strong>
+              <span>
+                {formatBytes(message.media_size_bytes)} ·{" "}
+                {message.mime_type || message.message_type}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {isPdf(message) && draft ? (
+          <DraftCard message={message} draft={draft} />
+        ) : null}
+
+        {isPdf(message) && !draft && message.storage_path ? (
+          <form
+            className="waInlineAction"
+            action={"/api/ops/messages/" + message.id + "/parse"}
+            method="post"
+          >
+            <button type="submit">Parse bill data</button>
+          </form>
+        ) : null}
+
+        <div className="waBubbleActions">
+          {message.storage_path ? (
+            <a
+              href={"/api/ops/media/" + message.id}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View file
+            </a>
+          ) : (
+            <span>Raw file deleted</span>
+          )}
+          {message.storage_path ? (
+            <details className="waDelete">
+              <summary>Delete</summary>
+              <form
+                action={"/api/ops/media/" + message.id + "/delete"}
+                method="post"
+              >
+                <span>Structured data stays.</span>
+                <button type="submit">Confirm delete</button>
+              </form>
+            </details>
+          ) : null}
+        </div>
+
+        <footer>
+          <span>{documentStatus(draft)}</span>
+          <time>{formatTime(message.received_at)}</time>
+        </footer>
+      </div>
+    </article>
+  );
+}
+
+function OutboundBubble({ message }: { message: OpsOutboundMessage }) {
+  return (
+    <article className="waRow waRowOutbound">
+      <div className="waBubble waOutboundBubble">
+        <p className="waMessageText">{message.body}</p>
+        {message.error_message ? (
+          <p className="waSendError">Delivery failed</p>
+        ) : null}
+        <footer>
+          <span>{message.status}</span>
+          <time>{formatTime(message.sent_at || message.created_at)}</time>
+        </footer>
+      </div>
+    </article>
+  );
+}
+
+export default async function OpsDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    conversation?: string;
+    reply?: string;
+    document?: string;
+  }>;
+}) {
   const cookieStore = await cookies();
   const session = cookieStore.get(OPS_SESSION_COOKIE)?.value;
+  if (!verifyOpsSession(session)) redirect("/ops/login");
 
-  if (!verifyOpsSession(session)) {
-    redirect("/ops/login");
-  }
-
-  const [messages, summary] = await Promise.all([
-    listOpsMessages(100),
+  const params = await searchParams;
+  const [messages, outbound, summary] = await Promise.all([
+    listOpsMessages(),
+    listOpsOutboundMessages(),
     getOpsSummary(),
   ]);
+  const drafts = await listOpsDraftsForMessages(
+    messages.map((message) => message.id),
+  );
+  const conversations = buildOpsConversations(messages, outbound);
+  const selected =
+    conversations.find((item) => item.key === params.conversation) ??
+    conversations[0] ??
+    null;
+
   const health = getHealthConfiguration();
   const runtimeHealthy =
     health.validation.webhook && health.validation.ingestion;
 
+  const timeline = selected
+    ? [
+        ...selected.messages.map((message) => ({
+          type: "inbound" as const,
+          time: message.received_at,
+          message,
+        })),
+        ...selected.outbound.map((message) => ({
+          type: "outbound" as const,
+          time: message.sent_at || message.created_at,
+          message,
+        })),
+      ].sort(
+        (left, right) =>
+          new Date(left.time).getTime() - new Date(right.time).getTime(),
+      )
+    : [];
+
+  const latestInbound = selected?.messages[selected.messages.length - 1] ?? null;
+  const canReply =
+    latestInbound && isWithinCustomerServiceWindow(latestInbound.received_at);
+
   return (
-    <main className="opsShell">
-      <header className="opsTopbar">
+    <main className="waShell">
+      <header className="waTopbar">
         <div>
           <p className="opsBrand">SOLAR OPS</p>
-          <h1>Received bills</h1>
-          <p>Live WhatsApp ingestion status and temporary file review.</p>
+          <strong>WhatsApp Operations</strong>
         </div>
-
-        <div className="opsTopbarActions">
-          <a className="opsSecondaryButton" href="/ops">
-            Refresh
-          </a>
+        <div className="waTopActions">
+          <span className={runtimeHealthy ? "waOnline" : "waOffline"}>
+            {runtimeHealthy ? "System online" : "Check config"}
+          </span>
           <form action="/api/ops/logout" method="post">
-            <button className="opsGhostButton" type="submit">
-              Sign out
-            </button>
+            <button type="submit">Sign out</button>
           </form>
         </div>
       </header>
 
-      <section className="opsStats" aria-label="System summary">
-        <article>
-          <span>Total received</span>
-          <strong>{summary.totalMessages}</strong>
-        </article>
-        <article>
-          <span>Stored</span>
-          <strong>{summary.storedMessages}</strong>
-        </article>
-        <article>
-          <span>Files available</span>
-          <strong>{summary.availableFiles}</strong>
-        </article>
-        <article>
-          <span>Failed</span>
-          <strong>{summary.failedMessages}</strong>
-        </article>
-      </section>
-
-      <section className="opsSystemBar">
-        <div>
-          <span
-            className={
-              runtimeHealthy
-                ? "opsStatusDot opsStatusDotGood"
-                : "opsStatusDot opsStatusDotDanger"
-            }
-            aria-hidden="true"
-          />
-          <strong>
-            {runtimeHealthy ? "System configured" : "Configuration needs attention"}
-          </strong>
+      {(params.reply || params.document) && (
+        <div className="waNotice">
+          {params.reply === "sent" ? "Reply sent." : null}
+          {params.reply === "window_closed"
+            ? "24-hour reply window is closed. A Meta template would be required."
+            : null}
+          {params.reply === "failed" ? "Reply failed. No automatic retry was sent." : null}
+          {params.reply === "invalid" ? "Reply text was invalid." : null}
+          {params.document === "approved" ? "Parsed bill approved." : null}
+          {params.document === "approval_failed" ? "Bill approval was not allowed." : null}
+          {params.document === "failed" ? "Bill parsing failed." : null}
+          {params.document &&
+          !["approved", "approval_failed", "failed"].includes(params.document)
+            ? "Bill parsed: " + params.document.replaceAll("_", " ") + "."
+            : null}
         </div>
-        <span>Raw files are temporary and cleanup-targeted after 24 hours.</span>
+      )}
+
+      <section className="waStats">
+        <span>{summary.totalMessages} received</span>
+        <span>{summary.availableFiles} files</span>
+        <span>{summary.reviewDrafts} to review</span>
+        <span>{summary.failedMessages} failed</span>
       </section>
 
-      <section className="opsFeed">
-        <div className="opsSectionHeading">
-          <div>
-            <h2>Recent messages</h2>
-            <p>Latest 100 accepted WhatsApp messages.</p>
+      <div className="waApp">
+        <aside className="waConversationList">
+          <div className="waListHeader">
+            <h1>Chats</h1>
+            <a href="/ops">Refresh</a>
           </div>
-        </div>
 
-        {messages.length === 0 ? (
-          <div className="opsEmpty">No accepted messages yet.</div>
-        ) : (
-          <div className="opsMessageList">
-            {messages.map((message) => {
-              const state = mediaState(message);
-              const retention = retentionText(message);
-              const title =
-                message.original_filename ||
-                (message.message_type === "text"
-                  ? "WhatsApp text"
-                  : message.message_type);
-
+          {conversations.length === 0 ? (
+            <p className="waEmptyList">No WhatsApp messages yet.</p>
+          ) : (
+            conversations.map((conversation) => {
+              const latest =
+                conversation.messages[conversation.messages.length - 1];
               return (
-                <article className="opsMessageCard" key={message.id}>
-                  <div className="opsMessageMain">
-                    <div className="opsMessageHeading">
-                      <div>
-                        <p className="opsMessageType">
-                          {message.message_type.toUpperCase()}
-                        </p>
-                        <h3>{title}</h3>
-                      </div>
-                      <span className={state.className}>{state.label}</span>
-                    </div>
-
-                    {message.text_body ? (
-                      <p className="opsTextPreview">{message.text_body}</p>
-                    ) : null}
-
-                    <dl className="opsMetaGrid">
-                      <div>
-                        <dt>Sender</dt>
-                        <dd>
-                          {message.sender_name || "WhatsApp sender"} ·{" "}
-                          {maskSender(message.sender_phone)}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Received</dt>
-                        <dd>{formatDate(message.received_at)}</dd>
-                      </div>
-                      <div>
-                        <dt>Size</dt>
-                        <dd>{formatBytes(message.media_size_bytes)}</dd>
-                      </div>
-                      <div>
-                        <dt>Type</dt>
-                        <dd>{message.mime_type || message.message_type}</dd>
-                      </div>
-                    </dl>
-
-                    {retention ? (
-                      <p className="opsRetentionNote">{retention}</p>
-                    ) : null}
+                <a
+                  className={
+                    "waConversation " +
+                    (selected?.key === conversation.key ? "waConversationActive" : "")
+                  }
+                  href={"/ops?conversation=" + conversation.key}
+                  key={conversation.key}
+                >
+                  <div className="waAvatar">
+                    {(conversation.senderName || "W").slice(0, 1).toUpperCase()}
                   </div>
-
-                  {message.storage_path ? (
-                    <div className="opsMessageActions">
-                      <a
-                        className="opsPrimaryButton"
-                        href={`/api/ops/media/${message.id}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        View file
-                      </a>
-                      <details className="opsDeleteConfirm">
-                        <summary>Delete file</summary>
-                        <form
-                          action={`/api/ops/media/${message.id}/delete`}
-                          method="post"
-                        >
-                          <span>Raw file only; metadata stays.</span>
-                          <button className="opsDangerButton" type="submit">
-                            Confirm delete
-                          </button>
-                        </form>
-                      </details>
-                    </div>
-                  ) : null}
-                </article>
+                  <div>
+                    <strong>{conversation.senderName || "WhatsApp sender"}</strong>
+                    <span>{maskSender(conversation.senderPhone)}</span>
+                    <p>{documentTitle(latest)}</p>
+                  </div>
+                  <time>{formatTime(conversation.latestReceivedAt)}</time>
+                </a>
               );
-            })}
-          </div>
-        )}
-      </section>
+            })
+          )}
+        </aside>
+
+        <section className="waChat">
+          {selected ? (
+            <>
+              <header className="waChatHeader">
+                <div className="waAvatar">
+                  {(selected.senderName || "W").slice(0, 1).toUpperCase()}
+                </div>
+                <div>
+                  <strong>{selected.senderName || "WhatsApp sender"}</strong>
+                  <span>{maskSender(selected.senderPhone)}</span>
+                </div>
+              </header>
+
+              <div className="waTimeline">
+                {timeline.map((entry) =>
+                  entry.type === "inbound" ? (
+                    <InboundBubble
+                      draft={drafts.get(entry.message.id)}
+                      key={"in-" + entry.message.id}
+                      message={entry.message}
+                    />
+                  ) : (
+                    <OutboundBubble
+                      key={"out-" + entry.message.id}
+                      message={entry.message}
+                    />
+                  ),
+                )}
+              </div>
+
+              <footer className="waComposer">
+                {latestInbound && canReply ? (
+                  <form
+                    action={"/api/ops/messages/" + latestInbound.id + "/reply"}
+                    method="post"
+                  >
+                    <input
+                      type="hidden"
+                      name="requestId"
+                      value={randomUUID()}
+                    />
+                    <textarea
+                      aria-label="WhatsApp reply"
+                      maxLength={2000}
+                      name="body"
+                      placeholder="Type a reply…"
+                      required
+                      rows={1}
+                    />
+                    <button type="submit">Send</button>
+                  </form>
+                ) : (
+                  <p>
+                    Free-form reply unavailable: no inbound message in the last
+                    24 hours.
+                  </p>
+                )}
+              </footer>
+            </>
+          ) : (
+            <div className="waNoChat">Select a WhatsApp conversation.</div>
+          )}
+        </section>
+      </div>
     </main>
   );
 }
