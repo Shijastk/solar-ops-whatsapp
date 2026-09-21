@@ -5,6 +5,7 @@ import {
   buildMarkdownReport,
   buildMinimalPdf,
   buildWebhookPayload,
+  describeGraphApiError,
   normalizeDigits,
   redactText,
   sha256Hex,
@@ -203,7 +204,13 @@ async function uploadMetaMedia(bytes) {
 
   const body = await readJsonResponse(response);
   if (!response.ok || typeof body.id !== "string" || !body.id) {
-    throw new Error(`Meta media upload failed with HTTP ${response.status}`);
+    throw new Error(
+      `Meta media upload failed: ${describeGraphApiError(
+        body,
+        response.status,
+        secretValues,
+      )}`,
+    );
   }
 
   return body.id;
@@ -229,7 +236,11 @@ async function retrieveMetaMedia(mediaId) {
 
   if (!response.ok || typeof body.url !== "string" || !body.url) {
     throw new Error(
-      `Meta media metadata lookup failed with HTTP ${response.status}`,
+      `Meta media metadata lookup failed: ${describeGraphApiError(
+        body,
+        response.status,
+        secretValues,
+      )}`,
     );
   }
 
@@ -324,8 +335,13 @@ async function cleanup() {
       });
 
       if (!response.ok) {
+        const body = await readJsonResponse(response);
         throw new Error(
-          `Meta media cleanup failed with HTTP ${response.status}`,
+          `Meta media cleanup failed: ${describeGraphApiError(
+            body,
+            response.status,
+            secretValues,
+          )}`,
         );
       }
 
