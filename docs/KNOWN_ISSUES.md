@@ -116,21 +116,31 @@ The repository is private. Private-repository Pages availability depends on the 
 
 If Pages is unavailable, CI remains the authoritative test system. Do not make this repository public merely to obtain a Pages status page without explicit user approval.
 
-## K011 - Credentialed provider harness implemented but not yet run
+## K011 - Credentialed provider harness partially passes; Meta media upload is the current blocker
 
-The normal automated test suite intentionally avoids real Meta and Supabase credentials.
+Credentialed runs were performed on 2026-09-21.
 
-A manual credentialed integration harness now exists for:
+Verified by the live harness:
 
-- Meta media upload/retrieve/download
-- deployed webhook signature/security checks
-- Supabase database persistence
-- idempotency
-- private Storage upload/download
-- byte-integrity verification
-- cleanup
+- deployed health is healthy
+- invalid webhook signatures are rejected
+- sender allowlist is enforced
+- destination Phone Number ID is enforced
+- signed synthetic text reaches Vercel and Supabase
+- replay leaves exactly one database row
+- configured Supabase Storage bucket is private
+- synthetic database fixtures are cleaned up
 
-This does not become verified evidence until a real credentialed workflow run completes successfully and its report is inspected. Real inbound WhatsApp delivery from Meta remains a separate acceptance test.
+Meta media upload results:
+
+- earlier token: HTTP 401
+- replacement system-user token: HTTP 400
+
+The 401 -> 400 change indicates the failure mode changed after the token replacement, but the exact Meta Graph cause must not be guessed. The harness now records redacted Meta Graph error type/code/subcode/message details for the next run.
+
+Until media upload succeeds, live media retrieval, webhook media download, Storage upload, byte-integrity verification, and Meta-media cleanup remain unverified.
+
+Real inbound WhatsApp delivery from Meta remains a separate acceptance test.
 
 ## K012 - Dependency installs are reproducible
 
@@ -152,10 +162,10 @@ The deployed health endpoint was verified afterward and reports both fields pres
 The credentialed integration harness is designed to keep both protections enabled.
 
 
-## K014 - GitHub integration secrets still require account-level setup
+## K014 - GitHub integration secrets configured
 
-The repository now contains the manual `Credentialed Integration` workflow, but the required GitHub Actions secrets cannot be inferred or committed.
+Resolved on 2026-09-21.
 
-Before the first credentialed run, configure the `integration` GitHub environment (preferred) or repository secrets listed in `docs/INTEGRATION_TESTING.md`.
+The user configured the required `integration` environment secrets and the manual workflow can access them.
 
-Do not copy credentials into workflow inputs, source files, issues, or chat.
+Secret values remain intentionally unreadable from repository code and reports. Do not copy credentials into workflow inputs, source files, issues, or chat.
