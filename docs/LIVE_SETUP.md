@@ -273,3 +273,22 @@ It uses the existing `integration` environment secrets:
 No additional provider credential is required.
 
 The workflow stores only a count-based report artifact. It must not log customer filenames, Storage paths, phone numbers, message payloads, or document contents.
+
+
+## Internal operations dashboard
+
+Dashboard:
+
+`https://solar-ops-whatsapp.vercel.app/ops`
+
+The page requires an operations session.
+
+Preferred login configuration:
+
+`OPS_ACCESS_KEY`
+
+If it is not configured, the prototype temporarily accepts the existing webhook verify token as the dashboard access key.
+
+Available files are opened using a 5-minute signed Supabase URL generated only after server-side session validation.
+
+The dashboard also provides authenticated manual deletion for raw files. Message rows and metadata remain after file deletion.
