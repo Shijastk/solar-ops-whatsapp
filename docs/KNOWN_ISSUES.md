@@ -24,17 +24,13 @@ The current Meta test setup may use a temporary token.
 
 Before long-lived operation, token lifecycle and the appropriate production credential setup must be intentionally configured.
 
-## K005 - Meta Graph API version must be verified
+## K005 - Meta Graph API v26.0 expiration date is TBD
 
-The source currently has a default Graph API version.
+Resolved portion: the repository now intentionally pins `META_GRAPH_API_VERSION=v26.0`, based on the Meta version table supplied for this project on 2026-09-21.
 
-Do not assume that default is the correct production version merely because it is present in code.
+Remaining concern: Meta currently lists the v26.0 expiration date as TBD.
 
-Before production:
-
-1. verify the current supported Meta Graph API version from official Meta documentation
-2. intentionally pin the chosen version
-3. update code/docs together
+Before production rollout, or when Meta publishes an expiration date, re-check the official Meta version table and update code/docs only if needed.
 
 ## K006 - No automated test suite yet
 
