@@ -77,3 +77,11 @@ Evidence recorded on 2026-09-21: Meta's version table supplied for this project 
 Reason: Provider-version assumptions must not be invented. The repository should use an explicitly selected version rather than silently inheriting an older default.
 
 Follow-up: Re-check Meta's official version table before production rollout and when Meta publishes the v26.0 expiration date.
+
+## D013 - GitHub Actions is the quality gate; Pages is only the report
+
+Decision: Use GitHub Actions for automated typecheck, lint, tests, and production build. Use GitHub Pages only to publish a non-sensitive static report after those checks pass.
+
+Reason: GitHub Pages is static hosting and cannot execute the server-side WhatsApp webhook. Treating Pages as backend testing would give false confidence.
+
+Security condition: the Pages artifact may contain only generic quality metadata. It must never publish secrets, WhatsApp payloads, phone numbers, customer documents, or internal commercial data.
