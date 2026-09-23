@@ -233,17 +233,23 @@ The UI supports free-form operator replies only when the latest inbound message 
 
 Approved Meta template messaging outside that window is not implemented.
 
-## K024 - Vercel production deployment is quota-delayed
+## K024 - Vercel production deployment needs a fresh retry after the quota delay
 
-The production deployment attempt after the operations-dashboard merge was rejected by Vercel with a build-rate-limit instruction to retry in 24 hours.
+Observed again on 2026-09-23:
 
-Repository CI can verify source quality, but new behavior must not be described as live on the stable production alias until a production deployment reaches READY.
+- GitHub `main` is at `540fd8c9a9424b20c3fc14efaa22804115ad8c78`
+- the Vercel status attached to that commit still records the earlier build-rate-limit failure
+- the stable production alias is still serving commit `828a8abaaf3110e66ea604ad55f2a2603c19f953`
+- Vercel did not automatically retry the failed production deployment after the waiting period
 
+The operator reports that the 24-hour waiting window has elapsed. A fresh `main` deployment must therefore be triggered through the normal CI-first release path.
+
+Do not promote an existing feature-branch Preview because preview environment values may differ from production. Do not describe the operations dashboard, structured parsing, or manual-reply source as production-live until a fresh production deployment reaches `READY` and the stable alias is verified.
 
 ## K025 - Automatic preview-deployment spam is prevented in source
 
-The repository now contains `vercel.json` branch deployment rules that disable automatic Vercel deployments for feature branches and keep automatic deployment enabled for `main`.
+The repository contains `vercel.json` branch deployment rules that disable automatic Vercel deployments for feature branches and keep automatic deployment enabled for `main`.
 
 This prevents the development pattern that exhausted the Hobby deployment/build quota.
 
-The current already-triggered quota block is external account state and is not cleared merely by adding this configuration. The latest `main` release still requires a successful production deployment after Vercel allows another production deployment or the account quota/plan is changed.
+The earlier quota failure remains attached to the old `main` deployment attempt until a fresh production build is triggered. The safe retry path is feature branch -> CI -> pull request -> CI PASS -> squash merge to `main` -> one production deployment -> post-deploy verification.
