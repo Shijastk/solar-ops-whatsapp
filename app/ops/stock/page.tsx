@@ -69,9 +69,13 @@ export default async function StockPage({
                 ? "Opening stock was not saved because the values were invalid."
                 : params.result === "inconsistent"
                   ? "Opening stock was blocked because the company/product data conflicted."
-                  : params.result === "failed"
-                    ? "Opening stock could not be saved."
-                    : params.result.replaceAll("_", " ")}
+                  : params.result === "potential_company_duplicate"
+                    ? "A very similar company already exists. Select the existing company, or explicitly confirm below that this is a different company."
+                    : params.result === "potential_product_duplicate"
+                      ? "A very similar product already exists for this company/unit. Check Current stock first. Only override if this is genuinely a different product."
+                      : params.result === "failed"
+                        ? "Opening stock could not be saved."
+                        : params.result.replaceAll("_", " ")}
         </div>
       ) : null}
 
@@ -167,6 +171,22 @@ export default async function StockPage({
               step="0.001"
               type="number"
             />
+          </label>
+
+          <label className="stockConfirm">
+            <input name="allowSimilarCompany" type="checkbox" />
+            <span>
+              I checked the existing companies and confirm this new company is
+              genuinely different.
+            </span>
+          </label>
+
+          <label className="stockConfirm">
+            <input name="allowSimilarProduct" type="checkbox" />
+            <span>
+              I checked Current stock and confirm this similar product is
+              genuinely a different product.
+            </span>
           </label>
 
           <button className="stockPrimary" type="submit">
