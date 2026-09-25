@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   type FormEvent,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -71,6 +72,9 @@ export default function StockManager({
 }: StockManagerProps) {
   const router = useRouter();
   const openingFormRef = useRef<HTMLFormElement>(null);
+  const addSheetRef = useRef<HTMLElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [notice, setNotice] = useState(
     initialResult ? resultMessage(initialResult) : "",
   );
@@ -87,6 +91,41 @@ export default function StockManager({
       null,
     [adjustingProductId, balances],
   );
+
+  useEffect(() => {
+    if (!isAddSheetOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const focusTarget = addSheetRef.current?.querySelector<
+      HTMLSelectElement | HTMLInputElement
+    >("select, input:not([type='checkbox'])");
+    focusTarget?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsAddSheetOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isAddSheetOpen]);
+
+  function openAddSheet() {
+    setNotice("");
+    setIsAddSheetOpen(true);
+  }
+
+  function closeAddSheet() {
+    setIsAddSheetOpen(false);
+    window.requestAnimationFrame(() => addButtonRef.current?.focus());
+  }
 
   async function submitOpening(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -110,7 +149,9 @@ export default function StockManager({
 
       if (response.ok && status === "opening_created") {
         openingFormRef.current?.reset();
+        setIsAddSheetOpen(false);
         router.refresh();
+        window.requestAnimationFrame(() => addButtonRef.current?.focus());
       }
     } catch {
       setNotice(resultMessage("failed"));
@@ -210,7 +251,7 @@ export default function StockManager({
             {balances.length === 0 ? (
               <div className="stockEmpty">
                 <strong>No stock products yet</strong>
-                <span>Add the first opening balance below.</span>
+                <span>Use Add stock to create the first opening balance.</span>
               </div>
             ) : (
               <div className="stockList">
@@ -306,15 +347,34 @@ export default function StockManager({
             </p>
           </section>
 
-          <section className="stockSection stockSetupSection">
-            <div className="stockSectionHeader">
+          <section
+            aria-label="Add opening stock"
+            aria-modal={isAddSheetOpen ? true : undefined}
+            className={
+              "stockSection stockSetupSection" +
+              (isAddSheetOpen ? " stockSetupSectionOpen" : "")
+            }
+            id="stock-add-sheet"
+            ref={addSheetRef}
+            role={isAddSheetOpen ? "dialog" : undefined}
+          >
+            <div className="stockSectionHeader stockSheetHeader">
               <div>
+                <span className="stockSheetHandle" aria-hidden="true" />
                 <span className="stockSectionLabel">New product</span>
                 <h2>Add opening stock</h2>
                 <p>
                   Use this once when a product first enters the stock ledger.
                 </p>
               </div>
+              <button
+                aria-label="Close add stock"
+                className="stockSheetClose"
+                onClick={closeAddSheet}
+                type="button"
+              >
+                ×
+              </button>
             </div>
 
             <form
@@ -439,6 +499,29 @@ export default function StockManager({
             </form>
           </section>
         </div>
+
+        <button
+          aria-controls="stock-add-sheet"
+          aria-expanded={isAddSheetOpen}
+          className="stockAddFab"
+          onClick={openAddSheet}
+          ref={addButtonRef}
+          type="button"
+        >
+          <span aria-hidden="true">+</span>
+          Add stock
+        </button>
+
+        <button
+          aria-label="Close add stock"
+          className={
+            "stockSheetBackdrop" +
+            (isAddSheetOpen ? " stockSheetBackdropOpen" : "")
+          }
+          onClick={closeAddSheet}
+          tabIndex={isAddSheetOpen ? 0 : -1}
+          type="button"
+        />
       </div>
     </main>
   );
