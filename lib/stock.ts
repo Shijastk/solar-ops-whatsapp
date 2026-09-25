@@ -22,6 +22,11 @@ const stockResultSchema = z.object({
     "alias_saved",
     "alias_exists",
     "alias_conflict",
+    "company_alias_saved",
+    "company_alias_exists",
+    "company_alias_conflict",
+    "opening_created",
+    "opening_exists",
   ]),
   draft_id: z.string().uuid().optional(),
   company_id: z.string().uuid().optional(),
@@ -263,6 +268,23 @@ export async function applyStockQuantityCorrection(input: {
   return stockResultSchema.parse(data);
 }
 
+export async function saveCompanyAlias(input: {
+  draftId: string;
+  companyId: string;
+}): Promise<StockResult> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.rpc("map_stock_company_alias", {
+    p_draft_id: input.draftId,
+    p_company_id: input.companyId,
+  });
+
+  if (error) {
+    throw new Error("Failed to save company mapping: " + error.message);
+  }
+
+  return stockResultSchema.parse(data);
+}
+
 export async function saveProductAlias(input: {
   draftId: string;
   itemId: string;
@@ -280,6 +302,27 @@ export async function saveProductAlias(input: {
   }
 
   return stockResultSchema.parse(data);
+}
+
+export async function listCompanySuggestions(
+  name: string,
+  limit = 8,
+): Promise<StockCompany[]> {
+  const companies = await listStockCompanies();
+  const target = tokenSet(name);
+
+  return companies
+    .map((company) => ({
+      company,
+      score: similarityScore(target, tokenSet(company.canonical_name)),
+    }))
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.company.canonical_name.localeCompare(right.company.canonical_name),
+    )
+    .slice(0, Math.min(Math.max(limit, 1), 9))
+    .map((entry) => entry.company);
 }
 
 export async function listProductSuggestions(input: {
