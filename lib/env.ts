@@ -18,6 +18,16 @@ const ingestionEnvSchema = z.object({
   MAX_MEDIA_BYTES: z.coerce.number().int().positive().default(15 * 1024 * 1024),
 });
 
+const automationEnvSchema = z.object({
+  DOCUMENT_AUTOMATION_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  GROQ_API_KEY: nonEmpty.optional(),
+  GROQ_MODEL: nonEmpty.default("openai/gpt-oss-20b"),
+  GROQ_TIMEOUT_MS: z.coerce.number().int().min(1000).max(10000).default(7000),
+});
+
 export function getWebhookEnv() {
   return webhookEnvSchema.parse(process.env);
 }
@@ -34,6 +44,23 @@ export function getIngestionEnv() {
   return {
     ...parsed,
     allowedSenders,
+  };
+}
+
+export function getDocumentAutomationEnv() {
+  const parsed = automationEnvSchema.parse(process.env);
+
+  if (parsed.DOCUMENT_AUTOMATION_ENABLED && !parsed.GROQ_API_KEY) {
+    throw new Error(
+      "GROQ_API_KEY is required when DOCUMENT_AUTOMATION_ENABLED=true",
+    );
+  }
+
+  return {
+    enabled: parsed.DOCUMENT_AUTOMATION_ENABLED,
+    apiKey: parsed.GROQ_API_KEY ?? null,
+    model: parsed.GROQ_MODEL,
+    timeoutMs: parsed.GROQ_TIMEOUT_MS,
   };
 }
 
@@ -59,6 +86,10 @@ export function getHealthConfiguration() {
     "SUPABASE_SECRET_KEY",
     "SUPABASE_STORAGE_BUCKET",
     "MAX_MEDIA_BYTES",
+    "DOCUMENT_AUTOMATION_ENABLED",
+    "GROQ_API_KEY",
+    "GROQ_MODEL",
+    "GROQ_TIMEOUT_MS",
   ] as const;
 
   const presence = Object.fromEntries(
@@ -67,6 +98,14 @@ export function getHealthConfiguration() {
 
   const webhookValidation = webhookEnvSchema.safeParse(process.env);
   const ingestionValidation = ingestionEnvSchema.safeParse(process.env);
+  const automationValidation = automationEnvSchema.safeParse(process.env);
+
+  const automationInvalidFields = automationValidation.success
+    ? automationValidation.data.DOCUMENT_AUTOMATION_ENABLED &&
+      !automationValidation.data.GROQ_API_KEY
+      ? ["GROQ_API_KEY"]
+      : []
+    : invalidFieldNames(automationValidation.error);
 
   const invalidFields = [
     ...(webhookValidation.success
@@ -82,6 +121,16 @@ export function getHealthConfiguration() {
     validation: {
       webhook: webhookValidation.success,
       ingestion: ingestionValidation.success,
+      automation: {
+        enabled:
+          automationValidation.success &&
+          automationValidation.data.DOCUMENT_AUTOMATION_ENABLED,
+        ready:
+          automationValidation.success &&
+          (!automationValidation.data.DOCUMENT_AUTOMATION_ENABLED ||
+            Boolean(automationValidation.data.GROQ_API_KEY)),
+        invalidFields: automationInvalidFields,
+      },
       invalidFields: Array.from(new Set(invalidFields)).sort(),
     },
   };
