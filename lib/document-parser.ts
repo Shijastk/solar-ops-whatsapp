@@ -201,7 +201,7 @@ function parseParties(text: string) {
   const buyerLines = cleanPartyLines(blockBetween(
     text,
     /Buyer\s*\(Bill to\)\s*/,
-    /(?:^|\n)Sl\s+Description of Goods|Delivery Note No\.|Invoice No\.|Bill No\.|Doc No\./,
+    /(?:^|\n)Sl\s+Description of Goods/,
   ));
 
   let consignee = partyFromLines(consigneeLines);
