@@ -208,3 +208,11 @@ Historical diagnostic progression:
 This provider-level integration is verified for synthetic signed events. Real inbound Meta callback delivery was separately verified on 2026-09-21.
 
 The current harness intentionally remains inbound-only and does not test the newly added manual outbound reply path. Outbound sending must not be described as provider-verified until an explicit safe live reply test is performed.
+
+## Document automation isolation
+
+The existing credentialed integration workflow remains deliberately inbound-only.
+
+It must not be modified to send automatic WhatsApp messages to a person or to submit real customer documents to Groq. For synthetic integration runs, `DOCUMENT_AUTOMATION_ENABLED` should remain false unless a future separately approved provider test is designed with synthetic data and explicit cleanup/safety constraints.
+
+Groq verification and the automatic interactive WhatsApp workflow require their own explicit live acceptance evidence after production configuration. Existing run `35578308664` does not verify them.
