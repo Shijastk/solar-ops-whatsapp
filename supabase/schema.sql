@@ -244,6 +244,7 @@ $$;
 
 create table if not exists public.document_actions (
   id uuid primary key default gen_random_uuid(),
+  action_key uuid not null unique,
   draft_id uuid not null references public.document_drafts(id) on delete cascade,
   source_message_id uuid references public.whatsapp_messages(id) on delete set null,
   action text not null
@@ -309,3 +310,11 @@ drop trigger if exists set_document_edit_sessions_updated_at
 create trigger set_document_edit_sessions_updated_at
 before update on public.document_edit_sessions
 for each row execute function public.set_updated_at();
+
+
+-- Idempotent audit keys for Meta webhook retries.
+alter table public.document_actions
+  add column if not exists action_key uuid;
+
+create unique index if not exists document_actions_action_key_idx
+  on public.document_actions (action_key);
