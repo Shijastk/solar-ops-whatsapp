@@ -16,6 +16,7 @@ describe("document automation helpers", () => {
         {
           id: "item-1",
           description: "Solar 560 Wp Topcon Panel",
+          hsnSac: "8541",
           quantity: 6,
           unit: "NOS",
           rate: 20000,
