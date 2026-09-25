@@ -492,3 +492,20 @@ After deployment:
 6. verify the existing-company name/GSTIN creation fields are disabled while that company is selected
 
 Do not weaken the server/database rule even if browser-side required validation is present.
+
+
+## Phase N - Native mobile real-data acceptance
+
+After the backend and Flutter builds are deployed:
+
+1. open the mobile app and enter the same protected Operations access key used for the web dashboard
+2. confirm an invalid key is rejected without revealing configuration details
+3. confirm Dashboard counts come from production data and refresh from the server
+4. confirm Bills contains only real inbound PDF records; parsed fields/items appear only when a real draft exists
+5. trigger Parse/Approve only on a safe test PDF and verify the web dashboard/database shows the same resulting state
+6. confirm Dispatch does not display invented driver/delivery data
+7. confirm Stock matches `/ops/stock`, Opening Stock requires GSTIN for a new company, and Adjust creates the same audited ledger semantics
+8. confirm View PDF requests a fresh short-lived signed URL and handles deleted raw media as unavailable
+9. let the signed mobile session expire and confirm the app returns to login rather than continuing with stale authorization
+
+Do not describe authenticated production mobile access as device-verified until a real installed build completes these steps.
