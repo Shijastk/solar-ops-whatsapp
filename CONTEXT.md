@@ -103,3 +103,20 @@ The intended lifecycle is now:
 4. Automatically delete the raw Storage object after approximately 24 hours when processing succeeded.
 
 The current source now extracts deterministic structured fields from selectable-text PDFs into review drafts, while retaining raw media only temporarily. Parser approval is intentionally separate from stock mutation because warehouse stock-direction and opening-balance rules are still a business decision.
+
+
+## Approved next direction - verified document automation
+
+The user approved a low-friction document workflow that keeps WhatsApp as the operator surface.
+
+For selectable-text PDFs:
+
+1. Keep the deterministic semantic parser as the first extractor.
+2. Optionally run a small Groq model as an independent second extractor using strict JSON Schema output.
+3. Compare every persisted structured field, every line item, and deterministic arithmetic checks.
+4. Automatically mark the document workflow recorded only when the two independent extractions agree.
+5. Send a concise WhatsApp summary with Edit/Delete controls.
+6. Let the operator type only a corrected value after selecting a field to edit.
+7. Treat Delete as cancellation from the active workflow while retaining an audit trail.
+
+This automation is fail-closed. Scanned PDFs, missing fields, mismatches, provider errors, timeouts, or rate limits go to review. No AI result or document approval is permitted to mutate warehouse stock yet. A separate stock-IN document sample and explicit inventory rules are still required before stock automation.
