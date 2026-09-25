@@ -116,22 +116,22 @@ export function buildDocumentSummary(
     | "totalAmount"
     | "items"
   > & { stockStatus?: string },
-  heading = "✅ Bill verified",
+  heading = "✅ ബിൽ പരിശോധിച്ച് സ്ഥിരീകരിച്ചു",
 ): string {
   const lines = [heading];
 
   if (input.supplierName) {
-    lines.push("Company: " + trimForWhatsApp(input.supplierName, 70));
+    lines.push("കമ്പനി: " + trimForWhatsApp(input.supplierName, 70));
   }
   if (input.documentNumber) {
-    lines.push("Doc: " + trimForWhatsApp(input.documentNumber, 60));
+    lines.push("ബിൽ നമ്പർ: " + trimForWhatsApp(input.documentNumber, 60));
   }
   if (input.vehicleNumber) {
-    lines.push("Vehicle: " + trimForWhatsApp(input.vehicleNumber, 32));
+    lines.push("വാഹനം: " + trimForWhatsApp(input.vehicleNumber, 32));
   }
 
   if (input.items.length > 0) {
-    lines.push("", "Items:");
+    lines.push("", "സാധനങ്ങൾ:");
     for (const [index, item] of input.items
       .slice(0, SUMMARY_ITEM_LIMIT)
       .entries()) {
@@ -149,23 +149,23 @@ export function buildDocumentSummary(
       lines.push(
         "+ " +
           String(input.items.length - SUMMARY_ITEM_LIMIT) +
-          " more item(s)",
+          " സാധനം കൂടി",
       );
     }
   }
 
   const total = formatMoney(input.totalAmount);
-  if (total) lines.push("", "Total: " + total);
+  if (total) lines.push("", "ആകെ: " + total);
 
   const stockStatus = input.stockStatus ?? "not_ready";
   if (stockStatus === "applied") {
-    lines.push("", "✅ Stock updated.");
+    lines.push("", "✅ സ്റ്റോക്ക് വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു.");
   } else if (stockStatus === "duplicate_document") {
-    lines.push("", "ℹ️ Stock was already updated from an earlier upload. No second deduction.");
+    lines.push("", "ℹ️ ഈ ബിൽ നേരത്തെ സ്റ്റോക്കിൽ രേഖപ്പെടുത്തിയതാണ്. അതിനാൽ സ്റ്റോക്ക് വീണ്ടും കുറച്ചിട്ടില്ല.");
   } else if (stockStatus === "reversed") {
-    lines.push("", "↩️ Stock deduction reversed.");
+    lines.push("", "↩️ സ്റ്റോക്കിൽ നിന്ന് കുറച്ചത് തിരികെ ചേർത്തു.");
   } else {
-    lines.push("", "⏳ Stock update pending.");
+    lines.push("", "⏳ സ്റ്റോക്ക് അപ്ഡേറ്റ് പൂർത്തിയായിട്ടില്ല.");
   }
   return trimForWhatsApp(lines.join("\n"), 950);
 }
@@ -442,8 +442,8 @@ async function sendSummary(
     replyToMessageId,
     body,
     buttons: [
-      { id: "so:doc:edit:" + draft.id, title: "Edit" },
-      { id: "so:doc:delete:" + draft.id, title: "Delete" },
+      { id: "so:doc:edit:" + draft.id, title: "തിരുത്തുക" },
+      { id: "so:doc:delete:" + draft.id, title: "ഒഴിവാക്കുക" },
     ],
   });
 
@@ -468,8 +468,8 @@ async function sendReviewNotice(
 ) {
   const body =
     reason === "needs_review"
-      ? "⚠️ Bill received, but the data could not be verified safely. Nothing was auto-recorded. Please review it in Solar Ops."
-      : "⚠️ Bill received, but automatic verification is temporarily unavailable. Nothing was auto-recorded. Please review it in Solar Ops.";
+      ? "⚠️ ബിൽ ലഭിച്ചു. പക്ഷേ വിവരങ്ങൾ സുരക്ഷിതമായി സ്ഥിരീകരിക്കാൻ കഴിഞ്ഞില്ല. ഒന്നും സ്വയമേവ രേഖപ്പെടുത്തിയിട്ടില്ല. Solar Ops-ൽ പരിശോധിക്കുക."
+      : "⚠️ ബിൽ ലഭിച്ചു. ഇപ്പോൾ സ്വയമേവ പരിശോധിക്കാൻ കഴിഞ്ഞില്ല. ഒന്നും സ്വയമേവ രേഖപ്പെടുത്തിയിട്ടില്ല. Solar Ops-ൽ പരിശോധിക്കുക.";
 
   await sendOpsReply({
     requestId: deterministicUuid(
@@ -569,7 +569,8 @@ export async function runDocumentAutomationForDraft(
         stockResult.status === "already_applied"
       ) {
         stockStatus = "applied";
-      } else if (stockResult.status === "duplicate_document") {
+      }
+      else if (stockResult.status === "duplicate_document") {
         stockStatus = "duplicate_document";
       }
     } catch (error) {
@@ -690,7 +691,8 @@ export async function runDocumentAutomationForDraft(
         stockResult.status === "already_applied"
       ) {
         stockStatus = "applied";
-      } else if (stockResult.status === "duplicate_document") {
+      }
+      else if (stockResult.status === "duplicate_document") {
         stockStatus = "duplicate_document";
       }
     } catch (error) {
@@ -754,13 +756,13 @@ function editRows(draft: DraftContext) {
   const rows = [
     {
       id: "so:doc:field:document_number:" + draft.id,
-      title: "Document number",
-      description: trimForWhatsApp(draft.documentNumber ?? "Not detected", 60),
+      title: "ബിൽ നമ്പർ",
+      description: trimForWhatsApp(draft.documentNumber ?? "കണ്ടെത്തിയില്ല", 60),
     },
     {
       id: "so:doc:field:vehicle_number:" + draft.id,
-      title: "Vehicle number",
-      description: trimForWhatsApp(draft.vehicleNumber ?? "Not detected", 60),
+      title: "വാഹന നമ്പർ",
+      description: trimForWhatsApp(draft.vehicleNumber ?? "കണ്ടെത്തിയില്ല", 60),
     },
   ];
 
@@ -769,7 +771,7 @@ function editRows(draft: DraftContext) {
     .entries()) {
     rows.push({
       id: "so:doc:qty:" + draft.id + ":" + item.id,
-      title: "Quantity item " + String(index + 1),
+      title: "അളവ് സാധനം " + String(index + 1),
       description: trimForWhatsApp(
         item.description +
           " — " +
@@ -822,10 +824,10 @@ async function startEditSession(input: {
 
   const label =
     input.targetKind === "document_number"
-      ? "document number"
+      ? "ബിൽ നമ്പർ"
       : input.targetKind === "vehicle_number"
-        ? "vehicle number"
-        : "item quantity";
+        ? "വാഹന നമ്പർ"
+        : "സാധനത്തിന്റെ അളവ്";
 
   await sendOpsReplyButtons({
     requestId: deterministicUuid(
@@ -833,15 +835,15 @@ async function startEditSession(input: {
     ),
     replyToMessageId: input.sourceMessageId,
     body:
-      "Send only the corrected " +
+      "ശരിയായ " +
       label +
-      " as your next message. This edit expires in " +
+      " മാത്രം അടുത്ത മെസേജായി അയക്കുക. ഈ തിരുത്തൽ " +
       String(EDIT_SESSION_MINUTES) +
-      " minutes.",
+      " മിനിറ്റിന് ശേഷം കാലഹരണപ്പെടും.",
     buttons: [
       {
         id: "so:doc:edit_cancel:" + input.draft.id,
-        title: "Cancel",
+        title: "റദ്ദാക്കുക",
       },
     ],
   });
@@ -885,7 +887,7 @@ async function applyPendingTextEdit(
     await sendOpsReply({
       requestId: deterministicUuid("document-edit-expired:" + message.messageId),
       replyToMessageId: storedMessageId,
-      body: "That edit session expired. Tap Edit on the bill summary and try again.",
+      body: "തിരുത്താനുള്ള സമയം കഴിഞ്ഞു. ബിൽ സംഗ്രഹത്തിലെ തിരുത്തുക അമർത്തി വീണ്ടും ശ്രമിക്കുക.",
     });
     return true;
   }
@@ -901,11 +903,11 @@ async function applyPendingTextEdit(
       requestId: deterministicUuid("document-edit-invalid:" + message.messageId),
       replyToMessageId: storedMessageId,
       body:
-        "That value is not valid for this field. Send only the corrected value, or cancel the edit.",
+        "ഈ വിവരത്തിന് നൽകിയ വില ശരിയല്ല. ശരിയായ വില മാത്രം അയക്കുക, അല്ലെങ്കിൽ തിരുത്തൽ റദ്ദാക്കുക.",
       buttons: [
         {
           id: "so:doc:edit_cancel:" + draft.id,
-          title: "Cancel",
+          title: "റദ്ദാക്കുക",
         },
       ],
     });
@@ -957,15 +959,15 @@ async function applyPendingTextEdit(
           ),
           replyToMessageId: storedMessageId,
           body:
-            "❌ Quantity correction was not saved because there is not enough stock. Required extra: " +
+            "❌ ആവശ്യത്തിന് സ്റ്റോക്ക് ഇല്ലാത്തതിനാൽ അളവിലെ തിരുത്തൽ സേവ് ചെയ്തില്ല. അധികമായി വേണ്ടത്: " +
             String(stockCorrection.required ?? 0) +
-            ", available: " +
+            ", ലഭ്യമായത്: " +
             String(stockCorrection.available ?? 0) +
-            ". Send another quantity or cancel.",
+            ". മറ്റൊരു അളവ് അയക്കുക, അല്ലെങ്കിൽ റദ്ദാക്കുക.",
           buttons: [
             {
               id: "so:doc:edit_cancel:" + draft.id,
-              title: "Cancel",
+              title: "റദ്ദാക്കുക",
             },
           ],
         });
@@ -1061,7 +1063,7 @@ async function applyPendingTextEdit(
     updatedDraft,
     storedMessageId,
     "document-summary-after-edit:" + message.messageId,
-    "✅ Correction saved",
+    "✅ തിരുത്തൽ സേവ് ചെയ്തു",
   );
   return true;
 }
@@ -1082,7 +1084,7 @@ async function handleInteractiveAction(
       await sendOpsReply({
         requestId: deterministicUuid("document-edit-cancelled:" + message.messageId),
         replyToMessageId: storedMessageId,
-        body: "This record is already deleted from the active workflow.",
+        body: "ഈ ബിൽ നിലവിലെ പ്രവർത്തന പട്ടികയിൽ നിന്ന് ഇതിനകം ഒഴിവാക്കിയിട്ടുണ്ട്.",
       });
       return true;
     }
@@ -1090,8 +1092,8 @@ async function handleInteractiveAction(
     await sendOpsList({
       requestId: deterministicUuid("document-edit-list:" + message.messageId),
       replyToMessageId: storedMessageId,
-      body: "Choose what you want to correct. You only need to type the new value after choosing a field.",
-      buttonText: "Choose field",
+      body: "തിരുത്തേണ്ടത് തിരഞ്ഞെടുക്കുക. അതിന് ശേഷം പുതിയ വില മാത്രം ടൈപ്പ് ചെയ്താൽ മതി.",
+      buttonText: "തിരഞ്ഞെടുക്കുക",
       rows: editRows(draft),
     });
     return true;
@@ -1102,15 +1104,15 @@ async function handleInteractiveAction(
       requestId: deterministicUuid("document-delete-confirm:" + message.messageId),
       replyToMessageId: storedMessageId,
       body:
-        "Delete this bill from the active workflow? If stock was deducted, the system will restore it with a reversal entry. Audit history will be retained.",
+        "ഈ ബിൽ നിലവിലെ പ്രവർത്തന പട്ടികയിൽ നിന്ന് ഒഴിവാക്കണോ? സ്റ്റോക്ക് കുറച്ചിട്ടുണ്ടെങ്കിൽ അത് തിരികെ ചേർക്കും. പഴയ രേഖകൾ സുരക്ഷിതമായി നിലനിർത്തും.",
       buttons: [
         {
           id: "so:doc:delete_confirm:" + draft.id,
-          title: "Yes, delete",
+          title: "അതെ, ഒഴിവാക്കുക",
         },
         {
           id: "so:doc:delete_keep:" + draft.id,
-          title: "Keep",
+          title: "വേണ്ട",
         },
       ],
     });
@@ -1132,7 +1134,7 @@ async function handleInteractiveAction(
           ),
           replyToMessageId: storedMessageId,
           body:
-            "⚠️ Delete was blocked because the stock deduction could not be reversed safely. No workflow data was cancelled.",
+            "⚠️ സ്റ്റോക്ക് സുരക്ഷിതമായി തിരികെ ചേർക്കാൻ കഴിഞ്ഞില്ല. അതിനാൽ ബിൽ ഒഴിവാക്കിയിട്ടില്ല; വിവരങ്ങളിൽ മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല.",
         });
         return true;
       }
@@ -1152,10 +1154,10 @@ async function handleInteractiveAction(
       requestId: deterministicUuid("document-deleted:" + message.messageId),
       replyToMessageId: storedMessageId,
       body:
-        "🗑️ Deleted from the active workflow. Audit history is retained." +
+        "🗑️ ബിൽ നിലവിലെ പ്രവർത്തന പട്ടികയിൽ നിന്ന് ഒഴിവാക്കി. പഴയ രേഖകൾ നിലനിർത്തിയിട്ടുണ്ട്." +
         (stockWasReversed
-          ? " The previous stock deduction was restored with a reversal entry."
-          : " No stock deduction had been applied."),
+          ? " മുമ്പ് കുറച്ച സ്റ്റോക്ക് തിരികെ ചേർത്തു."
+          : " ഈ ബില്ലിനായി സ്റ്റോക്ക് കുറച്ചിട്ടില്ലായിരുന്നു."),
     });
     return true;
   }
@@ -1164,7 +1166,7 @@ async function handleInteractiveAction(
     await sendOpsReply({
       requestId: deterministicUuid("document-kept:" + message.messageId),
       replyToMessageId: storedMessageId,
-      body: "Record kept. No changes were made.",
+      body: "ബിൽ നിലനിർത്തി. മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല.",
     });
     return true;
   }
@@ -1174,7 +1176,7 @@ async function handleInteractiveAction(
     await sendOpsReply({
       requestId: deterministicUuid("document-edit-cancel:" + message.messageId),
       replyToMessageId: storedMessageId,
-      body: "Edit cancelled. No changes were made.",
+      body: "തിരുത്തൽ റദ്ദാക്കി. മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല.",
     });
     return true;
   }
