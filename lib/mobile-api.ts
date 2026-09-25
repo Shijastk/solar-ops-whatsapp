@@ -1,11 +1,14 @@
 import { getHealthConfiguration } from "@/lib/env";
 import {
+  buildOpsConversations,
   listOpsDraftsForMessages,
   listOpsMessages,
+  listOpsOutboundMessages,
   type OpsDocumentDraft,
   type OpsMessage,
 } from "@/lib/ops-data";
 import { verifyOpsSession } from "@/lib/ops-auth";
+import { isWithinCustomerServiceWindow } from "@/lib/replies";
 import { listStockBalances, listStockCompanies } from "@/lib/stock";
 
 export const MOBILE_API_VERSION = "v1";
@@ -130,8 +133,9 @@ function serializeDraft(draft: OpsDocumentDraft | undefined) {
 }
 
 export async function buildMobileBootstrap(now = new Date()) {
-  const [messages, companies, balances] = await Promise.all([
+  const [messages, outbound, companies, balances] = await Promise.all([
     listOpsMessages(150),
+    listOpsOutboundMessages(250),
     listStockCompanies(),
     listStockBalances(),
   ]);
@@ -182,6 +186,43 @@ export async function buildMobileBootstrap(now = new Date()) {
   );
 
   const health = getHealthConfiguration();
+  const conversations = buildOpsConversations(messages, outbound).map((conversation) => {
+    const latestInbound = conversation.messages[conversation.messages.length - 1] ?? null;
+    const timeline = [
+      ...conversation.messages.map((message) => ({
+        type: "inbound" as const,
+        time: message.received_at,
+        id: message.id,
+        messageType: message.message_type,
+        textBody: message.text_body,
+        fileName: message.original_filename,
+        mimeType: message.mime_type,
+        mediaSizeBytes: message.media_size_bytes,
+        storageAvailable: Boolean(message.storage_path),
+        processingStatus: message.processing_status,
+      })),
+      ...conversation.outbound.map((message) => ({
+        type: "outbound" as const,
+        time: message.sent_at || message.created_at,
+        id: message.id,
+        body: message.body,
+        status: message.status,
+        errorMessage: message.error_message,
+      })),
+    ].sort((left, right) => new Date(left.time).getTime() - new Date(right.time).getTime());
+
+    return {
+      key: conversation.key,
+      senderName: conversation.senderName,
+      senderPhoneMasked: maskMobilePhone(conversation.senderPhone),
+      latestReceivedAt: conversation.latestReceivedAt,
+      latestInboundMessageId: latestInbound?.id ?? null,
+      canReply: latestInbound
+        ? isWithinCustomerServiceWindow(latestInbound.received_at, now)
+        : false,
+      timeline,
+    };
+  });
 
   return {
     apiVersion: MOBILE_API_VERSION,
@@ -204,6 +245,7 @@ export async function buildMobileBootstrap(now = new Date()) {
       dailyBills,
     },
     bills,
+    conversations,
     dispatches: bills
       .filter((bill) => bill.draft !== null)
       .map((bill) => ({
