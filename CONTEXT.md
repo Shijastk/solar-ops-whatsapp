@@ -102,7 +102,7 @@ The intended lifecycle is now:
 3. Retain useful structured/operational data long-term.
 4. Automatically delete the raw Storage object after approximately 24 hours when processing succeeded.
 
-The current source now extracts deterministic structured fields from selectable-text PDFs into review drafts, while retaining raw media only temporarily. Parser approval is intentionally separate from stock mutation because warehouse stock-direction and opening-balance rules are still a business decision.
+The current source extracts deterministic structured fields from selectable-text PDFs into review drafts, while retaining raw media only temporarily. The user has now approved a specific outgoing-stock rule: products receive a one-time manually entered Opening Stock, and an approved outgoing/dispatch bill may reduce stock only through the guarded stock ledger.
 
 
 ## Approved next direction - verified document automation
@@ -119,4 +119,19 @@ For selectable-text PDFs:
 6. Let the operator type only a corrected value after selecting a field to edit.
 7. Treat Delete as cancellation from the active workflow while retaining an audit trail.
 
-This automation is fail-closed. Scanned PDFs, missing fields, mismatches, provider errors, timeouts, or rate limits go to review. No AI result or document approval is permitted to mutate warehouse stock yet. A separate stock-IN document sample and explicit inventory rules are still required before stock automation.
+This automation is fail-closed. Scanned PDFs, missing fields, mismatches, provider errors, timeouts, or rate limits go to review.
+
+## Approved direction - Opening Stock and outgoing stock deduction
+
+The user selected Opening Stock option A:
+
+1. Add each company/product/unit opening quantity manually once in the protected Stock screen.
+2. Treat the currently handled bill/PDF as an outgoing/dispatch document.
+3. After the document is approved/verified, attempt a full-bill Stock OUT.
+4. Match company/product only through canonical identities or operator-approved aliases; AI/fuzzy matching can suggest choices but must not mutate stock by itself.
+5. If any line is unmapped, invalid, or insufficient, deduct nothing from the bill and notify the WhatsApp sender.
+6. Resolve spelling variations through WhatsApp interactive company/product selection and remember the approved alias for future bills.
+7. Quantity edits create ledger corrections; Delete creates a reversal before cancellation.
+8. Replayed webhooks/documents must never deduct twice.
+
+A separate stock-IN PDF sample is still required before automating receiving/incoming stock.
