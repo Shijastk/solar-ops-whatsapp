@@ -148,7 +148,7 @@ export function buildDocumentSummary(
   const total = formatMoney(input.totalAmount);
   if (total) lines.push("", "Total: " + total);
 
-  lines.push("", "Recorded only; stock is unchanged.");
+  lines.push("", "Recorded only. Stock unchanged.");
   return trimForWhatsApp(lines.join("\n"), 950);
 }
 
