@@ -424,7 +424,7 @@ The approved outgoing-stock architecture adds a server-only inventory layer.
 
 ### Stock master
 
-`stock_companies` stores canonical company identities.
+`stock_companies` stores canonical company identities and requires a non-null GSTIN. GSTIN is the mandatory strong identity for Opening Stock companies; company names/aliases remain secondary matching aids.
 
 `stock_company_aliases` stores operator-approved supplier-name variants.
 
