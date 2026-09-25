@@ -45,7 +45,7 @@ export type ParsedOperationalDocument = {
   items: ParsedDocumentItem[];
 };
 
-export const DOCUMENT_PARSER_VERSION = "anchor-v1";
+export const DOCUMENT_PARSER_VERSION = "anchor-v2";
 
 const MONTHS: Record<string, number> = {
   jan: 1,
@@ -185,17 +185,24 @@ function partyFromLines(lines: string[]) {
   };
 }
 
+function cleanPartyLines(lines: string[]): string[] {
+  return lines.filter(
+    (line) =>
+      !/^(?:Dispatch Doc No\.|Dispatched through Destination|Mode\/Terms of Payment|Reference No\. & Date\. Other References|Buyer’s Order No\. Dated|Terms of Delivery)$/i.test(line),
+  );
+}
+
 function parseParties(text: string) {
-  const consigneeLines = blockBetween(
+  const consigneeLines = cleanPartyLines(blockBetween(
     text,
     /Consignee\s*\(Ship to\)\s*/,
     /Buyer\s*\(Bill to\)/,
-  );
-  const buyerLines = blockBetween(
+  ));
+  const buyerLines = cleanPartyLines(blockBetween(
     text,
     /Buyer\s*\(Bill to\)\s*/,
-    /Delivery Note No\.|Invoice No\.|Bill No\.|Doc No\./,
-  );
+    /(?:^|\n)Sl\s+Description of Goods|Delivery Note No\.|Invoice No\.|Bill No\.|Doc No\./,
+  ));
 
   let consignee = partyFromLines(consigneeLines);
   const buyer = partyFromLines(buyerLines);
@@ -229,23 +236,32 @@ function parseSupplier(text: string) {
     };
   }
 
-  const firstPage = text.match(
-    /(?:DELIVERY NOTE|DELIVERY CHALLAN|TAX INVOICE|INVOICE)[^\n]*\n([^\n]+)[\s\S]{0,500}?GSTIN(?:\/UIN)?\s*:\s*([A-Z0-9]{15})/i,
-  );
-
-  const headerLines = text.split("\n").slice(1, 12).map(cleanLine);
+  const headerLines = text.split("\n").slice(0, 16).map(cleanLine);
   const gstinIndex = headerLines.findIndex((line) =>
     /GSTIN(?:\/UIN)?\s*:/i.test(line),
   );
-  const address =
-    gstinIndex > 1
-      ? headerLines.slice(1, gstinIndex).join(", ")
-      : null;
+  const gstin = gstinIndex >= 0
+    ? headerLines[gstinIndex].match(/GSTIN(?:\/UIN)?\s*:\s*([A-Z0-9]{15})/i)?.[1]?.toUpperCase() ?? null
+    : null;
+  const beforeGstin = gstinIndex > 0 ? headerLines.slice(1, gstinIndex) : [];
+  const nameIndex = beforeGstin.findIndex(
+    (line) =>
+      /\b(?:LIMITED|LTD\.?|LLP|PRIVATE|PVT\.?)\b/i.test(line) &&
+      !/^(?:Delivery Note No\.|Invoice No\.|Bill No\.)/i.test(line),
+  );
+  const name = nameIndex >= 0 ? beforeGstin[nameIndex] : null;
+  const addressLines = nameIndex >= 0
+    ? beforeGstin.slice(nameIndex + 1).filter(
+        (line) =>
+          !/^(?:Delivery Note No\.|Mode\/Terms of Payment|Reference No\.|Buyer’s Order No\.)/i.test(line) &&
+          !/\b\d{12}\b/.test(line),
+      )
+    : [];
 
   return {
-    name: firstPage?.[1] ? cleanLine(firstPage[1]) : null,
-    gstin: firstPage?.[2]?.toUpperCase() ?? null,
-    address,
+    name,
+    gstin,
+    address: addressLines.length > 0 ? addressLines.join(", ") : null,
   };
 }
 
@@ -291,6 +307,14 @@ function parseLabelValue(text: string, label: string): string | null {
   return firstMatch(text, [
     new RegExp("(?:^|\\n)" + escaped + "\\s*:\\s*([^\\n]+)", "i"),
   ]);
+}
+
+function normalizeLooseAddressForSplit(value: string): string {
+  return cleanLine(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function cleanupEwayDescription(value: string): string {
@@ -463,8 +487,33 @@ export function parseOperationalDocumentText(
     buyerGstin: parties.buyer.gstin,
     buyerPincode: parties.buyer.pincode,
     buyerPhone: parties.buyer.phone,
-    destination: parseLabelValue(text, "Destination"),
+    destination:
+      parseLabelValue(text, "Destination") ??
+      firstMatch(text, [
+        /(?:^|\n)Dispatched through Destination\s*\n([^\n]+)/i,
+      ]),
     dispatchFromAddress: (() => {
+      const eway = text.match(
+        /(?:^|\n)Dispatch From(?:\s+Ship To)?\s*\n([\s\S]*?)(?=\n3\.\s*Goods Details)/i,
+      );
+      if (eway?.[1]) {
+        const lines = eway[1].split("\n").map(cleanLine).filter(Boolean);
+        const shipTo = parties.consignee.address
+          ? normalizeLooseAddressForSplit(parties.consignee.address)
+          : null;
+        if (shipTo) {
+          const joined = lines.join(", ");
+          const index = normalizeLooseAddressForSplit(joined).indexOf(shipTo);
+          if (index > 0) {
+            // Text extraction can interleave the Dispatch From / Ship To columns.
+            // Only split when the full Ship To address is present contiguously.
+            const rawIndex = joined.toLowerCase().indexOf(
+              (parties.consignee.address ?? "").toLowerCase(),
+            );
+            if (rawIndex > 0) return cleanLine(joined.slice(0, rawIndex).replace(/,\s*$/, ""));
+          }
+        }
+      }
       const lines = blockBetween(
         text,
         /(?:^|\n)Dispatch From\s*/,
