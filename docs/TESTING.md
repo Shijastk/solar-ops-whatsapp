@@ -453,3 +453,27 @@ Pre-document CI run `36118671889` passed typecheck, lint, unit tests, and produc
 Migration/schema-inclusive CI run `36119245198` also passed the complete quality gate.
 
 After documentation updates, a fresh final CI run is required before merge.
+
+
+## Stock mobile-first visual regression gate
+
+The stock redesign changes presentation only; stock mutation semantics remain covered by the existing stock tests.
+
+Required source quality gate after the redesign:
+
+- TypeScript typecheck
+- ESLint
+- unit tests
+- Next.js production build
+
+Implementation CI run `36120323881` passed all four checks before documentation was updated.
+
+Production-live visual acceptance after merge should confirm at minimum:
+
+- narrow/mobile viewport shows Current stock before Add opening stock
+- no horizontal page overflow in the stock list/form
+- Adjust controls are comfortably tappable
+- light stock theme is isolated and does not alter the WhatsApp chat theme
+- add/adjust actions remain SPA-like and do not cause a normal browser document reload
+
+A fresh full CI run is required after documentation updates before merge.
