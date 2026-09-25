@@ -136,6 +136,28 @@ describe("compareDocumentVerification", () => {
     });
   });
 
+  it("accepts only a trailing financial-year supplier suffix when GSTIN is identical", () => {
+    const result = compareDocumentVerification(
+      { ...candidate, supplierName: "SUN GRID SOLUTIONS LIMITED 24-25" },
+      extraction,
+    );
+    expect(result.verified).toBe(true);
+
+    const wrongGstin = compareDocumentVerification(
+      { ...candidate, supplierName: "SUN GRID SOLUTIONS LIMITED 24-25" },
+      { ...extraction, supplier_gstin: "32ABCDE1234F9Z9" },
+    );
+    expect(wrongGstin.verified).toBe(false);
+    expect(wrongGstin.mismatches).toContain("supplier_gstin");
+
+    const wrongName = compareDocumentVerification(
+      { ...candidate, supplierName: "OTHER COMPANY 24-25" },
+      extraction,
+    );
+    expect(wrongName.verified).toBe(false);
+    expect(wrongName.mismatches).toContain("supplier_name");
+  });
+
   it("fails closed when quantity or item count changes", () => {
     const changedQuantity: GroqDocumentExtraction = {
       ...extraction,
@@ -253,6 +275,35 @@ describe("extractDocumentWithGroq", () => {
     expect(body.include_reasoning).toBe(false);
     expect(body.stream).toBe(false);
     expect(JSON.stringify(body)).not.toContain("groq-test-secret");
+  });
+
+  it("forces dispatch address to null when PDF text has flattened Dispatch From and Ship To columns", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            choices: [{
+              message: {
+                content: JSON.stringify({
+                  ...extraction,
+                  dispatch_from_address: "LEFT COLUMN ADDRESS",
+                }),
+              },
+            }],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+
+    const result = await extractDocumentWithGroq(
+      "2. Address Details\nDispatch From Ship To\nLEFT RIGHT\n3. Goods Details",
+    );
+    expect(result.dispatch_from_address).toBeNull();
   });
 
   it("captures bounded provider diagnostics when verification is rejected", async () => {
