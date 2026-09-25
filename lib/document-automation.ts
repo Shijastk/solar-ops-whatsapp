@@ -160,6 +160,8 @@ export function buildDocumentSummary(
   const stockStatus = input.stockStatus ?? "not_ready";
   if (stockStatus === "applied") {
     lines.push("", "✅ Stock updated.");
+  } else if (stockStatus === "duplicate_document") {
+    lines.push("", "ℹ️ Stock was already updated from an earlier upload. No second deduction.");
   } else if (stockStatus === "reversed") {
     lines.push("", "↩️ Stock deduction reversed.");
   } else {
@@ -567,6 +569,8 @@ export async function runDocumentAutomationForDraft(
         stockResult.status === "already_applied"
       ) {
         stockStatus = "applied";
+      } else if (stockResult.status === "duplicate_document") {
+        stockStatus = "duplicate_document";
       }
     } catch (error) {
       console.warn("Recorded document stock update did not complete", {
@@ -686,6 +690,8 @@ export async function runDocumentAutomationForDraft(
         stockResult.status === "already_applied"
       ) {
         stockStatus = "applied";
+      } else if (stockResult.status === "duplicate_document") {
+        stockStatus = "duplicate_document";
       }
     } catch (error) {
       console.warn("Verified document stock update did not complete", {
