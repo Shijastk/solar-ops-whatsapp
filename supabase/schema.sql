@@ -311,10 +311,3 @@ create trigger set_document_edit_sessions_updated_at
 before update on public.document_edit_sessions
 for each row execute function public.set_updated_at();
 
-
--- Idempotent audit keys for Meta webhook retries.
-alter table public.document_actions
-  add column if not exists action_key uuid;
-
-create unique index if not exists document_actions_action_key_idx
-  on public.document_actions (action_key);
