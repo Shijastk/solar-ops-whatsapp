@@ -10,6 +10,25 @@ const mediaSchema = z
   })
   .passthrough();
 
+const interactiveReplySchema = z
+  .object({
+    type: z.enum(["button_reply", "list_reply"]),
+    button_reply: z
+      .object({
+        id: z.string().min(1),
+        title: z.string().min(1),
+      })
+      .optional(),
+    list_reply: z
+      .object({
+        id: z.string().min(1),
+        title: z.string().min(1),
+        description: z.string().optional(),
+      })
+      .optional(),
+  })
+  .passthrough();
+
 const messageSchema = z
   .object({
     from: z.string().min(1),
@@ -17,6 +36,7 @@ const messageSchema = z
     timestamp: z.string().min(1),
     type: z.string().min(1),
     text: z.object({ body: z.string() }).optional(),
+    interactive: interactiveReplySchema.optional(),
     document: mediaSchema.optional(),
     image: mediaSchema.optional(),
     audio: mediaSchema.optional(),
@@ -97,6 +117,13 @@ export type NormalizedWhatsAppStatus = {
   errorTitle?: string;
 };
 
+export type NormalizedInteractiveReply = {
+  type: "button_reply" | "list_reply";
+  id: string;
+  title: string;
+  description?: string;
+};
+
 export type NormalizedWhatsAppMessage = {
   wabaId?: string;
   phoneNumberId?: string;
@@ -107,6 +134,7 @@ export type NormalizedWhatsAppMessage = {
   timestamp: Date;
   type: string;
   textBody?: string;
+  interactiveReply?: NormalizedInteractiveReply;
   media?: {
     id: string;
     mimeType?: string;
@@ -135,6 +163,32 @@ function mediaForMessage(message: z.infer<typeof messageSchema>) {
     filename: candidate.filename,
     voice: candidate.voice,
   };
+}
+
+function interactiveForMessage(
+  message: z.infer<typeof messageSchema>,
+): NormalizedInteractiveReply | undefined {
+  const interactive = message.interactive;
+  if (!interactive) return undefined;
+
+  if (interactive.type === "button_reply" && interactive.button_reply) {
+    return {
+      type: "button_reply",
+      id: interactive.button_reply.id,
+      title: interactive.button_reply.title,
+    };
+  }
+
+  if (interactive.type === "list_reply" && interactive.list_reply) {
+    return {
+      type: "list_reply",
+      id: interactive.list_reply.id,
+      title: interactive.list_reply.title,
+      description: interactive.list_reply.description,
+    };
+  }
+
+  return undefined;
 }
 
 export function extractWhatsAppMessages(
@@ -166,6 +220,7 @@ export function extractWhatsAppMessages(
         }
 
         const contact = contactById.get(message.from);
+        const interactiveReply = interactiveForMessage(message);
 
         output.push({
           wabaId: entry.id,
@@ -176,7 +231,8 @@ export function extractWhatsAppMessages(
           messageId: message.id,
           timestamp: new Date(seconds * 1000),
           type: message.type,
-          textBody: message.text?.body,
+          textBody: message.text?.body ?? interactiveReply?.title,
+          interactiveReply,
           media: mediaForMessage(message),
         });
       }
@@ -185,7 +241,6 @@ export function extractWhatsAppMessages(
 
   return output;
 }
-
 
 export function extractWhatsAppStatuses(
   payload: unknown,
