@@ -11,6 +11,14 @@ import { sendOpsReply } from "@/lib/replies";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+export function replyRedirectState(
+  status: string,
+): "sent" | "pending" | "failed" {
+  if (status === "failed") return "failed";
+  if (status === "queued") return "pending";
+  return "sent";
+}
+
 const replySchema = z.object({
   requestId: z.string().uuid(),
   body: z.string().trim().min(1).max(2000),
@@ -59,13 +67,7 @@ export async function POST(
       body: parsed.data.body,
     });
 
-    if (result.status === "failed") {
-      dashboardUrl.searchParams.set("reply", "failed");
-    } else if (result.status === "queued") {
-      dashboardUrl.searchParams.set("reply", "pending");
-    } else {
-      dashboardUrl.searchParams.set("reply", "sent");
-    }
+    dashboardUrl.searchParams.set("reply", replyRedirectState(result.status));
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     console.error("Manual WhatsApp reply failed", {
