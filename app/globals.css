@@ -1441,3 +1441,35 @@ ul {
     display: none;
   }
 }
+
+
+.waParseBadges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.waWorkflowState-recorded {
+  background: rgba(0, 168, 132, 0.16);
+  color: #7ee8d0;
+}
+
+.waWorkflowState-review_required {
+  background: rgba(241, 192, 67, 0.12);
+  color: #f5d77a;
+}
+
+.waWorkflowState-cancelled {
+  background: rgba(241, 92, 109, 0.14);
+  color: #ffb4bd;
+}
+
+.waVerificationMeta {
+  margin: 0;
+  padding: 8px 9px;
+  border-top: 1px solid #2a3942;
+  color: #8696a0;
+  font-size: 9px;
+  line-height: 1.45;
+}
