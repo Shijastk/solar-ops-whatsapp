@@ -79,6 +79,7 @@ const documentDraftSchema = z.object({
   stock_status: z.string(),
   stock_error: z.string().nullable(),
   stock_updated_at: z.string().nullable(),
+  stock_company_id: z.string().uuid().nullable(),
   summary_sent_at: z.string().nullable(),
 });
 
@@ -182,6 +183,7 @@ const DRAFT_SELECT = [
   "stock_status",
   "stock_error",
   "stock_updated_at",
+  "stock_company_id",
   "summary_sent_at",
 ].join(",");
 
