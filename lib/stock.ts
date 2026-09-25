@@ -4,6 +4,11 @@ import { deterministicUuid } from "@/lib/idempotency";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 const quantitySchema = z.coerce.number().finite().positive().max(1_000_000_000);
+const stockTargetQuantitySchema = z.coerce
+  .number()
+  .finite()
+  .min(0)
+  .max(1_000_000_000);
 
 const stockResultSchema = z.object({
   status: z.enum([
@@ -72,6 +77,16 @@ export type StockCompany = z.infer<typeof companySchema>;
 export type StockProduct = z.infer<typeof productSchema>;
 export type StockBalance = z.infer<typeof balanceSchema>;
 
+const stockAdjustmentResultSchema = z.object({
+  status: z.enum(["adjusted", "already_adjusted", "no_change", "not_ready"]),
+  product_id: z.string().uuid().optional(),
+  product_name: z.string().optional(),
+  previous_quantity: z.coerce.number().optional(),
+  target_quantity: z.coerce.number().optional(),
+});
+
+export type StockAdjustmentResult = z.infer<typeof stockAdjustmentResultSchema>;
+
 export function normalizeStockName(value: string): string {
   return value
     .normalize("NFKC")
@@ -104,22 +119,6 @@ export function normalizeStockGstin(value: string): string {
   const uniqueCandidates = [...new Set(candidates)];
 
   return uniqueCandidates.length === 1 ? uniqueCandidates[0] : compact;
-}
-
-export function getStockGstinDiagnostics(value: string) {
-  const normalizedText = value.normalize("NFKC").toUpperCase();
-  const compact = normalizedText.replace(/[^A-Z0-9]/g, "");
-  const candidates = normalizedText.match(GSTIN_TOKEN_PATTERN) ?? [];
-  const normalized = normalizeStockGstin(value);
-
-  return {
-    rawCodePointLength: [...value].length,
-    normalizedCodePointLength: [...normalizedText].length,
-    compactLength: compact.length,
-    candidateCount: new Set(candidates).size,
-    outputLength: normalized.length,
-    outputMatchesGstinShape: GSTIN_PATTERN.test(normalized),
-  };
 }
 
 export function validateOpeningStockInput(input: {
@@ -179,6 +178,41 @@ export function validateOpeningStockInput(input: {
     allowSimilarCompany: Boolean(input.allowSimilarCompany),
     allowSimilarProduct: Boolean(input.allowSimilarProduct),
   };
+}
+
+export function validateStockAdjustmentInput(input: {
+  productId: string;
+  targetQuantity: number | string;
+}) {
+  const productId = z.string().uuid().parse(input.productId);
+  const targetQuantity = stockTargetQuantitySchema.parse(input.targetQuantity);
+
+  return {
+    productId,
+    targetQuantity,
+  };
+}
+
+export async function adjustStockBalance(input: {
+  productId: string;
+  targetQuantity: number | string;
+  actionKey: string;
+}): Promise<StockAdjustmentResult> {
+  const parsed = validateStockAdjustmentInput(input);
+  const actionKey = z.string().uuid().parse(input.actionKey);
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase.rpc("adjust_stock_balance", {
+    p_product_id: parsed.productId,
+    p_target_quantity: parsed.targetQuantity,
+    p_idempotency_key: actionKey,
+  });
+
+  if (error) {
+    throw new Error("Failed to adjust stock: " + error.message);
+  }
+
+  return stockAdjustmentResultSchema.parse(data);
 }
 
 export async function createOpeningStock(input: {
