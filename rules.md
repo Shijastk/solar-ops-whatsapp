@@ -74,9 +74,23 @@ Avoid:
 - WhatsApp message ID is the idempotency key.
 - Repeated webhook deliveries must not create duplicate message rows.
 - Media download/storage failure must be visible as a failed processing state.
-- Do not automatically mutate future stock data from parser, OCR, or AI output.
+- Do not mutate stock directly from unapproved parser/OCR/AI output.
+- Approved outgoing/dispatch documents may mutate stock only through the documented atomic stock-ledger functions.
 - AI schema compliance is not proof of semantic correctness; independent parser-vs-verifier agreement is required for automatic document recording.
 - Human edits and workflow cancellation must retain an audit trail rather than silently rewriting or hard-deleting history.
+
+
+Stock safety rules:
+
+- Opening Stock is a one-time positive ledger entry per company/product/unit.
+- Never overwrite an opening entry silently.
+- Current stock is derived from immutable ledger deltas, not a mutable balance field.
+- If one bill line cannot be mapped or has insufficient stock, apply zero Stock OUT entries for that bill.
+- Product/company spelling similarity may rank suggestions only; it must not auto-create an alias.
+- A WhatsApp operator selection may create an alias only after sender ownership is checked server-side.
+- Quantity edits after Stock OUT must create correction ledger entries atomically.
+- Bill cancellation/Delete must restore prior net Stock OUT with reversal entries before workflow cancellation.
+- Duplicate webhook retries must not duplicate stock movements.
 
 ## 7. Testing discipline
 
@@ -120,7 +134,7 @@ The user has approved temporary media retention, structured PDF parsing, the int
 
 Parser output is a review draft. Extract only values supported by the document; missing fields remain null. Never infer a phone number, destination, quantity, or other business fact from unrelated digits/text.
 
-A complete draft may be marked approved, but approval must not mutate stock until stock IN/OUT, opening-balance, returns, and correction rules are explicitly defined.
+A complete draft may be marked approved. For the currently defined outgoing/dispatch document type, approval may then trigger Stock OUT only under the approved Opening Stock rules: exact/approved company and product mapping, matching unit, positive quantity, sufficient balance, idempotency, and all-or-nothing application.
 
 Manual WhatsApp replies may be sent only from the protected internal UI and only while the latest inbound message keeps Meta's 24-hour customer-service window open.
 
@@ -128,7 +142,7 @@ The user has additionally approved one bounded automatic WhatsApp path: after a 
 
 Do not turn the internal dashboard into a customer-facing portal or expose internal data publicly.
 
-Do not add automatic stock mutation, billing, paid services, or customer portals unless explicitly approved.
+Do not add automatic stock-IN/receiving rules, billing, paid services, or customer portals unless explicitly approved.
 
 ## 10. Documentation maintenance
 
