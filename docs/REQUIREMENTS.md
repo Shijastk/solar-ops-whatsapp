@@ -579,3 +579,27 @@ The system must:
 Manual stock adjustments must remain safe if the operator double-clicks, the browser retries, or two requests serialize close together.
 
 The database operation must lock the product row before deriving the balance. Replaying the same idempotency key must not add a second delta; a later request targeting an already-achieved quantity must return `no_change`.
+
+
+### R56 - Mobile-first professional stock UI
+
+The protected stock-management surface must be designed mobile-first.
+
+Normal mobile order:
+
+1. current inventory and quick Adjust actions
+2. add-opening-stock setup below it
+
+On wider screens the same semantic sections may be rearranged for efficiency.
+
+The stock UI must:
+
+- use a light theme scoped to the stock surface
+- use shared design tokens for background, surface, text, muted text, borders, accent, focus, spacing, and radii
+- keep form controls and primary actions at least approximately 44px high for touch use
+- avoid horizontal-table dependence on narrow screens
+- preserve readable labels and quantities without truncating critical stock values
+- avoid decorative gradients/heavy card styling that reduces operational clarity
+- add no new design-system dependency unless explicitly approved
+
+This requirement is visual/interaction-only and must not weaken the existing stock ledger, authentication, or mutation rules.

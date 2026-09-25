@@ -492,6 +492,10 @@ Insufficient stock produces a WhatsApp warning with required/available quantitie
 
 `/ops/stock` is a protected internal stock-management page for one-time Opening Stock setup, current derived balances, and audited quantity adjustments.
 
+Its visual layer is mobile-first and scoped independently from the WhatsApp chat UI. `.stockShell` defines light-theme design tokens for background/surfaces, text hierarchy, borders, accent/focus states, spacing, and radii. No third-party UI/design library is required.
+
+On mobile, Current stock is rendered before the longer new-product form. Inventory uses responsive rows rather than a table that needs horizontal scrolling. On wider screens, CSS grid reorders the same sections to opening-stock setup on the left and inventory on the right.
+
 The page is implemented as a Next.js App Router hybrid: server components load protected stock data and a client `StockManager` performs add/adjust mutations through authenticated fetch requests. Successful mutations call `router.refresh()` to obtain fresh server-rendered data without a normal browser document reload.
 
 The application as a whole is therefore not a pure client SPA. It is a hybrid server/client App Router application; the high-frequency stock and chat interactions are SPA-like while sensitive data access remains server-side.

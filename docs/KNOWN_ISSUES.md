@@ -360,3 +360,23 @@ Production-live acceptance is still required after deployment to confirm the ope
 The Current stock table now supports setting a target physical quantity.
 
 This does not edit the historical Opening Stock value. The system appends an `adjustment` delta instead. This distinction is intentional and should remain visible in future audit/reporting work.
+
+
+## K037 - Stock page visual design was desktop-biased and generic
+
+Observed after the initial stock-management release:
+
+- the dark presentation felt visually generic and inconsistent with a form-heavy inventory workflow
+- the responsive table/card treatment was not comfortable on narrow mobile screens
+- the long add-product form appeared before the more frequent current-stock task on mobile
+
+Resolution in source:
+
+- mobile-first Current stock ordering
+- responsive inventory rows instead of mobile table conversion
+- scoped light design-token system
+- larger touch targets and cleaner form hierarchy
+- desktop-only section reordering for efficient use of width
+- no new UI/design dependency
+
+Production-live visual acceptance remains required after deployment.
