@@ -348,3 +348,40 @@ Manual UI acceptance for the live chat additionally checks:
 - scrolling upward to read history is not immediately forced back to the bottom
 - rapid repeated Send interaction does not produce a false `Reply sent` notice
 - Meta send failure displays the persisted safe diagnostic rather than exposing secrets
+
+## Verified document automation tests
+
+Normal CI must cover the new automation without making real Groq or outbound Meta calls.
+
+Automated coverage includes:
+
+- automation disabled by default
+- enabling automation without `GROQ_API_KEY` fails closed
+- Groq model/timeout configuration validation
+- strict JSON Schema request shape
+- Groq key remains only in the Authorization header and is not copied into the request body
+- provider rejection fails closed
+- full persisted-field parser-vs-Groq comparison
+- item count/description/HSN/quantity/unit/rate/amount mismatch rejection
+- deterministic line arithmetic rejection
+- deterministic automatic-outbound UUID generation
+- Meta reply-button request body
+- Meta list-message request body
+- inbound button-reply normalization
+- inbound list-reply normalization
+- namespaced Edit/Delete action parsing
+- correction value validation
+- summary states that stock is unchanged
+
+Provider/live acceptance is separate. Do not claim Groq verification or automatic interactive WhatsApp messaging works live merely because mocked CI passes.
+
+After the feature is configured in production, use a non-sensitive selectable-text test PDF and verify:
+
+1. the PDF remains stored even if verifier/outbound fails
+2. exact parser/Groq agreement produces `recorded + verified`
+3. one summary arrives with Edit/Delete buttons
+4. Edit opens a field menu
+5. selecting a quantity and sending a corrected value stores a `manual_override` audit action and sends an updated summary
+6. Delete requires confirmation and changes only workflow state to `cancelled`
+7. stock remains unchanged throughout
+8. a deliberately ambiguous/mismatching fixture becomes `review_required` instead of auto-recorded
