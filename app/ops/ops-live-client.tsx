@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 
 const DEFAULT_REFRESH_MS = 3500;
@@ -88,5 +94,54 @@ export function ChatTimeline({
       {children}
       <div aria-hidden="true" className="waBottomAnchor" />
     </div>
+  );
+}
+
+
+export function ReplyForm({
+  action,
+  requestId,
+}: {
+  action: string;
+  requestId: string;
+}) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing
+    ) {
+      event.preventDefault();
+      formRef.current?.requestSubmit();
+    }
+  }
+
+  return (
+    <form
+      action={action}
+      method="post"
+      onSubmit={() => setSending(true)}
+      ref={formRef}
+    >
+      <input type="hidden" name="requestId" value={requestId} />
+      <textarea
+        aria-label="WhatsApp reply"
+        maxLength={2000}
+        name="body"
+        onChange={(event) => setBody(event.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="Type a message"
+        required
+        rows={1}
+        value={body}
+      />
+      <button disabled={sending || body.trim().length === 0} type="submit">
+        {sending ? "Sending…" : "Send"}
+      </button>
+    </form>
   );
 }
