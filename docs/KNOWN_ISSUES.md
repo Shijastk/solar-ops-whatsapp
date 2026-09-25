@@ -419,3 +419,14 @@ Production-live form acceptance remains required after deployment.
 The current backend does not yet store driver assignment, trip lifecycle, delivered-at timestamps, or external-vehicle records as a dedicated dispatch model.
 
 The native API therefore exposes only dispatch-related fields already parsed from real bills (vehicle number, destination, consignee and workflow/stock status). The mobile UI must show a truthful empty/unavailable state when those fields do not exist and must not fabricate delivery progress.
+
+
+## K041 - Repeated business-document uploads need cross-draft stock idempotency
+
+Observed on 2026-09-25 while testing the same delivery-note/e-Way Bill more than once.
+
+WhatsApp message-id idempotency prevents a retried webhook from duplicating one message, but a user can legitimately send the same PDF again and create a new message and draft. Draft/item-scoped stock ledger keys alone therefore do not protect against a second Stock OUT for the same business document.
+
+The pending cross-draft guard claims a normalized document identity atomically inside the Stock OUT transaction. It prefers e-Way Bill number; when that is absent it uses supplier GSTIN plus document number. A later draft with an already-claimed identity returns `duplicate_document` and must create zero additional Stock OUT rows. The claim remains after reversal so a cancelled/reversed document cannot silently become stock-active again through a re-upload; any such case requires explicit operator review.
+
+This change requires migration application plus automated CI and database-level verification before production acceptance.
