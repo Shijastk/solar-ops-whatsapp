@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizeStockGstin,
   normalizeStockName,
   normalizeStockUnit,
   validateOpeningStockInput,
@@ -11,6 +12,22 @@ describe("stock input helpers", () => {
       "sun grid solutions ltd",
     );
     expect(normalizeStockUnit(" No.s ")).toBe("NOS");
+  });
+
+  it("normalizes pasted GSTIN punctuation and invisible characters before validation", () => {
+    expect(normalizeStockGstin(" 32ABMCS6908B1ZG,\u200B ")).toBe(
+      "32ABMCS6908B1ZG",
+    );
+
+    expect(
+      validateOpeningStockInput({
+        companyName: "Sun Grid Solutions",
+        companyGstin: "32ABMCS6908B1ZG,\u200B",
+        productName: "Solar panel",
+        unit: "NOS",
+        quantity: "18",
+      }).companyGstin,
+    ).toBe("32ABMCS6908B1ZG");
   });
 
   it("validates opening stock and creates deterministic normalized fields", () => {
