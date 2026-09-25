@@ -392,6 +392,23 @@ After the feature is configured in production, use a non-sensitive selectable-te
 13. a deliberately ambiguous/mismatching document-verification fixture becomes `review_required` instead of auto-recorded
 
 
+## Opening Stock input validation tests
+
+Normal CI now covers the Opening Stock GSTIN boundary without contacting Supabase or Meta.
+
+Regression coverage includes:
+
+- the reported 15-character GSTIN `32ABMCS6908B1ZG`
+- lowercase-to-uppercase normalization
+- punctuation and zero-width characters around/in pasted input
+- NFKC-compatible full-width characters
+- copying a value with a prefix such as `GSTIN: 32ABMCS6908B1ZG`
+- extracting exactly one GSTIN-shaped token from surrounding clipboard text
+- rejecting ambiguous input that contains more than one GSTIN-shaped token
+- safe diagnostics containing only lengths/counts/shape booleans and never the GSTIN value
+
+The implementation/test CI gate passed after correcting only the expected diagnostic string length; the GSTIN extraction behavior itself passed in that run. Documentation changes require a fresh full quality-gate run before merge.
+
 ## Stock ledger tests
 
 Normal CI must cover pure stock validation/action parsing without contacting Supabase or Meta.
