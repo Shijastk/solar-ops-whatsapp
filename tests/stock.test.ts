@@ -66,6 +66,31 @@ describe("stock input helpers", () => {
     ).toThrow("standard 15-character GSTIN format");
   });
 
+  it("requires GSTIN when creating a new stock company", () => {
+    expect(() =>
+      validateOpeningStockInput({
+        companyName: "Sun Grid Solutions",
+        productName: "Solar panel",
+        unit: "NOS",
+        quantity: "18",
+      }),
+    ).toThrow("GSTIN is required");
+  });
+
+  it("allows an existing company id without retyping its saved GSTIN", () => {
+    expect(
+      validateOpeningStockInput({
+        companyId: "11111111-1111-4111-8111-111111111111",
+        productName: "Solar panel",
+        unit: "NOS",
+        quantity: "18",
+      }),
+    ).toMatchObject({
+      companyId: "11111111-1111-4111-8111-111111111111",
+      companyGstin: null,
+    });
+  });
+
   it("validates opening stock and creates deterministic normalized fields", () => {
     expect(
       validateOpeningStockInput({
@@ -100,6 +125,7 @@ describe("stock input helpers", () => {
     expect(() =>
       validateOpeningStockInput({
         companyName: "Company",
+        companyGstin: "32ABCDE1234F1Z5",
         productName: "Solar panel",
         unit: "NOS",
         quantity: "0",
