@@ -233,23 +233,35 @@ The UI supports free-form operator replies only when the latest inbound message 
 
 Approved Meta template messaging outside that window is not implemented.
 
-## K024 - Vercel production deployment needs a fresh retry after the quota delay
+## K024 - Vercel production deployment recovered after quota delay
 
-Observed again on 2026-09-23:
+Resolved on 2026-09-23.
 
-- GitHub `main` is at `540fd8c9a9424b20c3fc14efaa22804115ad8c78`
-- the Vercel status attached to that commit still records the earlier build-rate-limit failure
-- the stable production alias is still serving commit `828a8abaaf3110e66ea604ad55f2a2603c19f953`
-- Vercel did not automatically retry the failed production deployment after the waiting period
+A fresh validated `main` merge triggered production deployment `dpl_9WE9Jx8e7owEUuS4gRc9QZzckmtd`. The stable alias moved to commit `227f171bbe705e55f3f0822ec6b9d8a76ad11176`, reached `READY`, and `/api/health` plus the protected `/ops` login surface returned HTTP 200.
 
-The operator reports that the 24-hour waiting window has elapsed. A fresh `main` deployment must therefore be triggered through the normal CI-first release path.
+Future source changes still require the normal CI -> main -> production READY -> route verification sequence.
 
-Do not promote an existing feature-branch Preview because preview environment values may differ from production. Do not describe the operations dashboard, structured parsing, or manual-reply source as production-live until a fresh production deployment reaches `READY` and the stable alias is verified.
 
-## K025 - Automatic preview-deployment spam is prevented in source
+## K025 - Nested branch names bypassed the original preview-deployment pattern
 
-The repository contains `vercel.json` branch deployment rules that disable automatic Vercel deployments for feature branches and keep automatic deployment enabled for `main`.
+Observed on 2026-09-23: a `chore/...` branch still created a Vercel Preview even though the repository used `"*": false`.
 
-This prevents the development pattern that exhausted the Hobby deployment/build quota.
+The repository now uses the recursive branch rule `"**": false` with `"main": true`, so slash-delimited branches such as `feature/...`, `fix/...`, and `chore/...` are included in the disabled set.
 
-The earlier quota failure remains attached to the old `main` deployment attempt until a fresh production build is triggered. The safe retry path is feature branch -> CI -> pull request -> CI PASS -> squash merge to `main` -> one production deployment -> post-deploy verification.
+This source configuration must still be judged by observed future Vercel behavior; do not assume provider behavior solely from the file.
+
+
+## K026 - Operations chat viewport, manual refresh, and reply failure reporting
+
+Observed on 2026-09-25 from the production UI:
+
+- global `article` styling leaked into chat rows and produced large card-like message blocks
+- the operations shell could exceed the viewport, hiding the composer below the page fold
+- conversations opened at older content rather than the newest message
+- new data required a manual full-page Refresh interaction
+- a failed Meta send returned HTTP 400
+- repeated submission of the same failed request could incorrectly redirect with `reply=sent`
+
+The current source change isolates message-row styling, uses a viewport-locked WhatsApp-Web-like layout, auto-scrolls newly opened conversations, adds visible-tab automatic refresh, guards duplicate submits, maps duplicate failed/queued states accurately, and retains bounded redacted Meta send diagnostics.
+
+The exact Meta HTTP 400 cause from the already-failed historical request cannot be recovered because the previous production code discarded Meta's response body. A new explicit operator-triggered reply test after deployment is required to capture any future provider rejection safely.

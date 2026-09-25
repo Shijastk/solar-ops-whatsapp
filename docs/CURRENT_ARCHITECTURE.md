@@ -286,7 +286,7 @@ No Supabase secret or Meta access token is sent to the browser.
 
 `lib/ops-data.ts` performs server-only reads through the existing Supabase admin client and validates returned row shapes with Zod.
 
-The dashboard renders the latest accepted messages, high-level counts, masked sender references, processing state, file availability, and approximate 24-hour cleanup eligibility.
+The dashboard renders a WhatsApp-Web-like two-pane conversation surface with masked sender references, inbound/outbound state, structured document review controls, and private file actions. The page itself is viewport-locked; the sidebar and chat timeline scroll independently.
 
 ### File preview
 
@@ -313,7 +313,7 @@ The bucket remains private.
 
 This web dashboard is internal only. It is not a customer portal.
 
-The stable production alias may still be serving the earlier deployed revision until Vercel allows the next production build. Repository CI success does not by itself prove the new Milestone 2C source is live.
+Repository CI success does not by itself prove a source change is live. Production behavior is considered deployed only after the stable Vercel alias points at the expected main commit and the relevant route is verified.
 
 
 ## Structured document parsing
@@ -336,10 +336,23 @@ No stock table is changed by parsing or approval.
 
 Outbound state is stored in `whatsapp_outbound_messages`.
 
+Meta non-2xx send responses are reduced to bounded, redacted HTTP/code/type/message diagnostics before they are persisted. Duplicate requests preserve their existing queued/failed/sent state instead of being blindly reported as sent.
+
 The main webhook processes both inbound messages and outbound message-status notifications.
 
 ## WhatsApp-style operations UI
 
 The protected `/ops` surface groups messages by hashed conversation keys and renders inbound/outbound bubbles. Document messages can expose structured fields/items plus parse, approve, private-view, and delete actions. The composer is enabled only while the 24-hour service window is open.
+
+`app/ops/ops-live-client.tsx` supplies the client-only interaction layer:
+
+- a short automatic refresh interval while the tab is visible
+- refresh on browser focus/visibility return
+- initial/latest-message scroll-to-bottom behavior
+- preservation of history-reading position when the operator scrolls upward
+- guarded reply submission so rapid clicks do not submit the same form repeatedly
+- Enter-to-send and Shift+Enter newline behavior
+
+This is deliberately a low-cost authenticated polling approach, not a claim of true provider-push realtime. Server-only Supabase credentials remain off the client.
 
 Full phone numbers are not placed in dashboard URLs.

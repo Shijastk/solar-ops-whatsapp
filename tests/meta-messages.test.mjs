@@ -72,7 +72,42 @@ describe("sendWhatsAppTextReply", () => {
     });
   });
 
-  it("fails closed when Meta rejects the send request", async () => {
+  it("keeps safe Meta diagnostics when a send request is rejected", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              message:
+                "Recipient 919999999999 is not available for this test request",
+              type: "OAuthException",
+              code: 131030,
+              error_subcode: 2494010,
+            },
+          }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      ),
+    );
+
+    const promise = sendWhatsAppTextReply({
+      recipientPhone: "919999999999",
+      replyToMessageId: "wamid.inbound-1",
+      body: "Received",
+    });
+
+    await expect(promise).rejects.toThrow("HTTP 400");
+    await expect(promise).rejects.toThrow("Meta code 131030");
+    await expect(promise).rejects.toThrow("type OAuthException");
+    await expect(promise).rejects.toThrow("[redacted-number]");
+    await expect(promise).rejects.not.toThrow("919999999999");
+  });
+
+  it("fails closed without exposing an invalid provider body", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(new Response("provider error", { status: 400 })),
@@ -84,6 +119,6 @@ describe("sendWhatsAppTextReply", () => {
         replyToMessageId: "wamid.inbound-1",
         body: "Received",
       }),
-    ).rejects.toThrow("HTTP 400");
+    ).rejects.toThrow("WhatsApp reply request failed with HTTP 400");
   });
 });

@@ -333,6 +333,18 @@ Automated coverage now includes:
 - WhatsApp status webhook normalization
 - 24-hour manual-reply window boundary
 - Meta text-reply request body with reply context
+- redacted Meta HTTP error diagnostics
+- duplicate failed/queued reply redirect-state mapping
 - all existing webhook/signature/ingestion regressions
 
 Repository fixtures use synthetic names and identifiers. Real customer PDFs are not committed as tests.
+
+Manual UI acceptance for the live chat additionally checks:
+
+- desktop viewport fits without document-level vertical scrolling
+- composer remains visible at the bottom of the selected chat
+- selected conversation opens at the newest message
+- a new inbound message appears without pressing Refresh
+- scrolling upward to read history is not immediately forced back to the bottom
+- rapid repeated Send interaction does not produce a false `Reply sent` notice
+- Meta send failure displays the persisted safe diagnostic rather than exposing secrets

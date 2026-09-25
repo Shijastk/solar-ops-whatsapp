@@ -318,6 +318,25 @@ No template-message path is implemented in this milestone.
 
 Persist outbound messages and update them from Meta status webhooks. Supported states are queued, sent, delivered, read, failed, and deleted. Older callbacks must not overwrite a newer status timestamp.
 
+### R28 - Live chat viewport behavior
+
+The protected operations chat should follow the WhatsApp Web interaction model on desktop:
+
+- use the available viewport height instead of growing the whole document
+- keep the conversation list and selected timeline independently scrollable
+- keep the reply composer visible at the bottom of the selected chat
+- open a selected conversation at its newest message
+- automatically refresh visible chat data without requiring the operator to press a manual Refresh button
+- do not force-scroll to the bottom after the operator intentionally scrolls up to inspect history
+
+The current low-cost implementation uses a short visible-tab refresh interval rather than exposing Supabase server credentials or opening an unauthenticated realtime subscription.
+
+### R29 - Accurate outbound failure feedback
+
+A failed or queued duplicate reply request must never be displayed as successfully sent.
+
+When Meta rejects a send request, persist only bounded, redacted provider diagnostics suitable for internal troubleshooting. Never persist access tokens, full phone numbers, raw payloads, or provider trace identifiers.
+
 ### N11 - No extra paid parsing provider
 
 Selectable-text PDF parsing is local/server-side. No OCR or LLM provider is introduced for this phase.
