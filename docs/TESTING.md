@@ -477,3 +477,28 @@ Production-live visual acceptance after merge should confirm at minimum:
 - add/adjust actions remain SPA-like and do not cause a normal browser document reload
 
 A fresh full CI run is required after documentation updates before merge.
+
+
+## Mobile Add Stock bottom-sheet regression gate
+
+Implementation CI run `36121266799` passed:
+
+- TypeScript typecheck
+- ESLint
+- unit tests
+- Next.js production build
+
+Live mobile acceptance after deployment should confirm:
+
+- **+ Add stock** is visible on phone-width stock screens
+- Opening Stock form is not permanently occupying the mobile page
+- tapping the FAB opens the bottom sheet above a backdrop
+- backdrop, close button, and Escape close the sheet
+- background page does not scroll while the sheet is open
+- form remains scrollable inside the sheet
+- Save remains reachable with mobile safe-area spacing
+- successful save closes the sheet and refreshes Current stock without a full document reload
+- desktop still shows the Opening Stock form inline
+- Adjust behavior remains unchanged
+
+Documentation was updated only after the implementation quality gate passed. A fresh final CI run is required before merge.
