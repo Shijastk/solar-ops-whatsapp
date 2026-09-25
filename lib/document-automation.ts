@@ -116,7 +116,7 @@ export function buildDocumentSummary(
     | "totalAmount"
     | "items"
   > & { stockStatus?: string },
-  heading = "✅ Bill data recorded",
+  heading = "✅ Bill verified",
 ): string {
   const lines = [heading];
 
@@ -402,13 +402,39 @@ async function updateAutomationState(
   }
 }
 
+async function canonicalSupplierName(
+  gstin: string | null,
+): Promise<string | null> {
+  if (!gstin) return null;
+  const normalized = gstin.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("stock_companies")
+    .select("canonical_name")
+    .eq("gstin", normalized)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Canonical company name lookup failed", {
+      reason: error.message.slice(0, 180),
+    });
+    return null;
+  }
+  return data?.canonical_name ?? null;
+}
+
 async function sendSummary(
   draft: DraftContext,
   replyToMessageId: string,
   requestSeed: string,
   heading?: string,
 ) {
-  const body = buildDocumentSummary(draft, heading);
+  const companyName = await canonicalSupplierName(draft.supplierGstin);
+  const body = buildDocumentSummary(
+    { ...draft, supplierName: companyName ?? draft.supplierName },
+    heading,
+  );
   const result = await sendOpsReplyButtons({
     requestId: deterministicUuid(requestSeed),
     replyToMessageId,
