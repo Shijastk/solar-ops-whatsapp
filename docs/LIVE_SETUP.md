@@ -461,3 +461,20 @@ After the mobile-first stock redesign is deployed:
 7. repeat Add/Adjust and confirm successful actions still refresh data without a normal document reload
 
 No external design library is required for this acceptance.
+
+
+## Phase L - Mobile Add Stock drawer acceptance
+
+On a phone-width viewport:
+
+1. open `/ops/stock`
+2. confirm Current stock is immediately usable without scrolling through the creation form
+3. tap **+ Add stock**
+4. confirm the Opening Stock form slides up from the bottom with a dimmed backdrop
+5. scroll inside the drawer and confirm the page behind it remains fixed
+6. close once using the X control and once using the backdrop
+7. reopen, enter a safe test only when needed, and confirm Save remains reachable above the device safe area
+8. confirm successful save closes the sheet and refreshes inventory without a browser document reload
+9. verify a desktop-width view still shows the Opening Stock form inline
+
+Do not introduce a separate mobile stock mutation API for this UI; mobile and desktop must continue to share the same validated server path.
