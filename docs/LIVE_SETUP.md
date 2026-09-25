@@ -339,10 +339,78 @@ Expected:
 - Groq independently extracts the full persisted draft
 - exact normalized agreement + arithmetic checks => `recorded / verified`
 - one WhatsApp summary arrives with Edit/Delete controls
-- summary says stock is unchanged
+- summary reports stock applied or pending accurately
 - Edit -> choose field -> send corrected value => `manual_override` plus audit row
 - Delete -> confirmation => `cancelled`, not hard-deleted
 - any mismatch/provider failure => `review_required`, no silent auto-record
-- no stock/current-stock table is touched
+- when Opening Stock is configured and every stock check passes, the outgoing bill creates one idempotent Stock OUT
 
 Do not describe this provider flow as live-verified until those observations are made on the production deployment.
+
+
+## Phase I - Opening Stock and outgoing inventory
+
+### I1. One-time setup
+
+Open:
+
+`https://solar-ops-whatsapp.vercel.app/ops/stock`
+
+Use the protected operations login.
+
+For each existing warehouse product:
+
+1. choose an existing company or create the company once
+2. include GSTIN when available because it is a strong company identifier
+3. enter the canonical product name
+4. select the canonical unit
+5. enter HSN/SAC when known
+6. enter the current physical Opening Stock quantity
+
+Opening Stock cannot be silently overwritten.
+
+### I2. Safe outgoing acceptance
+
+With a non-sensitive test product:
+
+1. Opening Stock = 100
+2. send/approve an outgoing bill quantity 30
+3. expected balance = 70
+4. replay the same webhook/document
+5. expected balance remains 70
+
+### I3. Spelling mismatch
+
+Send a bill whose product description intentionally differs from the configured canonical/alias text.
+
+Expected:
+
+- no stock deduction
+- WhatsApp receives a product-mapping list
+- operator selects the correct product
+- the alias is remembered
+- the full bill is retried
+- balance changes only after the mapping is accepted
+
+The same rule applies to a company-name mismatch when GSTIN does not already identify it.
+
+### I4. Insufficient stock
+
+With available stock lower than the bill requirement:
+
+Expected:
+
+- WhatsApp reports required and available quantities
+- zero Stock OUT rows from that bill
+- balance unchanged
+
+### I5. Edit and Delete
+
+After successful Stock OUT:
+
+- decrease/increase bill quantity through WhatsApp Edit
+- verify the difference is represented by a correction ledger entry
+- an increase beyond available stock must be rejected without changing the old quantity
+- Delete must restore the bill's net deduction through a reversal before marking the document cancelled
+
+Do not call this inventory flow production-live-verified until these observations are completed after deployment.
