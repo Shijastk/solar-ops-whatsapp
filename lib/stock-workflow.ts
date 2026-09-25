@@ -296,34 +296,45 @@ export async function processStockForDraft(input: {
 
   const result = await applyStockOutForDraft(input.draftId);
 
-  if (result.status === "applied" || result.status === "already_applied") {
-    if (input.notifySuccess) {
-      await sendSuccess(
-        draft,
-        input.replyToMessageId,
-        "stock-success:" + draft.id,
-      );
+  try {
+    if (result.status === "applied" || result.status === "already_applied") {
+      if (input.notifySuccess) {
+        await sendSuccess(
+          draft,
+          input.replyToMessageId,
+          "stock-success:" + draft.id,
+        );
+      }
+      return result;
     }
+
+    if (result.status === "company_unmapped") {
+      await notifyCompanyMatch(draft, input.replyToMessageId);
+      return result;
+    }
+
+    if (result.status === "needs_product_match") {
+      await notifyProductMatch(draft, input.replyToMessageId, result);
+      return result;
+    }
+
+    if (result.status === "insufficient_stock") {
+      await notifyInsufficient(draft, input.replyToMessageId, result);
+      return result;
+    }
+
+    await notifyUnsafeState(draft, input.replyToMessageId, result);
+    return result;
+  } catch (error) {
+    console.warn("Stock workflow notification did not complete", {
+      status: result.status,
+      reason:
+        error instanceof Error
+          ? error.message.slice(0, 180)
+          : "Unknown notification error",
+    });
     return result;
   }
-
-  if (result.status === "company_unmapped") {
-    await notifyCompanyMatch(draft, input.replyToMessageId);
-    return result;
-  }
-
-  if (result.status === "needs_product_match") {
-    await notifyProductMatch(draft, input.replyToMessageId, result);
-    return result;
-  }
-
-  if (result.status === "insufficient_stock") {
-    await notifyInsufficient(draft, input.replyToMessageId, result);
-    return result;
-  }
-
-  await notifyUnsafeState(draft, input.replyToMessageId, result);
-  return result;
 }
 
 export async function handleStockWorkflowInbound(
