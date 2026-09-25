@@ -5,13 +5,37 @@ import {
   isSameOriginRequest,
   verifyOpsSession,
 } from "@/lib/ops-auth";
-import {
-  createOpeningStock,
-  getStockGstinDiagnostics,
-} from "@/lib/stock";
+import { createOpeningStock } from "@/lib/stock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function wantsJson(request: Request): boolean {
+  return request.headers.get("accept")?.includes("application/json") ?? false;
+}
+
+export function openingStockErrorState(message: string): string {
+  if (message.includes("GSTIN")) return "invalid_gstin";
+  if (message.includes("existing company")) return "company_required";
+  if (message.includes("Product name")) return "product_required";
+  if (message.includes("Unit")) return "invalid_unit";
+  if (message.includes("HSN")) return "invalid_hsn";
+  return "failed";
+}
+
+function resultResponse(
+  request: Request,
+  target: URL,
+  status: string,
+  httpStatus = 200,
+) {
+  if (wantsJson(request)) {
+    return Response.json({ status }, { status: httpStatus });
+  }
+
+  target.searchParams.set("result", status);
+  return NextResponse.redirect(target, 303);
+}
 
 export async function POST(request: Request) {
   if (!isSameOriginRequest(request)) {
@@ -24,16 +48,13 @@ export async function POST(request: Request) {
   }
 
   const target = new URL("/ops/stock", request.url);
-  let companyGstinInput = "";
 
   try {
     const form = await request.formData();
-    companyGstinInput = String(form.get("companyGstin") ?? "");
-
     const result = await createOpeningStock({
       companyId: String(form.get("companyId") ?? ""),
       companyName: String(form.get("companyName") ?? ""),
-      companyGstin: companyGstinInput,
+      companyGstin: String(form.get("companyGstin") ?? ""),
       productName: String(form.get("productName") ?? ""),
       unit: String(form.get("unit") ?? ""),
       hsnSac: String(form.get("hsnSac") ?? ""),
@@ -42,34 +63,13 @@ export async function POST(request: Request) {
       allowSimilarProduct: form.get("allowSimilarProduct") === "on",
     });
 
-    target.searchParams.set("result", result.status);
+    return resultResponse(request, target, result.status);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown opening stock error";
+    const status = openingStockErrorState(message);
 
-    const safeDetails = message.includes("GSTIN")
-      ? { gstin: getStockGstinDiagnostics(companyGstinInput) }
-      : {};
-
-    console.error("Opening stock setup failed", {
-      message,
-      ...safeDetails,
-    });
-
-    if (message.includes("GSTIN")) {
-      target.searchParams.set("result", "invalid_gstin");
-    } else if (message.includes("existing company")) {
-      target.searchParams.set("result", "company_required");
-    } else if (message.includes("Product name")) {
-      target.searchParams.set("result", "product_required");
-    } else if (message.includes("Unit")) {
-      target.searchParams.set("result", "invalid_unit");
-    } else if (message.includes("HSN")) {
-      target.searchParams.set("result", "invalid_hsn");
-    } else {
-      target.searchParams.set("result", "failed");
-    }
+    console.error("Opening stock setup failed", { message });
+    return resultResponse(request, target, status, 400);
   }
-
-  return NextResponse.redirect(target, 303);
 }
