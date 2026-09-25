@@ -71,6 +71,7 @@ Current Milestone 2 scope:
 - automatic transactional WhatsApp summaries only after fail-closed verification
 - WhatsApp Edit/Delete workflow controls with audit-safe corrections/cancellation
 - one-time Opening Stock setup
+- GSTIN-backed company identity is mandatory for Opening Stock companies
 - inline audited current-stock adjustments
 - immutable stock ledger for approved outgoing/dispatch bills
 - WhatsApp-first company/product alias resolution for stock exceptions
