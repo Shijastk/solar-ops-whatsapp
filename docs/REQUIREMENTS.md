@@ -603,3 +603,22 @@ The stock UI must:
 - add no new design-system dependency unless explicitly approved
 
 This requirement is visual/interaction-only and must not weaken the existing stock ledger, authentication, or mutation rules.
+
+
+### R57 - Mobile Add Stock bottom sheet
+
+On narrow/mobile stock screens, adding a new stock product must be a secondary action exposed through a floating **Add stock** button rather than a permanently visible long form.
+
+The mobile interaction must:
+
+- open the existing Opening Stock form in a bottom sheet/drawer
+- reuse the same server validation and mutation path as desktop
+- keep Current stock visible as the primary page task while the sheet is closed
+- support backdrop close, an explicit close control, and Escape-key close
+- prevent background-page scrolling while the sheet is open
+- keep the primary Save action reachable near the bottom of the sheet
+- respect mobile safe-area insets
+- return focus to the Add stock trigger after closing when practical
+- avoid adding a new UI/design dependency
+
+Desktop/wide layouts may continue to render the Opening Stock form inline.

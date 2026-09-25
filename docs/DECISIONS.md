@@ -350,3 +350,12 @@ No external UI/design library was added.
 Decision: On narrow screens, Current stock appears before the Add opening stock form. On desktop, CSS grid reorders the same sections to setup-left / inventory-right.
 
 Reason: Adjusting existing stock is expected to be the more frequent mobile task after initial setup, so it should require less scrolling.
+
+
+## D041 - Mobile Opening Stock uses a bottom sheet
+
+Decision: On mobile, the Opening Stock form is launched from a floating **Add stock** action and presented as a bottom sheet. Desktop keeps the same form inline.
+
+Reason: Current inventory and Adjust are the frequent day-to-day tasks after setup. Keeping the long creation form permanently in the mobile document flow adds scrolling and visual weight.
+
+The sheet reuses the existing form and mutation path; this is an interaction/layout decision, not a second stock workflow.

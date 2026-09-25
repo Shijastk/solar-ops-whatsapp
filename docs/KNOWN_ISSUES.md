@@ -380,3 +380,20 @@ Resolution in source:
 - no new UI/design dependency
 
 Production-live visual acceptance remains required after deployment.
+
+
+## K038 - Long Add opening stock form consumed mobile page space
+
+After the mobile-first light redesign, the full Opening Stock form was still permanently present below inventory on narrow screens.
+
+Resolution in source:
+
+- mobile floating **+ Add stock** trigger
+- Opening Stock form presented as a bottom sheet
+- backdrop/close/Escape dismissal
+- body-scroll lock while open
+- safe-area-aware spacing and sticky Save action
+- desktop inline form preserved
+- no additional UI library
+
+Production-live mobile acceptance remains required after deployment.

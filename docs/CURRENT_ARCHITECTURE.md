@@ -494,7 +494,9 @@ Insufficient stock produces a WhatsApp warning with required/available quantitie
 
 Its visual layer is mobile-first and scoped independently from the WhatsApp chat UI. `.stockShell` defines light-theme design tokens for background/surfaces, text hierarchy, borders, accent/focus states, spacing, and radii. No third-party UI/design library is required.
 
-On mobile, Current stock is rendered before the longer new-product form. Inventory uses responsive rows rather than a table that needs horizontal scrolling. On wider screens, CSS grid reorders the same sections to opening-stock setup on the left and inventory on the right.
+On mobile, Current stock is the primary persistent surface. The longer new-product form is removed from the normal document flow and launched from a floating **Add stock** button as a bottom sheet. The same form remains inline on wider screens.
+
+The mobile sheet uses the existing Opening Stock submit path and adds only presentation/accessibility behavior: backdrop and explicit close controls, Escape handling, temporary body-scroll lock, focus transfer/return, safe-area spacing, and a sticky Save action. Inventory uses responsive rows rather than a table that needs horizontal scrolling.
 
 The page is implemented as a Next.js App Router hybrid: server components load protected stock data and a client `StockManager` performs add/adjust mutations through authenticated fetch requests. Successful mutations call `router.refresh()` to obtain fresh server-rendered data without a normal browser document reload.
 
