@@ -333,3 +333,20 @@ Decision: Editing an existing current stock quantity appends an `adjustment` mov
 Reason: The physical count may need correction, but overwriting the original opening balance or historical bill movements destroys auditability.
 
 A target of zero is valid; a negative target is not.
+
+
+## D039 - Stock UI uses scoped light design tokens
+
+Decision: The stock-management surface uses a light operational theme with CSS custom-property design tokens scoped under `stockShell`.
+
+Reason: Stock entry and physical-count correction are form-heavy operational tasks. A restrained light surface with explicit borders, readable hierarchy, and consistent focus states is easier to scan on mobile than the previous dark card-heavy presentation.
+
+The WhatsApp operations chat remains visually separate; the stock theme must not recolor the chat surface.
+
+No external UI/design library was added.
+
+## D040 - Current inventory comes first on mobile
+
+Decision: On narrow screens, Current stock appears before the Add opening stock form. On desktop, CSS grid reorders the same sections to setup-left / inventory-right.
+
+Reason: Adjusting existing stock is expected to be the more frequent mobile task after initial setup, so it should require less scrolling.
