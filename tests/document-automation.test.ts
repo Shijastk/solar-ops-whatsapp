@@ -50,6 +50,29 @@ describe("document automation helpers", () => {
     });
 
     expect(applied).toContain("Stock updated");
+
+    const duplicate = buildDocumentSummary({
+      supplierName: "Sun Grid Solutions Limited",
+      documentNumber: "SG000123",
+      vehicleNumber: "KL11AA1234",
+      totalAmount: 176026.86,
+      stockStatus: "duplicate_document",
+      items: [
+        {
+          id: "item-1",
+          description: "Solar 560 Wp Topcon Panel",
+          hsnSac: "8541",
+          quantity: 6,
+          unit: "NOS",
+          rate: 20000,
+          amount: 120000,
+        },
+      ],
+    });
+
+    expect(duplicate).toContain("Already recorded earlier");
+    expect(duplicate).toContain("Stock was not deducted again");
+    expect(duplicate).not.toContain("Stock update pending");
   });
 
   it("parses only namespaced document workflow actions", () => {
