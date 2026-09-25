@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getHealthConfiguration, getIngestionEnv } from "../lib/env";
+import {
+  getDocumentAutomationEnv,
+  getHealthConfiguration,
+  getIngestionEnv,
+} from "../lib/env";
 
 const keys = [
   "WHATSAPP_VERIFY_TOKEN",
@@ -12,6 +16,10 @@ const keys = [
   "SUPABASE_SECRET_KEY",
   "SUPABASE_STORAGE_BUCKET",
   "MAX_MEDIA_BYTES",
+  "DOCUMENT_AUTOMATION_ENABLED",
+  "GROQ_API_KEY",
+  "GROQ_MODEL",
+  "GROQ_TIMEOUT_MS",
 ] as const;
 
 const originalValues = Object.fromEntries(
@@ -40,6 +48,7 @@ function setValidEnvironment() {
   process.env.SUPABASE_SECRET_KEY = "test-secret";
   process.env.SUPABASE_STORAGE_BUCKET = "whatsapp-media";
   process.env.MAX_MEDIA_BYTES = "15728640";
+  process.env.DOCUMENT_AUTOMATION_ENABLED = "false";
 }
 
 describe("getIngestionEnv", () => {
@@ -74,6 +83,11 @@ describe("getHealthConfiguration", () => {
     expect(result.validation).toEqual({
       webhook: true,
       ingestion: true,
+      automation: {
+        enabled: false,
+        ready: true,
+        invalidFields: [],
+      },
       invalidFields: [],
     });
     expect(result.presence.SUPABASE_SECRET_KEY).toBe(true);
@@ -96,5 +110,50 @@ describe("getHealthConfiguration", () => {
     ]);
     expect(JSON.stringify(result)).not.toContain("not-a-url");
     expect(JSON.stringify(result)).not.toContain("not-a-number");
+  });
+});
+
+
+describe("getDocumentAutomationEnv", () => {
+  it("is disabled by default and does not require a Groq key", () => {
+    setValidEnvironment();
+    delete process.env.DOCUMENT_AUTOMATION_ENABLED;
+    delete process.env.GROQ_API_KEY;
+
+    expect(getDocumentAutomationEnv()).toMatchObject({
+      enabled: false,
+      apiKey: null,
+      model: "openai/gpt-oss-20b",
+      timeoutMs: 7000,
+    });
+  });
+
+  it("fails closed when automation is enabled without a Groq key", () => {
+    setValidEnvironment();
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    delete process.env.GROQ_API_KEY;
+
+    expect(() => getDocumentAutomationEnv()).toThrow("GROQ_API_KEY");
+    const health = getHealthConfiguration();
+    expect(health.validation.automation).toEqual({
+      enabled: true,
+      ready: false,
+      invalidFields: ["GROQ_API_KEY"],
+    });
+  });
+
+  it("accepts an explicitly configured Groq verifier", () => {
+    setValidEnvironment();
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-key";
+    process.env.GROQ_MODEL = "openai/gpt-oss-20b";
+    process.env.GROQ_TIMEOUT_MS = "6000";
+
+    expect(getDocumentAutomationEnv()).toMatchObject({
+      enabled: true,
+      apiKey: "groq-test-key",
+      model: "openai/gpt-oss-20b",
+      timeoutMs: 6000,
+    });
   });
 });
