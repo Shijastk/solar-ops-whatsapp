@@ -28,7 +28,7 @@ Examples that require confirmation:
 
 - changing what counts as stock in/out
 - automatically updating inventory from OCR
-- sending automatic WhatsApp replies
+- sending automatic WhatsApp replies outside the explicitly approved verified-document workflow
 - exposing cost/profit data
 - onboarding a real production phone number
 - changing the database schema in a destructive way
@@ -74,7 +74,9 @@ Avoid:
 - WhatsApp message ID is the idempotency key.
 - Repeated webhook deliveries must not create duplicate message rows.
 - Media download/storage failure must be visible as a failed processing state.
-- Do not automatically mutate future stock data from unverified OCR output.
+- Do not automatically mutate future stock data from parser, OCR, or AI output.
+- AI schema compliance is not proof of semantic correctness; independent parser-vs-verifier agreement is required for automatic document recording.
+- Human edits and workflow cancellation must retain an audit trail rather than silently rewriting or hard-deleting history.
 
 ## 7. Testing discipline
 
@@ -120,7 +122,9 @@ Parser output is a review draft. Extract only values supported by the document; 
 
 A complete draft may be marked approved, but approval must not mutate stock until stock IN/OUT, opening-balance, returns, and correction rules are explicitly defined.
 
-Manual WhatsApp replies may be sent only from the protected internal UI and only while the latest inbound message keeps Meta's 24-hour customer-service window open. Automatic replies and template messaging remain out of scope.
+Manual WhatsApp replies may be sent only from the protected internal UI and only while the latest inbound message keeps Meta's 24-hour customer-service window open.
+
+The user has additionally approved one bounded automatic WhatsApp path: after a received selectable-text PDF is independently verified by the deterministic parser and Groq under the documented fail-closed rules, the service may send a transactional summary with Edit/Delete controls within the active customer-service window. A mismatch, incomplete document, scanned PDF, Groq error, timeout, or unavailable configuration must not auto-record the document or silently continue as verified. Template messaging remains out of scope.
 
 Do not turn the internal dashboard into a customer-facing portal or expose internal data publicly.
 
