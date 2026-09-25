@@ -219,7 +219,7 @@ Current source implements deterministic PDF document parsing and manual operator
 - driver model
 - porter model
 - customer dashboard
-- automatic WhatsApp reply path
+- general-purpose automatic WhatsApp reply path outside the approved document workflow
 - template-message path outside the customer-service window
 - production-grade multi-user authentication
 
@@ -356,3 +356,64 @@ The protected `/ops` surface groups messages by hashed conversation keys and ren
 This is deliberately a low-cost authenticated polling approach, not a claim of true provider-push realtime. Server-only Supabase credentials remain off the client.
 
 Full phone numbers are not placed in dashboard URLs.
+
+## Verified document automation
+
+Milestone 2D adds an optional, server-only document verification and correction workflow.
+
+### Configuration
+
+`lib/env.ts` exposes:
+
+- `DOCUMENT_AUTOMATION_ENABLED` (default `false`)
+- `GROQ_API_KEY` (server-only)
+- `GROQ_MODEL` (default `openai/gpt-oss-20b`)
+- `GROQ_TIMEOUT_MS` (default 7000 ms)
+
+Core WhatsApp ingestion remains independently healthy when this optional feature is disabled.
+
+### Independent verification
+
+`lib/document-verifier.ts` sends at most 24,000 extracted-text characters to Groq. It requests strict JSON Schema output and independently extracts the same persisted structured fields/items as the deterministic parser.
+
+The verifier compares all persisted fields and every item description/HSN/quantity/unit/rate/amount. It also checks line arithmetic and, when available, the sum of line amounts against taxable amount. Any difference returns a mismatch list; it never merges competing values.
+
+Schema compliance from Groq is treated only as transport/shape correctness, not proof of semantic correctness.
+
+### Document workflow
+
+`lib/document-automation.ts` manages workflow states `pending`, `recorded`, `review_required`, and `cancelled`.
+
+Verification state is separate: `not_run`, `verified`, `needs_review`, `failed`, and `manual_override`.
+
+A verified document can automatically send a concise WhatsApp summary with Edit/Delete buttons. The summary explicitly says stock is unchanged.
+
+### Interactive WhatsApp flow
+
+`lib/meta-messages.ts` supports text, reply-button, and list interactive messages through the existing Meta `/messages` endpoint.
+
+`lib/whatsapp.ts` normalizes inbound `interactive.button_reply` and `interactive.list_reply` events.
+
+The interaction ID is only a lookup hint. `lib/document-automation.ts` verifies the document belongs to the same stored sender before acting.
+
+Edit uses a short-lived server-side `document_edit_sessions` row. After a field is chosen, the operator types only the corrected value. Valid corrections are stored as `manual_override` and written to `document_actions` with previous/new values.
+
+Delete uses a second confirmation step and marks the document `cancelled`; structured data and audit history remain.
+
+### Database additions
+
+`document_drafts` adds verification/workflow/summary state.
+
+`whatsapp_outbound_messages.message_kind` distinguishes text and interactive sends.
+
+`document_actions` is an RLS-protected audit table.
+
+`document_edit_sessions` stores one short-lived pending correction target per sender and is RLS-protected.
+
+No anon/authenticated policies are created for these internal tables. Server-side service-role access is explicitly granted for new tables.
+
+### Ingestion isolation
+
+`lib/ingest.ts` runs document automation only after successful PDF storage and parsing. Automation/provider errors are caught separately, so a Groq or outbound failure does not convert already-stored inbound media into an ingestion failure.
+
+No stock table exists or is modified by this workflow.
