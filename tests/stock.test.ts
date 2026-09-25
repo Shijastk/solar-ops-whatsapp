@@ -55,8 +55,8 @@ describe("stock input helpers", () => {
 
   it("reports safe diagnostics without exposing the GSTIN value", () => {
     expect(getStockGstinDiagnostics("GSTIN: 32ABMCS6908B1ZG")).toEqual({
-      rawCodePointLength: 21,
-      normalizedCodePointLength: 21,
+      rawCodePointLength: 22,
+      normalizedCodePointLength: 22,
       compactLength: 20,
       candidateCount: 1,
       outputLength: 15,
