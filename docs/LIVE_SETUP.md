@@ -361,7 +361,7 @@ Use the protected operations login.
 For each existing warehouse product:
 
 1. choose an existing company or create the company once
-2. include GSTIN when available because it is a strong company identifier
+2. enter a valid GSTIN for every new stock company; GSTIN is required
 3. enter the canonical product name
 4. select the canonical unit
 5. enter HSN/SAC when known
@@ -416,7 +416,7 @@ After successful Stock OUT:
 Do not call this inventory flow production-live-verified until these observations are completed after deployment.
 
 
-Opening Stock GSTIN input is optional.
+Opening Stock GSTIN is mandatory for stock-company identity.
 
 For clipboard safety, the server normalizes Unicode with NFKC and accepts a GSTIN only when it can resolve one unambiguous standard GSTIN-shaped value. This supports:
 
@@ -478,3 +478,17 @@ On a phone-width viewport:
 9. verify a desktop-width view still shows the Opening Stock form inline
 
 Do not introduce a separate mobile stock mutation API for this UI; mobile and desktop must continue to share the same validated server path.
+
+
+## Phase M - Required GSTIN acceptance
+
+After deployment:
+
+1. open the Add stock drawer/form
+2. leave company unselected and confirm New company name + Company GSTIN are required
+3. confirm a new company cannot be submitted without GSTIN
+4. enter a valid 15-character GSTIN and confirm normal Opening Stock validation proceeds
+5. select an existing company and confirm its saved GSTIN is reused without requiring re-entry
+6. verify the existing-company name/GSTIN creation fields are disabled while that company is selected
+
+Do not weaken the server/database rule even if browser-side required validation is present.
