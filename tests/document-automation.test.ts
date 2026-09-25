@@ -25,9 +25,9 @@ describe("document automation helpers", () => {
       ],
     });
 
-    expect(summary).toContain("Bill verified");
+    expect(summary).toContain("ബിൽ പരിശോധിച്ച് സ്ഥിരീകരിച്ചു");
     expect(summary).toContain("Solar 560 Wp Topcon Panel — 6 NOS");
-    expect(summary).toContain("Stock update pending");
+    expect(summary).toContain("സ്റ്റോക്ക് അപ്ഡേറ്റ് പൂർത്തിയായിട്ടില്ല");
     expect(summary.length).toBeLessThanOrEqual(950);
 
     const applied = buildDocumentSummary({
@@ -49,7 +49,7 @@ describe("document automation helpers", () => {
       ],
     });
 
-    expect(applied).toContain("Stock updated");
+    expect(applied).toContain("സ്റ്റോക്ക് വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു");
 
     const duplicate = buildDocumentSummary({
       supplierName: "Sun Grid Solutions Limited",
@@ -70,9 +70,9 @@ describe("document automation helpers", () => {
       ],
     });
 
-    expect(duplicate).toContain("Already recorded earlier");
-    expect(duplicate).toContain("Stock was not deducted again");
-    expect(duplicate).not.toContain("Stock update pending");
+    expect(duplicate).toContain("ഈ ബിൽ നേരത്തെ സ്റ്റോക്കിൽ രേഖപ്പെടുത്തിയതാണ്");
+    expect(duplicate).toContain("സ്റ്റോക്ക് വീണ്ടും കുറച്ചിട്ടില്ല");
+    expect(duplicate).not.toContain("സ്റ്റോക്ക് അപ്ഡേറ്റ് പൂർത്തിയായിട്ടില്ല");
   });
 
   it("parses only namespaced document workflow actions", () => {
