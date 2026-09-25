@@ -9,7 +9,11 @@ import {
 } from "@/lib/ops-data";
 import { verifyOpsSession } from "@/lib/ops-auth";
 import { isWithinCustomerServiceWindow } from "@/lib/replies";
-import { listStockBalances, listStockCompanies } from "@/lib/stock";
+import {
+  listStockBalances,
+  listStockCompanies,
+  type StockCompany,
+} from "@/lib/stock";
 
 export const MOBILE_API_VERSION = "v1";
 
@@ -72,6 +76,35 @@ function displayDay(value: Date): string {
   }).format(value);
 }
 
+function normalizeCompanyGstin(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const normalized = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return normalized.length === 15 ? normalized : null;
+}
+
+export function resolveMobileCompany(
+  draft: OpsDocumentDraft | undefined,
+  companies: StockCompany[],
+): StockCompany | null {
+  if (!draft) return null;
+
+  if (draft.stock_company_id) {
+    const mapped = companies.find(
+      (company) => company.id === draft.stock_company_id && company.gstin !== null,
+    );
+    if (mapped) return mapped;
+  }
+
+  const supplierGstin = normalizeCompanyGstin(draft.supplier_gstin);
+  if (!supplierGstin) return null;
+
+  return (
+    companies.find(
+      (company) => normalizeCompanyGstin(company.gstin) === supplierGstin,
+    ) ?? null
+  );
+}
+
 function draftNeedsReview(draft: OpsDocumentDraft | undefined): boolean {
   if (!draft) return false;
   return (
@@ -119,6 +152,7 @@ function serializeDraft(draft: OpsDocumentDraft | undefined) {
     stockStatus: draft.stock_status,
     stockError: draft.stock_error,
     stockUpdatedAt: draft.stock_updated_at,
+    stockCompanyId: draft.stock_company_id,
     items: draft.items.map((item) => ({
       id: item.id,
       lineIndex: item.line_index,
@@ -147,6 +181,7 @@ export async function buildMobileBootstrap(now = new Date()) {
 
   const bills = billMessages.map((message) => {
     const draft = drafts.get(message.id);
+    const company = resolveMobileCompany(draft, companies);
     return {
       id: message.id,
       fileName: message.original_filename || "WhatsApp PDF",
@@ -157,6 +192,9 @@ export async function buildMobileBootstrap(now = new Date()) {
       receivedAt: message.received_at,
       senderName: message.sender_name,
       senderPhoneMasked: maskMobilePhone(message.sender_phone),
+      companyId: company?.id ?? null,
+      companyName: company?.canonical_name ?? null,
+      companyGstin: company?.gstin ?? null,
       draft: serializeDraft(draft),
     };
   });
@@ -253,7 +291,9 @@ export async function buildMobileBootstrap(now = new Date()) {
         fileName: bill.fileName,
         receivedAt: bill.receivedAt,
         documentNumber: bill.draft?.documentNumber ?? null,
-        companyName: bill.draft?.supplierName ?? null,
+        companyId: bill.companyId,
+        companyName: bill.companyName ?? bill.draft?.supplierName ?? null,
+        companyGstin: bill.companyGstin ?? bill.draft?.supplierGstin ?? null,
         destination: bill.draft?.destination ?? null,
         consigneeName: bill.draft?.consigneeName ?? null,
         vehicleNumber: bill.draft?.vehicleNumber ?? null,
