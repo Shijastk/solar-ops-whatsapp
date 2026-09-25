@@ -45,7 +45,7 @@ export type ParsedOperationalDocument = {
   items: ParsedDocumentItem[];
 };
 
-export const DOCUMENT_PARSER_VERSION = "anchor-v1";
+export const DOCUMENT_PARSER_VERSION = "anchor-v2";
 
 const MONTHS: Record<string, number> = {
   jan: 1,
@@ -185,17 +185,24 @@ function partyFromLines(lines: string[]) {
   };
 }
 
+function cleanPartyLines(lines: string[]): string[] {
+  return lines.filter(
+    (line) =>
+      !/^(?:Dispatch Doc No\.|Dispatched through Destination|Mode\/Terms of Payment|Reference No\. & Date\. Other References|Buyer’s Order No\. Dated|Terms of Delivery)$/i.test(line),
+  );
+}
+
 function parseParties(text: string) {
-  const consigneeLines = blockBetween(
+  const consigneeLines = cleanPartyLines(blockBetween(
     text,
     /Consignee\s*\(Ship to\)\s*/,
     /Buyer\s*\(Bill to\)/,
-  );
-  const buyerLines = blockBetween(
+  ));
+  const buyerLines = cleanPartyLines(blockBetween(
     text,
     /Buyer\s*\(Bill to\)\s*/,
-    /Delivery Note No\.|Invoice No\.|Bill No\.|Doc No\./,
-  );
+    /(?:^|\n)Sl\s+Description of Goods/,
+  ));
 
   let consignee = partyFromLines(consigneeLines);
   const buyer = partyFromLines(buyerLines);
@@ -229,23 +236,32 @@ function parseSupplier(text: string) {
     };
   }
 
-  const firstPage = text.match(
-    /(?:DELIVERY NOTE|DELIVERY CHALLAN|TAX INVOICE|INVOICE)[^\n]*\n([^\n]+)[\s\S]{0,500}?GSTIN(?:\/UIN)?\s*:\s*([A-Z0-9]{15})/i,
-  );
-
-  const headerLines = text.split("\n").slice(1, 12).map(cleanLine);
+  const headerLines = text.split("\n").slice(0, 16).map(cleanLine);
   const gstinIndex = headerLines.findIndex((line) =>
     /GSTIN(?:\/UIN)?\s*:/i.test(line),
   );
-  const address =
-    gstinIndex > 1
-      ? headerLines.slice(1, gstinIndex).join(", ")
-      : null;
+  const gstin = gstinIndex >= 0
+    ? headerLines[gstinIndex].match(/GSTIN(?:\/UIN)?\s*:\s*([A-Z0-9]{15})/i)?.[1]?.toUpperCase() ?? null
+    : null;
+  const beforeGstin = gstinIndex > 0 ? headerLines.slice(1, gstinIndex) : [];
+  const nameIndex = beforeGstin.findIndex(
+    (line) =>
+      /\b(?:LIMITED|LTD\.?|LLP|PRIVATE|PVT\.?)\b/i.test(line) &&
+      !/^(?:Delivery Note No\.|Invoice No\.|Bill No\.)/i.test(line),
+  );
+  const name = nameIndex >= 0 ? beforeGstin[nameIndex] : null;
+  const addressLines = nameIndex >= 0
+    ? beforeGstin.slice(nameIndex + 1).filter(
+        (line) =>
+          !/^(?:Delivery Note No\.|Mode\/Terms of Payment|Reference No\.|Buyer’s Order No\.)/i.test(line) &&
+          !/\b\d{12}\b/.test(line),
+      )
+    : [];
 
   return {
-    name: firstPage?.[1] ? cleanLine(firstPage[1]) : null,
-    gstin: firstPage?.[2]?.toUpperCase() ?? null,
-    address,
+    name,
+    gstin,
+    address: addressLines.length > 0 ? addressLines.join(", ") : null,
   };
 }
 
@@ -463,8 +479,17 @@ export function parseOperationalDocumentText(
     buyerGstin: parties.buyer.gstin,
     buyerPincode: parties.buyer.pincode,
     buyerPhone: parties.buyer.phone,
-    destination: parseLabelValue(text, "Destination"),
+    destination:
+      parseLabelValue(text, "Destination") ??
+      firstMatch(text, [
+        /(?:^|\n)Dispatched through Destination\s*\n([^\n]+)/i,
+      ]),
     dispatchFromAddress: (() => {
+      if (/(?:^|\n)Dispatch From\s+Ship To\s*(?:\n|$)/i.test(text)) {
+        // PDF text extraction flattened two address columns into the same lines.
+        // Their boundary is not deterministic, so fail closed instead of inventing it.
+        return null;
+      }
       const lines = blockBetween(
         text,
         /(?:^|\n)Dispatch From\s*/,

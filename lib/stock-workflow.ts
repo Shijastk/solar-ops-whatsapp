@@ -323,6 +323,18 @@ export async function processStockForDraft(input: {
       return result;
     }
 
+    if (result.status === "duplicate_document") {
+      await sendOpsReply({
+        requestId: deterministicUuid("stock-duplicate-document:" + draft.id),
+        replyToMessageId: input.replyToMessageId,
+        body:
+          "ℹ️ " +
+          documentLabel(draft) +
+          " was already applied from an earlier upload. Stock was not deducted again.",
+      });
+      return result;
+    }
+
     await notifyUnsafeState(draft, input.replyToMessageId, result);
     return result;
   } catch (error) {
