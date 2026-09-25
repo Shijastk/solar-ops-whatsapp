@@ -309,14 +309,6 @@ function parseLabelValue(text: string, label: string): string | null {
   ]);
 }
 
-function normalizeLooseAddressForSplit(value: string): string {
-  return cleanLine(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function cleanupEwayDescription(value: string): string {
   const parts = value.split(/\s+&\s+/);
   if (parts.length === 2) {
@@ -493,26 +485,10 @@ export function parseOperationalDocumentText(
         /(?:^|\n)Dispatched through Destination\s*\n([^\n]+)/i,
       ]),
     dispatchFromAddress: (() => {
-      const eway = text.match(
-        /(?:^|\n)Dispatch From(?:\s+Ship To)?\s*\n([\s\S]*?)(?=\n3\.\s*Goods Details)/i,
-      );
-      if (eway?.[1]) {
-        const lines = eway[1].split("\n").map(cleanLine).filter(Boolean);
-        const shipTo = parties.consignee.address
-          ? normalizeLooseAddressForSplit(parties.consignee.address)
-          : null;
-        if (shipTo) {
-          const joined = lines.join(", ");
-          const index = normalizeLooseAddressForSplit(joined).indexOf(shipTo);
-          if (index > 0) {
-            // Text extraction can interleave the Dispatch From / Ship To columns.
-            // Only split when the full Ship To address is present contiguously.
-            const rawIndex = joined.toLowerCase().indexOf(
-              (parties.consignee.address ?? "").toLowerCase(),
-            );
-            if (rawIndex > 0) return cleanLine(joined.slice(0, rawIndex).replace(/,\s*$/, ""));
-          }
-        }
+      if (/(?:^|\n)Dispatch From\s+Ship To\s*(?:\n|$)/i.test(text)) {
+        // PDF text extraction flattened two address columns into the same lines.
+        // Their boundary is not deterministic, so fail closed instead of inventing it.
+        return null;
       }
       const lines = blockBetween(
         text,
