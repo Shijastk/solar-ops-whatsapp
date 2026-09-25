@@ -526,3 +526,26 @@ Implementation CI run `36122481709` passed typecheck, lint, unit tests, and prod
 Migration/schema-inclusive CI run `36122964462` also passed the complete quality gate.
 
 A fresh post-documentation CI run is required before merge.
+
+
+## Native mobile API verification
+
+Implementation CI run `36129635457` passed:
+
+- Typecheck
+- Lint
+- Unit tests
+- Production build
+
+Automated tests cover:
+
+- valid/expired Bearer session verification
+- safe Bearer parsing
+- session expiry extraction
+- native session issuance only for a valid operations access key
+- invalid-key rejection
+- sender-phone masking and PDF identification
+
+Production data was inspected separately before implementing the UI contract. At that verification point the database contained real inbound/outbound messages and configured stock, while document drafts/items were empty. The API therefore returns true empty draft/dispatch states rather than synthetic records.
+
+A final post-documentation CI run is required before merge.
