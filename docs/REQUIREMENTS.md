@@ -622,3 +622,19 @@ The mobile interaction must:
 - avoid adding a new UI/design dependency
 
 Desktop/wide layouts may continue to render the Opening Stock form inline.
+
+
+### R58 - GSTIN is mandatory for Opening Stock companies
+
+Every company used by the Opening Stock workflow must have a valid standard 15-character GSTIN.
+
+Rules:
+
+- creating a new stock company requires GSTIN
+- selecting an existing company may reuse its stored GSTIN without retyping it
+- an existing stock company without GSTIN must be blocked from new Opening Stock entries
+- a supplied GSTIN that conflicts with the selected company's stored GSTIN must be rejected
+- database schema must enforce `stock_companies.gstin NOT NULL`
+- the stock UI may disable the GSTIN field when an existing GSTIN-backed company is selected, but server/database validation remains authoritative
+
+This requirement applies to inventory company identity and must not be bypassed by client-side form manipulation.
