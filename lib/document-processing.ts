@@ -74,7 +74,7 @@ async function existingDraft(messageId: string) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("document_drafts")
-    .select("id, parse_status")
+    .select("id, parse_status, workflow_status")
     .eq("message_id", messageId)
     .maybeSingle();
 
@@ -82,7 +82,11 @@ async function existingDraft(messageId: string) {
     throw new Error("Failed to inspect document draft: " + error.message);
   }
 
-  return data as { id: string; parse_status: string } | null;
+  return data as {
+    id: string;
+    parse_status: string;
+    workflow_status: string;
+  } | null;
 }
 
 export async function processPdfBytesForMessage(
@@ -92,10 +96,14 @@ export async function processPdfBytesForMessage(
   const supabase = getSupabaseAdmin();
   const existing = await existingDraft(messageId);
 
-  if (existing?.parse_status === "approved") {
+  if (
+    existing?.parse_status === "approved" ||
+    existing?.workflow_status === "cancelled"
+  ) {
     return {
       draftId: existing.id,
-      status: "approved",
+      status:
+        existing.workflow_status === "cancelled" ? "cancelled" : "approved",
       itemCount: 0,
       skippedApproved: true,
     };
@@ -246,7 +254,7 @@ export async function approveDocumentDraft(
 
   const { data: draft, error: readError } = await supabase
     .from("document_drafts")
-    .select("id, parse_status")
+    .select("id, parse_status, workflow_status")
     .eq("message_id", messageId)
     .maybeSingle();
 
@@ -255,6 +263,9 @@ export async function approveDocumentDraft(
   }
   if (!draft) {
     throw new Error("Document draft was not found");
+  }
+  if (draft.workflow_status === "cancelled") {
+    throw new Error("Cancelled document drafts cannot be approved");
   }
   if (draft.parse_status !== "ready_for_review") {
     throw new Error("Only complete parser drafts can be approved");
@@ -265,6 +276,8 @@ export async function approveDocumentDraft(
     .update({
       parse_status: "approved",
       approved_at: new Date().toISOString(),
+      workflow_status: "recorded",
+      verification_status: "manual_override",
       parse_error: null,
     })
     .eq("id", draft.id)
