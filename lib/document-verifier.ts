@@ -616,7 +616,7 @@ export async function extractDocumentWithGroq(
           {
             role: "system",
             content:
-              "You are a verification extractor for operational solar-distribution documents. Extract every requested field only when it is explicitly supported by the supplied document text. Never infer, calculate, repair, or guess business data. Use null when absent. Return document_date as YYYY-MM-DD when the source date is unambiguous. Keep e-way generated/valid text faithful to the source. Include every product line exactly once with description, HSN/SAC, quantity, unit, rate and amount.",
+              "You are a verification extractor for operational solar-distribution documents. Extract every requested field only when it is explicitly supported by the supplied document text. Never infer, calculate, repair, or guess business data. Use null when absent or when PDF text extraction has interleaved multiple columns so a field boundary cannot be determined safely. In particular, if Dispatch From and Ship To are flattened into the same lines, return null for dispatch_from_address rather than reconstructing it. Return document_date as YYYY-MM-DD when the source date is unambiguous. Keep e-way generated/valid text faithful to the source. Include every product line exactly once with description, HSN/SAC, quantity, unit, rate and amount.",
           },
           {
             role: "user",
