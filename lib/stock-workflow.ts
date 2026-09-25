@@ -113,7 +113,7 @@ async function assertDraftSender(
 }
 
 function documentLabel(draft: DraftStockContext): string {
-  return draft.documentNumber ? "Bill " + draft.documentNumber : "This bill";
+  return draft.documentNumber ? "ബിൽ " + draft.documentNumber : "ഈ ബിൽ";
 }
 
 async function sendSuccess(
@@ -127,10 +127,10 @@ async function sendSuccess(
     body:
       "✅ " +
       documentLabel(draft) +
-      " stock updated successfully. The deduction was applied once only.",
+      "-ന്റെ സ്റ്റോക്ക് വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു. സ്റ്റോക്ക് ഒരിക്കൽ മാത്രം കുറച്ചിട്ടുണ്ട്.",
     buttons: [
-      { id: "so:doc:edit:" + draft.id, title: "Edit bill" },
-      { id: "so:doc:delete:" + draft.id, title: "Delete" },
+      { id: "so:doc:edit:" + draft.id, title: "ബിൽ തിരുത്തുക" },
+      { id: "so:doc:delete:" + draft.id, title: "ഒഴിവാക്കുക" },
     ],
   });
 }
@@ -139,7 +139,7 @@ async function notifyCompanyMatch(
   draft: DraftStockContext,
   replyToMessageId: string,
 ) {
-  const supplierName = draft.supplierName?.trim() || "Unknown supplier";
+  const supplierName = draft.supplierName?.trim() || "അജ്ഞാത കമ്പനി";
   const suggestions = await listCompanySuggestions(supplierName, 9);
 
   if (suggestions.length === 0) {
@@ -147,9 +147,9 @@ async function notifyCompanyMatch(
       requestId: deterministicUuid("stock-company-missing:" + draft.id),
       replyToMessageId,
       body:
-        "⚠️ Stock was not changed. The bill company is not in Opening Stock yet: " +
+        "⚠️ സ്റ്റോക്കിൽ മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല. ഈ ബില്ലിലെ കമ്പനി Opening Stock-ൽ ഇതുവരെ ചേർത്തിട്ടില്ല: " +
         supplierName +
-        ". Add the company/product opening stock in Solar Ops Stock setup, then process the bill again.",
+        ". Solar Ops Stock-ൽ കമ്പനി/സാധനത്തിന്റെ Opening Stock ചേർത്ത ശേഷം ബിൽ വീണ്ടും പ്രോസസ് ചെയ്യുക.",
     });
     return;
   }
@@ -158,10 +158,10 @@ async function notifyCompanyMatch(
     requestId: deterministicUuid("stock-company-match:" + draft.id),
     replyToMessageId,
     body:
-      "⚠️ Stock was not changed because the bill company name is not mapped. Bill shows: " +
+      "⚠️ ബില്ലിലെ കമ്പനി Opening Stock കമ്പനിയുമായി ബന്ധിപ്പിച്ചിട്ടില്ലാത്തതിനാൽ സ്റ്റോക്ക് മാറ്റിയിട്ടില്ല. ബില്ലിൽ കാണുന്നത്: " +
       supplierName +
-      "\n\nChoose the correct Opening Stock company. This mapping will be remembered for future bills.",
-    buttonText: "Choose company",
+      "\n\nശരിയായ Opening Stock കമ്പനി തിരഞ്ഞെടുക്കുക. ഭാവിയിലെ ബില്ലുകൾക്കായി ഈ ബന്ധം ഓർമ്മിച്ചുവയ്ക്കും.",
+    buttonText: "കമ്പനി തിരഞ്ഞെടുക്കുക",
     rows: suggestions.map((company) => ({
       id: "so:stock:company:" + draft.id + ":" + company.id,
       title: shortTitle(company.canonical_name),
@@ -180,7 +180,7 @@ async function notifyProductMatch(
       requestId: deterministicUuid("stock-product-invalid:" + draft.id),
       replyToMessageId,
       body:
-        "⚠️ Stock was not changed because the product mapping request was incomplete. Please review the bill in Solar Ops.",
+        "⚠️ സാധനത്തിന്റെ ബന്ധിപ്പിക്കൽ വിവരങ്ങൾ പൂർത്തിയായിട്ടില്ലാത്തതിനാൽ സ്റ്റോക്ക് മാറ്റിയിട്ടില്ല. Solar Ops-ൽ ബിൽ പരിശോധിക്കുക.",
     });
     return;
   }
@@ -199,10 +199,10 @@ async function notifyProductMatch(
       ),
       replyToMessageId,
       body:
-        "⚠️ Stock was not changed. No Opening Stock product matches: " +
+        "⚠️ സ്റ്റോക്കിൽ മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല. ഈ സാധനവുമായി പൊരുത്തപ്പെടുന്ന Opening Stock സാധനം കണ്ടെത്തിയില്ല: " +
         result.description +
         (result.unit ? " (" + result.unit + ")" : "") +
-        ". Add this product in Solar Ops Stock setup, then process the bill again.",
+        ". Solar Ops Stock-ൽ ഈ സാധനം ചേർത്ത ശേഷം ബിൽ വീണ്ടും പ്രോസസ് ചെയ്യുക.",
     });
     return;
   }
@@ -213,11 +213,11 @@ async function notifyProductMatch(
     ),
     replyToMessageId,
     body:
-      "⚠️ Stock was not changed because this bill item is not mapped:\n" +
+      "⚠️ ബില്ലിലെ ഈ സാധനം Opening Stock സാധനവുമായി ബന്ധിപ്പിച്ചിട്ടില്ലാത്തതിനാൽ സ്റ്റോക്ക് മാറ്റിയിട്ടില്ല:\n" +
       result.description +
       (result.unit ? " — " + result.unit : "") +
-      "\n\nChoose the correct Opening Stock product. The spelling will be remembered for future bills.",
-    buttonText: "Choose product",
+      "\n\nശരിയായ Opening Stock സാധനം തിരഞ്ഞെടുക്കുക. ഈ പേര് ഭാവിയിലെ ബില്ലുകൾക്കായി ഓർമ്മിച്ചുവയ്ക്കും.",
+    buttonText: "സാധനം തിരഞ്ഞെടുക്കുക",
     rows: suggestions.map((product) => ({
       id:
         "so:stock:product:" +
@@ -238,7 +238,7 @@ async function notifyInsufficient(
   replyToMessageId: string,
   result: StockResult,
 ) {
-  const product = result.product_name || "Product";
+  const product = result.product_name || "സാധനം";
   const available = result.available ?? 0;
   const required = result.required ?? 0;
 
@@ -251,16 +251,16 @@ async function notifyInsufficient(
     ),
     replyToMessageId,
     body:
-      "❌ Stock update blocked.\n" +
+      "❌ സ്റ്റോക്ക് അപ്ഡേറ്റ് തടഞ്ഞു.\n" +
       product +
-      "\nRequired: " +
+      "\nആവശ്യം: " +
       required +
-      "\nAvailable: " +
+      "\nലഭ്യമായത്: " +
       available +
-      "\n\nNo stock was deducted from this bill.",
+      "\n\nഈ ബില്ലിനായി സ്റ്റോക്ക് ഒന്നും കുറച്ചിട്ടില്ല.",
     buttons: [
-      { id: "so:doc:edit:" + draft.id, title: "Edit bill" },
-      { id: "so:doc:delete:" + draft.id, title: "Delete" },
+      { id: "so:doc:edit:" + draft.id, title: "ബിൽ തിരുത്തുക" },
+      { id: "so:doc:delete:" + draft.id, title: "ഒഴിവാക്കുക" },
     ],
   });
 }
@@ -278,9 +278,9 @@ async function notifyUnsafeState(
     body:
       "⚠️ " +
       documentLabel(draft) +
-      " was recorded, but stock was not changed because the stock data could not be applied safely. Status: " +
+      " രേഖപ്പെടുത്തി. പക്ഷേ സ്റ്റോക്ക് വിവരങ്ങൾ സുരക്ഷിതമായി പ്രയോഗിക്കാൻ കഴിഞ്ഞില്ലാത്തതിനാൽ സ്റ്റോക്ക് മാറ്റിയിട്ടില്ല. നില: " +
       result.status.replaceAll("_", " ") +
-      ". Please review it before continuing.",
+      ". തുടരുന്നതിന് മുമ്പ് പരിശോധിക്കുക.",
   });
 }
 
@@ -324,14 +324,16 @@ export async function processStockForDraft(input: {
     }
 
     if (result.status === "duplicate_document") {
-      await sendOpsReply({
-        requestId: deterministicUuid("stock-duplicate-document:" + draft.id),
-        replyToMessageId: input.replyToMessageId,
-        body:
-          "ℹ️ " +
-          documentLabel(draft) +
-          " was already applied from an earlier upload. Stock was not deducted again.",
-      });
+      if (input.notifySuccess) {
+        await sendOpsReply({
+          requestId: deterministicUuid("stock-duplicate-document:" + draft.id),
+          replyToMessageId: input.replyToMessageId,
+          body:
+            "ℹ️ " +
+            documentLabel(draft) +
+            " നേരത്തെ അപ്‌ലോഡ് ചെയ്തപ്പോൾ തന്നെ സ്റ്റോക്കിൽ രേഖപ്പെടുത്തിയതാണ്. സ്റ്റോക്ക് വീണ്ടും കുറച്ചിട്ടില്ല.",
+        });
+      }
       return result;
     }
 
