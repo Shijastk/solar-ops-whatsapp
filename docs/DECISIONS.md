@@ -359,3 +359,12 @@ Decision: On mobile, the Opening Stock form is launched from a floating **Add st
 Reason: Current inventory and Adjust are the frequent day-to-day tasks after setup. Keeping the long creation form permanently in the mobile document flow adds scrolling and visual weight.
 
 The sheet reuses the existing form and mutation path; this is an interaction/layout decision, not a second stock workflow.
+
+
+## D042 - Stock companies require GSTIN
+
+Decision: Every stock company must have a valid GSTIN.
+
+Reason: Company name spelling alone is not strong enough for inventory identity. GSTIN provides a stable company-level key for Opening Stock and later bill matching.
+
+New companies cannot be created without GSTIN. Existing companies reuse their saved GSTIN; operators do not need to retype it for each product.
