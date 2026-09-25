@@ -78,7 +78,13 @@ export type StockProduct = z.infer<typeof productSchema>;
 export type StockBalance = z.infer<typeof balanceSchema>;
 
 const stockAdjustmentResultSchema = z.object({
-  status: z.enum(["adjusted", "already_adjusted", "no_change", "not_ready"]),
+  status: z.enum([
+    "adjusted",
+    "already_adjusted",
+    "no_change",
+    "not_ready",
+    "inconsistent",
+  ]),
   product_id: z.string().uuid().optional(),
   product_name: z.string().optional(),
   previous_quantity: z.coerce.number().optional(),
