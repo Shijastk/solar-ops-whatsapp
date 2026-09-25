@@ -342,6 +342,21 @@ Resolution in source:
 - a single standard GSTIN-shaped token may be extracted from surrounding copied label text
 - punctuation/invisible characters do not cause a valid standalone GSTIN to be truncated before validation
 - multiple GSTIN candidates are rejected instead of guessed
-- failure diagnostics contain only safe metadata and never the GSTIN value
+- temporary GSTIN diagnostic metadata logging used during investigation has been removed from the production route
 
-This source fix still requires production acceptance with the operator's real form submission after deployment before the issue is considered live-closed.
+The operator later confirmed the original short GSTIN submission was user input error. Robust GSTIN normalization remains, but the temporary debugging metadata is no longer part of the live code path.
+
+
+## K035 - Stock screen was previously full-navigation on mutation
+
+The initial `/ops/stock` implementation used a normal HTML POST followed by a 303 redirect, which made every save feel like a full page refresh.
+
+Resolution in source: normal stock add/adjust interactions now use a client `StockManager` with fetch plus Next.js `router.refresh()`. The app remains a hybrid App Router application rather than a pure client SPA.
+
+Production-live acceptance is still required after deployment to confirm the operator sees the intended no-document-reload behavior.
+
+## K036 - Current stock adjustment is an audited physical correction
+
+The Current stock table now supports setting a target physical quantity.
+
+This does not edit the historical Opening Stock value. The system appends an `adjustment` delta instead. This distinction is intentional and should remain visible in future audit/reporting work.
