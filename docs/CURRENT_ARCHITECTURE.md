@@ -211,11 +211,10 @@ Do not rename these without updating source, `.env.example`, README, and documen
 
 ## Important boundary
 
-Current source implements deterministic PDF document parsing and manual operator replies, but still has no:
+Current source implements deterministic PDF document parsing, manual operator replies, Opening Stock, outgoing Stock OUT, and audited stock adjustments, but still has no:
 
 - OCR pipeline for scanned/image-only PDFs
-- stock/inventory mutation model
-- company master-data model
+- automatic Stock IN / receiving-document model
 - driver model
 - porter model
 - customer dashboard
@@ -386,7 +385,7 @@ Schema compliance from Groq is treated only as transport/shape correctness, not 
 
 Verification state is separate: `not_run`, `verified`, `needs_review`, `failed`, and `manual_override`.
 
-A verified document can automatically send a concise WhatsApp summary with Edit/Delete buttons. The summary explicitly says stock is unchanged.
+A verified document can automatically send a concise WhatsApp summary with Edit/Delete buttons. The summary reports whether stock was applied, remains pending/blocked, or was reversed.
 
 ### Interactive WhatsApp flow
 
@@ -416,7 +415,7 @@ No anon/authenticated policies are created for these internal tables. Server-sid
 
 `lib/ingest.ts` runs document automation only after successful PDF storage and parsing. Automation/provider errors are caught separately, so a Groq or outbound failure does not convert already-stored inbound media into an ingestion failure.
 
-No stock table exists or is modified by this workflow.
+After document verification/recording, the separate stock workflow may apply outgoing Stock OUT only when all Milestone 2E inventory checks pass. Document verification itself is not sufficient authority to mutate stock.
 
 
 ## Opening stock and inventory ledger
@@ -445,6 +444,7 @@ Current movement types in this milestone:
 - `stock_out`
 - `correction`
 - `reversal`
+- `adjustment`
 
 The system does not yet create automatic Stock IN movements.
 
@@ -455,10 +455,11 @@ Postgres RPC functions own stock-critical mutations so validation, balance check
 The main operations are:
 
 - create one-time Opening Stock
+- set an existing product's current physical quantity through an immutable adjustment delta
 - apply full-bill Stock OUT
 - map a company alias
 - map a product alias
-- apply a quantity correction
+- apply a document quantity correction
 - reverse a bill's net deduction
 
 Stock OUT locks all matched product rows in deterministic order before checking balances. A bill is rejected before inserts if any line fails.
@@ -487,11 +488,17 @@ Unknown company/product spelling is resolved through interactive lists. The sele
 
 Insufficient stock produces a WhatsApp warning with required/available quantities and performs no partial deduction.
 
-### Opening Stock UI
+### Stock UI
 
-`/ops/stock` is a protected internal page for one-time Opening Stock setup and current derived balances.
+`/ops/stock` is a protected internal stock-management page for one-time Opening Stock setup, current derived balances, and audited quantity adjustments.
 
-The POST route uses existing operations-session authentication and same-origin protection.
+The page is implemented as a Next.js App Router hybrid: server components load protected stock data and a client `StockManager` performs add/adjust mutations through authenticated fetch requests. Successful mutations call `router.refresh()` to obtain fresh server-rendered data without a normal browser document reload.
+
+The application as a whole is therefore not a pure client SPA. It is a hybrid server/client App Router application; the high-frequency stock and chat interactions are SPA-like while sensitive data access remains server-side.
+
+`POST /api/ops/stock/opening` supports the client JSON flow and retains redirect compatibility.
+
+`POST /api/ops/stock/adjust` sets a target current physical quantity by calling the atomic `adjust_stock_balance` RPC. The RPC locks the product, derives the current ledger total, and appends only the delta as an `adjustment` movement.
 
 ### Edit/Delete behavior
 

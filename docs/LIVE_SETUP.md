@@ -428,3 +428,21 @@ For clipboard safety, the server normalizes Unicode with NFKC and accepts a GSTI
 If more than one GSTIN-shaped value is present, or no valid standard shape can be resolved, the request is rejected rather than guessed.
 
 On validation failure the server logs only non-sensitive diagnostics such as raw/normalized lengths, candidate count, and shape-valid boolean. It must never log the GSTIN value itself.
+
+
+## Phase J - Stock UI and adjustment acceptance
+
+After deploying the stock-management client layer:
+
+1. open `/ops/stock` while authenticated
+2. confirm the saved product appears in Current stock
+3. click **Adjust** on the existing product
+4. set a new target physical quantity
+5. save and confirm the row updates without a normal browser document reload
+6. refresh the browser manually and confirm the adjusted quantity persists
+7. verify the ledger contains an `adjustment` delta while the original Opening Stock movement remains unchanged
+8. set the same quantity again and confirm no extra adjustment movement is required
+
+Opening Stock remains the one-time starting point for a new product. Use **Adjust** for later physical-count corrections.
+
+The temporary GSTIN debugging metadata used during the earlier investigation has been removed; validation errors remain bounded and must not log the GSTIN value.

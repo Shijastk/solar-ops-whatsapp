@@ -71,12 +71,15 @@ Current Milestone 2 scope:
 - automatic transactional WhatsApp summaries only after fail-closed verification
 - WhatsApp Edit/Delete workflow controls with audit-safe corrections/cancellation
 - one-time Opening Stock setup
+- inline audited current-stock adjustments
 - immutable stock ledger for approved outgoing/dispatch bills
 - WhatsApp-first company/product alias resolution for stock exceptions
 
 The user has approved parsing, manual operator replies, and this bounded automatic document-summary workflow.
 
 The user has now defined the current outgoing-stock rule: Opening Stock is entered manually once per company/product/unit, and an approved outgoing/dispatch bill reduces that stock. The stock deduction must be atomic across the whole bill, idempotent, and fail closed when company/product identity, unit, quantity, or available balance is not safe.
+
+The operator may later correct the current physical quantity from the protected Stock screen. This must never rewrite the original Opening Stock or bill movements. Represent the difference as an immutable `adjustment` ledger entry, keep the resulting balance non-negative, and preserve all prior history.
 
 Image-only/scanned PDFs that do not contain a usable text layer must be marked for OCR rather than guessed.
 

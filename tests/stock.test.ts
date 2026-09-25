@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  getStockGstinDiagnostics,
   normalizeStockGstin,
   normalizeStockName,
   normalizeStockUnit,
   validateOpeningStockInput,
+  validateStockAdjustmentInput,
 } from "../lib/stock";
 
 describe("stock input helpers", () => {
@@ -51,17 +51,6 @@ describe("stock input helpers", () => {
     expect(normalizeStockGstin("３２ＡＢＭＣＳ６９０８Ｂ１ＺＧ")).toBe(
       "32ABMCS6908B1ZG",
     );
-  });
-
-  it("reports safe diagnostics without exposing the GSTIN value", () => {
-    expect(getStockGstinDiagnostics("GSTIN: 32ABMCS6908B1ZG")).toEqual({
-      rawCodePointLength: 22,
-      normalizedCodePointLength: 22,
-      compactLength: 20,
-      candidateCount: 1,
-      outputLength: 15,
-      outputMatchesGstinShape: true,
-    });
   });
 
   it("rejects ambiguous text containing more than one GSTIN", () => {
@@ -114,6 +103,41 @@ describe("stock input helpers", () => {
         productName: "Solar panel",
         unit: "NOS",
         quantity: "0",
+      }),
+    ).toThrow();
+  });
+
+  it("accepts zero or positive target quantities for audited stock adjustments", () => {
+    expect(
+      validateStockAdjustmentInput({
+        productId: "11111111-1111-4111-8111-111111111111",
+        targetQuantity: "0",
+      }),
+    ).toEqual({
+      productId: "11111111-1111-4111-8111-111111111111",
+      targetQuantity: 0,
+    });
+
+    expect(
+      validateStockAdjustmentInput({
+        productId: "11111111-1111-4111-8111-111111111111",
+        targetQuantity: "25.500",
+      }).targetQuantity,
+    ).toBe(25.5);
+  });
+
+  it("rejects negative or invalid stock adjustment targets", () => {
+    expect(() =>
+      validateStockAdjustmentInput({
+        productId: "11111111-1111-4111-8111-111111111111",
+        targetQuantity: "-1",
+      }),
+    ).toThrow();
+
+    expect(() =>
+      validateStockAdjustmentInput({
+        productId: "not-a-product-id",
+        targetQuantity: "10",
       }),
     ).toThrow();
   });

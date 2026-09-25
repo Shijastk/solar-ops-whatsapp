@@ -405,7 +405,7 @@ Regression coverage includes:
 - copying a value with a prefix such as `GSTIN: 32ABMCS6908B1ZG`
 - extracting exactly one GSTIN-shaped token from surrounding clipboard text
 - rejecting ambiguous input that contains more than one GSTIN-shaped token
-- safe diagnostics containing only lengths/counts/shape booleans and never the GSTIN value
+- no temporary GSTIN diagnostic metadata helper/logging remains in the production route
 
 The implementation/test CI gate passed after correcting only the expected diagnostic string length; the GSTIN extraction behavior itself passed in that run. Documentation changes require a fresh full quality-gate run before merge.
 
@@ -426,3 +426,30 @@ Required database invariants:
 - unresolved product => `needs_product_match`, zero ledger rows for that bill
 - mapping the alias then retrying => exactly one full-bill Stock OUT
 - multi-line bill with one failing line => zero Stock OUT rows for the entire bill
+
+
+## Stock SPA and adjustment verification
+
+Automated source coverage includes:
+
+- Opening Stock route error-state mapping
+- stock target validation for zero/positive quantities
+- rejection of negative target quantities
+- invalid product identifiers
+- production typecheck/lint/unit/build quality gates for the client `StockManager` and authenticated adjustment route
+
+Database synthetic acceptance was run against the connected project without touching the operator's real product:
+
+1. Opening Stock 10
+2. adjust target 14 -> derived balance 14
+3. target 14 again -> `no_change`
+4. adjust target 3 -> derived balance 3
+5. adjust target 5 -> derived balance 5
+6. replay the same idempotency key -> `already_adjusted`, balance remains 5
+7. synthetic company/product/ledger fixtures cleaned successfully
+
+Pre-document CI run `36118671889` passed typecheck, lint, unit tests, and production build.
+
+Migration/schema-inclusive CI run `36119245198` also passed the complete quality gate.
+
+After documentation updates, a fresh final CI run is required before merge.

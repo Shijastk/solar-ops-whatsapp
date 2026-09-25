@@ -135,3 +135,14 @@ The user selected Opening Stock option A:
 8. Replayed webhooks/documents must never deduct twice.
 
 A separate stock-IN PDF sample is still required before automating receiving/incoming stock.
+
+
+## Approved stock-dashboard correction workflow
+
+The protected Stock screen is not a pure full-page form anymore. It uses a client interaction layer for stock mutations and refreshes server-rendered data with Next.js `router.refresh()`, avoiding a browser document reload for normal add/adjust actions.
+
+Existing stock may be corrected from the Current stock table using an explicit target physical quantity. The server calculates:
+
+`adjustment delta = target current quantity - derived ledger balance`
+
+and appends that delta as an immutable `adjustment` movement. Opening Stock and bill Stock OUT history are never rewritten. Target quantity may be zero, but not negative.
