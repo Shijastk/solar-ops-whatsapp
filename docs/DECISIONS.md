@@ -194,10 +194,10 @@ Implementation:
 
 `vercel.json` uses Vercel's documented `git.deploymentEnabled` branch rules:
 
-- `* = false`
+- `** = false`
 - `main = true`
 
-Vercel evaluates matching branch rules so the explicit `main = true` rule allows main while other branches remain disabled.
+The recursive `**` pattern is required because development branches use names such as `feature/...`, `fix/...`, and `chore/...`. A single `*` pattern does not cover those nested branch names. Vercel evaluates matching branch rules so the explicit `main = true` rule allows main while other branches remain disabled.
 
 Reason: During active development, many small feature-branch commits created Preview deployments and exhausted the Hobby build/deployment quota before the final production release.
 
@@ -212,3 +212,12 @@ Release workflow:
 7. verify health/runtime logs after the deployment reaches READY
 
 A Preview deployment may still be created manually when one is genuinely needed for UI/provider verification. It should not be created for every development commit.
+
+
+## D023 - Keep operations updates automatic without exposing Supabase realtime access
+
+Decision: The protected `/ops` UI automatically refreshes server-rendered data on a short interval while the browser tab is visible, and scrolls a newly opened conversation to its newest message.
+
+Reason: The current dashboard uses a custom HttpOnly operations session and server-only Supabase admin access. Adding a browser-side Supabase Realtime subscription would require a separate client authorization model and must not be implemented by exposing the server secret or weakening RLS.
+
+The polling layer is intentionally small, pauses effectively when the tab is hidden, and preserves the operator's scroll position when they move upward to inspect history. This is a near-live UI behavior, not a claim of true push realtime.
