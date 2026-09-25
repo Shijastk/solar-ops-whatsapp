@@ -1,9 +1,32 @@
-import { sendWhatsAppTextReply } from "@/lib/meta-messages";
+import {
+  sendWhatsAppList,
+  sendWhatsAppReplyButtons,
+  sendWhatsAppTextReply,
+  type WhatsAppListRow,
+  type WhatsAppReplyButton,
+} from "@/lib/meta-messages";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppStatus } from "@/lib/whatsapp";
 
 const CUSTOMER_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_REPLY_CHARS = 2000;
+
+type SendResult = {
+  status: string;
+  metaMessageId: string | null;
+  duplicate: boolean;
+};
+
+type PersistedSendInput = {
+  requestId: string;
+  replyToMessageId: string;
+  body: string;
+  messageKind: "text" | "interactive";
+  send: (target: {
+    recipientPhone: string;
+    whatsappMessageId: string;
+  }) => Promise<string>;
+};
 
 export function isWithinCustomerServiceWindow(
   lastInboundAt: string | Date,
@@ -19,11 +42,7 @@ export function isWithinCustomerServiceWindow(
   );
 }
 
-export async function sendOpsReply(input: {
-  requestId: string;
-  replyToMessageId: string;
-  body: string;
-}): Promise<{ status: string; metaMessageId: string | null; duplicate: boolean }> {
+async function sendPersistedReply(input: PersistedSendInput): Promise<SendResult> {
   const body = input.body.trim();
   if (!body) {
     throw new Error("Reply text is required");
@@ -41,7 +60,9 @@ export async function sendOpsReply(input: {
     .maybeSingle();
 
   if (duplicateError) {
-    throw new Error("Failed to check reply idempotency: " + duplicateError.message);
+    throw new Error(
+      "Failed to check reply idempotency: " + duplicateError.message,
+    );
   }
   if (duplicate) {
     return {
@@ -93,6 +114,7 @@ export async function sendOpsReply(input: {
       reply_to_message_id: target.id,
       recipient_phone: target.sender_phone,
       body,
+      message_kind: input.messageKind,
       status: "queued",
     });
 
@@ -116,10 +138,9 @@ export async function sendOpsReply(input: {
   }
 
   try {
-    const metaMessageId = await sendWhatsAppTextReply({
+    const metaMessageId = await input.send({
       recipientPhone: target.sender_phone,
-      replyToMessageId: target.whatsapp_message_id,
-      body,
+      whatsappMessageId: target.whatsapp_message_id,
     });
     const now = new Date().toISOString();
 
@@ -136,7 +157,8 @@ export async function sendOpsReply(input: {
 
     if (updateError) {
       throw new Error(
-        "WhatsApp reply was sent but persistence failed: " + updateError.message,
+        "WhatsApp reply was sent but persistence failed: " +
+          updateError.message,
       );
     }
 
@@ -156,6 +178,67 @@ export async function sendOpsReply(input: {
 
     throw error;
   }
+}
+
+export async function sendOpsReply(input: {
+  requestId: string;
+  replyToMessageId: string;
+  body: string;
+}): Promise<SendResult> {
+  return sendPersistedReply({
+    ...input,
+    messageKind: "text",
+    send: ({ recipientPhone, whatsappMessageId }) =>
+      sendWhatsAppTextReply({
+        recipientPhone,
+        replyToMessageId: whatsappMessageId,
+        body: input.body,
+      }),
+  });
+}
+
+export async function sendOpsReplyButtons(input: {
+  requestId: string;
+  replyToMessageId: string;
+  body: string;
+  buttons: WhatsAppReplyButton[];
+}): Promise<SendResult> {
+  return sendPersistedReply({
+    requestId: input.requestId,
+    replyToMessageId: input.replyToMessageId,
+    body: input.body,
+    messageKind: "interactive",
+    send: ({ recipientPhone, whatsappMessageId }) =>
+      sendWhatsAppReplyButtons({
+        recipientPhone,
+        replyToMessageId: whatsappMessageId,
+        body: input.body,
+        buttons: input.buttons,
+      }),
+  });
+}
+
+export async function sendOpsList(input: {
+  requestId: string;
+  replyToMessageId: string;
+  body: string;
+  buttonText: string;
+  rows: WhatsAppListRow[];
+}): Promise<SendResult> {
+  return sendPersistedReply({
+    requestId: input.requestId,
+    replyToMessageId: input.replyToMessageId,
+    body: input.body,
+    messageKind: "interactive",
+    send: ({ recipientPhone, whatsappMessageId }) =>
+      sendWhatsAppList({
+        recipientPhone,
+        replyToMessageId: whatsappMessageId,
+        body: input.body,
+        buttonText: input.buttonText,
+        rows: input.rows,
+      }),
+  });
 }
 
 export async function applyWhatsAppStatusUpdates(
