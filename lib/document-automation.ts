@@ -6,6 +6,14 @@ import {
 } from "@/lib/document-verifier";
 import { deterministicUuid } from "@/lib/idempotency";
 import { sendOpsList, sendOpsReply, sendOpsReplyButtons } from "@/lib/replies";
+import {
+  applyStockQuantityCorrection,
+  reverseStockForDraft,
+} from "@/lib/stock";
+import {
+  handleStockWorkflowInbound,
+  processStockForDraft,
+} from "@/lib/stock-workflow";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
@@ -32,6 +40,7 @@ type DraftContext = {
   verificationStatus: string;
   verificationProvider: string | null;
   verificationModel: string | null;
+  stockStatus: string;
   summarySentAt: string | null;
   extractedText: string | null;
   documentType: string | null;
@@ -106,6 +115,7 @@ export function buildDocumentSummary(
     | "vehicleNumber"
     | "totalAmount"
     | "items"
+    | "stockStatus"
   >,
   heading = "✅ Bill data recorded",
 ): string {
@@ -148,7 +158,14 @@ export function buildDocumentSummary(
   const total = formatMoney(input.totalAmount);
   if (total) lines.push("", "Total: " + total);
 
-  lines.push("", "Recorded only. Stock unchanged.");
+  const stockStatus = "stockStatus" in input ? input.stockStatus : "not_ready";
+  if (stockStatus === "applied") {
+    lines.push("", "✅ Stock updated.");
+  } else if (stockStatus === "reversed") {
+    lines.push("", "↩️ Stock deduction reversed.");
+  } else {
+    lines.push("", "⏳ Stock update pending.");
+  }
   return trimForWhatsApp(lines.join("\n"), 950);
 }
 
@@ -231,7 +248,7 @@ async function loadDraftContext(draftId: string): Promise<DraftContext | null> {
   const { data: draft, error: draftError } = await supabase
     .from("document_drafts")
     .select(
-      "id, message_id, parse_status, workflow_status, verification_status, verification_provider, verification_model, summary_sent_at, extracted_text, document_type, supplier_name, supplier_gstin, supplier_address, document_number, document_date, eway_bill_number, consignee_name, consignee_address, consignee_gstin, consignee_pincode, consignee_phone, buyer_name, buyer_address, buyer_gstin, buyer_pincode, buyer_phone, destination, dispatch_from_address, vehicle_number, approximate_distance_km, eway_generated_at_text, eway_valid_until_text, supply_type, transaction_type, taxable_amount, cgst_amount, sgst_amount, total_amount",
+      "id, message_id, parse_status, workflow_status, verification_status, verification_provider, verification_model, stock_status, summary_sent_at, extracted_text, document_type, supplier_name, supplier_gstin, supplier_address, document_number, document_date, eway_bill_number, consignee_name, consignee_address, consignee_gstin, consignee_pincode, consignee_phone, buyer_name, buyer_address, buyer_gstin, buyer_pincode, buyer_phone, destination, dispatch_from_address, vehicle_number, approximate_distance_km, eway_generated_at_text, eway_valid_until_text, supply_type, transaction_type, taxable_amount, cgst_amount, sgst_amount, total_amount",
     )
     .eq("id", draftId)
     .maybeSingle();
@@ -274,6 +291,7 @@ async function loadDraftContext(draftId: string): Promise<DraftContext | null> {
     verificationStatus: draft.verification_status,
     verificationProvider: draft.verification_provider,
     verificationModel: draft.verification_model,
+    stockStatus: draft.stock_status,
     summarySentAt: draft.summary_sent_at,
     extractedText: draft.extracted_text,
     documentType: draft.document_type,
@@ -512,9 +530,31 @@ export async function runDocumentAutomationForDraft(
     draft.workflowStatus === "recorded" &&
     draft.verificationStatus === "verified"
   ) {
+    let stockStatus = draft.stockStatus;
+    try {
+      const stockResult = await processStockForDraft({
+        draftId: draft.id,
+        replyToMessageId: draft.messageId,
+        notifySuccess: false,
+      });
+      if (
+        stockResult.status === "applied" ||
+        stockResult.status === "already_applied"
+      ) {
+        stockStatus = "applied";
+      }
+    } catch (error) {
+      console.warn("Recorded document stock update did not complete", {
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown stock error",
+      });
+    }
+
     if (!draft.summarySentAt) {
       await sendSummary(
-        draft,
+        { ...draft, stockStatus },
         draft.messageId,
         "document-summary:" + draft.id,
       );
@@ -609,11 +649,34 @@ export async function runDocumentAutomationForDraft(
       },
     });
 
+    let stockStatus = "pending";
+    try {
+      const stockResult = await processStockForDraft({
+        draftId: draft.id,
+        replyToMessageId: draft.messageId,
+        notifySuccess: false,
+      });
+      if (
+        stockResult.status === "applied" ||
+        stockResult.status === "already_applied"
+      ) {
+        stockStatus = "applied";
+      }
+    } catch (error) {
+      console.warn("Verified document stock update did not complete", {
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown stock error",
+      });
+    }
+
     const recorded = {
       ...draft,
       parseStatus: "approved",
       workflowStatus: "recorded",
       verificationStatus: "verified",
+      stockStatus,
     };
     try {
       await sendSummary(
@@ -840,14 +903,65 @@ async function applyPendingTextEdit(
     }
 
     previousValue = item.quantity === null ? null : Number(item.quantity);
-    const { error: itemUpdateError } = await supabase
-      .from("document_items")
-      .update({ quantity: corrected })
-      .eq("id", session.target_item_id)
-      .eq("draft_id", draft.id);
 
-    if (itemUpdateError) {
-      throw new Error("Failed to update item quantity: " + itemUpdateError.message);
+    if (draft.stockStatus === "applied") {
+      const stockCorrection = await applyStockQuantityCorrection({
+        draftId: draft.id,
+        itemId: session.target_item_id,
+        quantity: Number(corrected),
+        actionKey: deterministicUuid(
+          "stock-edit:" +
+            message.messageId +
+            ":" +
+            draft.id +
+            ":" +
+            session.target_item_id,
+        ),
+      });
+
+      if (stockCorrection.status === "insufficient_stock") {
+        await sendOpsReplyButtons({
+          requestId: deterministicUuid(
+            "stock-edit-insufficient:" + message.messageId,
+          ),
+          replyToMessageId: storedMessageId,
+          body:
+            "❌ Quantity correction was not saved because there is not enough stock. Required extra: " +
+            String(stockCorrection.required ?? 0) +
+            ", available: " +
+            String(stockCorrection.available ?? 0) +
+            ". Send another quantity or cancel.",
+          buttons: [
+            {
+              id: "so:doc:edit_cancel:" + draft.id,
+              title: "Cancel",
+            },
+          ],
+        });
+        return true;
+      }
+
+      if (
+        stockCorrection.status !== "corrected" &&
+        stockCorrection.status !== "already_corrected"
+      ) {
+        throw new Error(
+          "Stock correction was not applied safely: " +
+            stockCorrection.status,
+        );
+      }
+    } else {
+      const { error: itemUpdateError } = await supabase
+        .from("document_items")
+        .update({ quantity: corrected })
+        .eq("id", session.target_item_id)
+        .eq("draft_id", draft.id);
+
+      if (itemUpdateError) {
+        throw new Error(
+          "Failed to update item quantity: " + itemUpdateError.message,
+        );
+      }
     }
   } else {
     const column =
@@ -889,9 +1003,27 @@ async function applyPendingTextEdit(
 
   await cancelEditSession(message.senderPhone, draft.id);
 
-  const updatedDraft = await loadDraftContext(draft.id);
+  let updatedDraft = await loadDraftContext(draft.id);
   if (!updatedDraft) {
     throw new Error("Updated document draft was not found");
+  }
+
+  if (updatedDraft.stockStatus !== "applied") {
+    try {
+      await processStockForDraft({
+        draftId: updatedDraft.id,
+        replyToMessageId: storedMessageId,
+        notifySuccess: false,
+      });
+      updatedDraft = (await loadDraftContext(draft.id)) ?? updatedDraft;
+    } catch (error) {
+      console.warn("Stock retry after bill correction did not complete", {
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown stock error",
+      });
+    }
   }
 
   await sendSummary(
@@ -939,7 +1071,7 @@ async function handleInteractiveAction(
       requestId: deterministicUuid("document-delete-confirm:" + message.messageId),
       replyToMessageId: storedMessageId,
       body:
-        "Delete this bill from the active workflow? The audit history will be retained and stock will not be changed.",
+        "Delete this bill from the active workflow? If stock was deducted, the system will restore it with a reversal entry. Audit history will be retained.",
       buttons: [
         {
           id: "so:doc:delete_confirm:" + draft.id,
@@ -955,6 +1087,27 @@ async function handleInteractiveAction(
   }
 
   if (action.type === "delete_confirm") {
+    let stockWasReversed = false;
+
+    if (draft.stockStatus === "applied") {
+      const reversal = await reverseStockForDraft(draft.id);
+      if (
+        reversal.status !== "reversed" &&
+        reversal.status !== "already_reversed"
+      ) {
+        await sendOpsReply({
+          requestId: deterministicUuid(
+            "document-delete-stock-blocked:" + message.messageId,
+          ),
+          replyToMessageId: storedMessageId,
+          body:
+            "⚠️ Delete was blocked because the stock deduction could not be reversed safely. No workflow data was cancelled.",
+        });
+        return true;
+      }
+      stockWasReversed = true;
+    }
+
     await updateAutomationState(draft.id, {
       workflow_status: "cancelled",
     });
@@ -968,7 +1121,10 @@ async function handleInteractiveAction(
       requestId: deterministicUuid("document-deleted:" + message.messageId),
       replyToMessageId: storedMessageId,
       body:
-        "🗑️ Deleted from the active workflow. Audit history is retained. Stock was not changed.",
+        "🗑️ Deleted from the active workflow. Audit history is retained." +
+        (stockWasReversed
+          ? " The previous stock deduction was restored with a reversal entry."
+          : " No stock deduction had been applied."),
     });
     return true;
   }
@@ -1024,6 +1180,12 @@ export async function handleDocumentWorkflowInbound(
   message: NormalizedWhatsAppMessage,
   storedMessageId: string,
 ): Promise<"handled" | "ignored"> {
+  if (
+    (await handleStockWorkflowInbound(message, storedMessageId)) === "handled"
+  ) {
+    return "handled";
+  }
+
   if (await handleInteractiveAction(message, storedMessageId)) {
     return "handled";
   }
