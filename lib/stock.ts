@@ -154,6 +154,8 @@ export async function createOpeningStock(input: {
   unit: string;
   hsnSac?: string | null;
   quantity: number | string;
+  allowSimilarCompany?: boolean;
+  allowSimilarProduct?: boolean;
 }): Promise<StockResult> {
   const parsed = validateOpeningStockInput(input);
   const supabase = getSupabaseAdmin();
