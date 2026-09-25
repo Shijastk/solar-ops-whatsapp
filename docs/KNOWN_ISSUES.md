@@ -412,3 +412,10 @@ Resolution in source/database:
 - current production stock companies were checked before the constraint and none had missing GSTIN
 
 Production-live form acceptance remains required after deployment.
+
+
+## K040 - Mobile Dispatch has no independent dispatch/driver data model
+
+The current backend does not yet store driver assignment, trip lifecycle, delivered-at timestamps, or external-vehicle records as a dedicated dispatch model.
+
+The native API therefore exposes only dispatch-related fields already parsed from real bills (vehicle number, destination, consignee and workflow/stock status). The mobile UI must show a truthful empty/unavailable state when those fields do not exist and must not fabricate delivery progress.
