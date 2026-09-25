@@ -221,11 +221,15 @@ Selectable-text PDFs are parsed locally. Scanned/image-only PDFs are marked `nee
 
 No paid OCR provider or heavy local OCR runtime has been added without a validated need.
 
-## K022 - Inventory semantics remain a business-rule blocker
+## K022 - Outgoing inventory semantics defined
 
-Product quantities can be parsed and approved as document data, but current-stock mutation remains intentionally disabled.
+Resolved for the current outgoing/dispatch document.
 
-Before implementing a stock ledger, define opening balance, which document types mean stock IN/OUT, and return/cancellation/correction behavior.
+The user selected one-time manual Opening Stock and confirmed that the currently handled bill reduces existing stock after document approval.
+
+The implementation is intentionally fail-closed: company/product alias, unit, quantity, balance, idempotency, correction, and reversal rules are enforced by the stock ledger.
+
+Automatic Stock IN remains undefined until a real receiving document is provided.
 
 ## K023 - Manual reply scope is limited to the open service window
 
@@ -293,8 +297,36 @@ The WhatsApp Edit menu currently exposes document number, vehicle number, and up
 
 Other structured fields remain reviewable in `/ops`. Expand editable fields only when the operator workflow requires them; do not silently accept arbitrary free-form field names.
 
-## K030 - Stock automation is still intentionally unavailable
+## K030 - Automatic Stock IN remains intentionally unavailable
 
-A verified outgoing/dispatch PDF does not prove the rules for receiving stock.
+Outgoing Stock OUT is now explicitly approved using one-time Opening Stock.
 
-The user plans to provide a separate stock-IN PDF. Inventory remains blocked until that sample and the opening-balance, IN/OUT, return, cancellation, correction, product identity/unit, and negative-stock rules are explicitly defined.
+Receiving/Stock IN is still not implemented. The user plans to provide a separate stock-IN PDF; that document must be inspected before defining its company/product mapping, receiving timestamp, returns, or other inbound rules.
+
+
+## K031 - Product/company aliases require operator confirmation
+
+Normalization and fuzzy similarity are not enough to prove identity.
+
+A new bill spelling that does not match an existing canonical/approved alias blocks Stock OUT and is surfaced in WhatsApp for explicit selection. This can create occasional first-use prompts, but avoids silent inventory corruption.
+
+## K032 - Opening Stock is intentionally one-time
+
+The Stock setup refuses to silently overwrite an existing product's Opening Stock.
+
+A future requirement for correcting a mistaken opening balance should be implemented as a separately audited adjustment movement rather than editing the historical opening row.
+
+## K033 - Stock workflow still requires production live acceptance
+
+Database functions and CI tests do not prove Meta interactive stock mapping works end-to-end.
+
+Before declaring the feature live-verified, production must demonstrate with non-sensitive test data:
+
+- Opening Stock visible in `/ops/stock`
+- approved/verified bill deducts once
+- duplicate retry does not deduct twice
+- a spelling mismatch produces a WhatsApp product/company selection
+- selecting it saves an alias and retries the bill
+- insufficient stock deducts zero
+- quantity correction adjusts the ledger
+- Delete restores stock before cancellation
