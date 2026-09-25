@@ -330,3 +330,18 @@ Before declaring the feature live-verified, production must demonstrate with non
 - insufficient stock deducts zero
 - quantity correction adjusts the ledger
 - Delete restores stock before cancellation
+
+
+## K034 - Opening Stock GSTIN clipboard normalization
+
+A production test exposed that a visually valid 15-character GSTIN could still be rejected when the browser submitted additional clipboard text or characters.
+
+Resolution in source:
+
+- NFKC normalization is applied
+- a single standard GSTIN-shaped token may be extracted from surrounding copied label text
+- punctuation/invisible characters do not cause a valid standalone GSTIN to be truncated before validation
+- multiple GSTIN candidates are rejected instead of guessed
+- failure diagnostics contain only safe metadata and never the GSTIN value
+
+This source fix still requires production acceptance with the operator's real form submission after deployment before the issue is considered live-closed.
