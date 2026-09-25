@@ -88,11 +88,38 @@ export function normalizeStockUnit(value: string): string {
     .replace(/[^A-Z0-9]/g, "");
 }
 
+const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
+const GSTIN_TOKEN_PATTERN =
+  /[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]/g;
+
 export function normalizeStockGstin(value: string): string {
-  return value
-    .normalize("NFKC")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
+  const normalizedText = value.normalize("NFKC").toUpperCase();
+  const compact = normalizedText.replace(/[^A-Z0-9]/g, "");
+
+  if (GSTIN_PATTERN.test(compact)) {
+    return compact;
+  }
+
+  const candidates = normalizedText.match(GSTIN_TOKEN_PATTERN) ?? [];
+  const uniqueCandidates = [...new Set(candidates)];
+
+  return uniqueCandidates.length === 1 ? uniqueCandidates[0] : compact;
+}
+
+export function getStockGstinDiagnostics(value: string) {
+  const normalizedText = value.normalize("NFKC").toUpperCase();
+  const compact = normalizedText.replace(/[^A-Z0-9]/g, "");
+  const candidates = normalizedText.match(GSTIN_TOKEN_PATTERN) ?? [];
+  const normalized = normalizeStockGstin(value);
+
+  return {
+    rawCodePointLength: [...value].length,
+    normalizedCodePointLength: [...normalizedText].length,
+    compactLength: compact.length,
+    candidateCount: new Set(candidates).size,
+    outputLength: normalized.length,
+    outputMatchesGstinShape: GSTIN_PATTERN.test(normalized),
+  };
 }
 
 export function validateOpeningStockInput(input: {
@@ -125,8 +152,8 @@ export function validateOpeningStockInput(input: {
   if (companyName && companyName.length > 160) {
     throw new Error("Company name is too long");
   }
-  if (companyGstin && !/^[0-9A-Z]{15}$/.test(companyGstin)) {
-    throw new Error("GSTIN must be exactly 15 letters/numbers");
+  if (companyGstin && !GSTIN_PATTERN.test(companyGstin)) {
+    throw new Error("GSTIN must match the standard 15-character GSTIN format");
   }
   if (!productName || productName.length > 200) {
     throw new Error("Product name is required");
