@@ -73,9 +73,19 @@ export default async function StockPage({
                     ? "A very similar company already exists. Select the existing company, or explicitly confirm below that this is a different company."
                     : params.result === "potential_product_duplicate"
                       ? "A very similar product already exists for this company/unit. Check Current stock first. Only override if this is genuinely a different product."
-                      : params.result === "failed"
-                        ? "Opening stock could not be saved."
-                        : params.result.replaceAll("_", " ")}
+                      : params.result === "invalid_gstin"
+                        ? "GSTIN is invalid after removing spaces/separators. Enter the 15-character GSTIN or leave it blank."
+                        : params.result === "company_required"
+                          ? "Select an existing company or enter a new company name."
+                          : params.result === "product_required"
+                            ? "Product name is required."
+                            : params.result === "invalid_unit"
+                              ? "Unit is invalid."
+                              : params.result === "invalid_hsn"
+                                ? "HSN / SAC is invalid."
+                                : params.result === "failed"
+                                  ? "Opening stock could not be saved. Check the entered values and try again."
+                                  : params.result.replaceAll("_", " ")}
         </div>
       ) : null}
 
@@ -121,9 +131,11 @@ export default async function StockPage({
               Company GSTIN
               <input
                 autoCapitalize="characters"
-                maxLength={15}
+                autoCorrect="off"
+                maxLength={40}
                 name="companyGstin"
-                placeholder="Recommended"
+                placeholder="15-character GSTIN (optional)"
+                spellCheck={false}
                 type="text"
               />
             </label>

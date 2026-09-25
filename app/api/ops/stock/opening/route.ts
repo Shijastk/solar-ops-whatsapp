@@ -38,10 +38,24 @@ export async function POST(request: Request) {
 
     target.searchParams.set("result", result.status);
   } catch (error) {
-    console.error("Opening stock setup failed", {
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
-    target.searchParams.set("result", "failed");
+    const message =
+      error instanceof Error ? error.message : "Unknown opening stock error";
+
+    console.error("Opening stock setup failed", { message });
+
+    if (message.includes("GSTIN")) {
+      target.searchParams.set("result", "invalid_gstin");
+    } else if (message.includes("existing company")) {
+      target.searchParams.set("result", "company_required");
+    } else if (message.includes("Product name")) {
+      target.searchParams.set("result", "product_required");
+    } else if (message.includes("Unit")) {
+      target.searchParams.set("result", "invalid_unit");
+    } else if (message.includes("HSN")) {
+      target.searchParams.set("result", "invalid_hsn");
+    } else {
+      target.searchParams.set("result", "failed");
+    }
   }
 
   return NextResponse.redirect(target, 303);

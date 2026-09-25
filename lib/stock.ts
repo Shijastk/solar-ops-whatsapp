@@ -88,6 +88,13 @@ export function normalizeStockUnit(value: string): string {
     .replace(/[^A-Z0-9]/g, "");
 }
 
+export function normalizeStockGstin(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
 export function validateOpeningStockInput(input: {
   companyId?: string | null;
   companyName?: string | null;
@@ -101,8 +108,9 @@ export function validateOpeningStockInput(input: {
 }) {
   const companyId = input.companyId?.trim() || null;
   const companyName = input.companyName?.trim() || null;
-  const companyGstin =
-    input.companyGstin?.trim().toUpperCase().replace(/\s+/g, "") || null;
+  const companyGstin = input.companyGstin
+    ? normalizeStockGstin(input.companyGstin) || null
+    : null;
   const productName = input.productName.trim();
   const unit = input.unit.trim().toUpperCase();
   const hsnSac = input.hsnSac?.trim() || null;

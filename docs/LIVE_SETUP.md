@@ -414,3 +414,6 @@ After successful Stock OUT:
 - Delete must restore the bill's net deduction through a reversal before marking the document cancelled
 
 Do not call this inventory flow production-live-verified until these observations are completed after deployment.
+
+
+Opening Stock GSTIN input is optional. Pasted GSTIN text is normalized server-side by removing spaces, punctuation, and invisible non-alphanumeric characters before the 15-character validation. If validation still fails, the Stock page shows a specific GSTIN error instead of a generic save failure.
