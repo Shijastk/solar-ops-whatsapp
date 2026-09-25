@@ -316,3 +316,20 @@ The dashboard remains an internal setup/audit surface.
 Decision: An edit after Stock OUT writes a correction delta; Delete restores the net deduction with a reversal before cancelling the workflow.
 
 Reason: Rewriting or deleting historical movements would destroy auditability and make duplicate/retry behavior difficult to reason about.
+
+
+## D037 - Keep the dashboard hybrid rather than a pure client SPA
+
+Decision: Keep Next.js App Router server rendering for protected data, but use client components for frequent operator mutations and `router.refresh()` for fresh server data.
+
+Reason: This preserves server-only Supabase credentials and authorization while removing the full-document reload feel from normal stock operations.
+
+The application is therefore a hybrid App Router application, not a traditional multi-page site and not a fully client-rendered SPA.
+
+## D038 - Manual stock correction is a ledger adjustment
+
+Decision: Editing an existing current stock quantity appends an `adjustment` movement equal to target minus current derived balance.
+
+Reason: The physical count may need correction, but overwriting the original opening balance or historical bill movements destroys auditability.
+
+A target of zero is valid; a negative target is not.
