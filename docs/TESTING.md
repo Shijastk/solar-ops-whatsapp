@@ -502,3 +502,27 @@ Live mobile acceptance after deployment should confirm:
 - Adjust behavior remains unchanged
 
 Documentation was updated only after the implementation quality gate passed. A fresh final CI run is required before merge.
+
+
+## Mandatory stock-company GSTIN verification
+
+Automated coverage includes:
+
+- missing GSTIN is rejected for a new company
+- valid GSTIN remains accepted
+- an existing company ID may reuse its saved GSTIN without retyping
+- route maps missing GSTIN to a dedicated safe UI state
+- existing quantity validation continues to run independently
+
+Database acceptance against the connected project used synthetic rows only:
+
+1. new company without GSTIN -> blocked with `company_gstin_required`
+2. same synthetic company with valid GSTIN -> Opening Stock created
+3. synthetic company/product/ledger rows cleaned
+4. production pre-existing stock companies were checked before `NOT NULL`; none lacked GSTIN
+
+Implementation CI run `36122481709` passed typecheck, lint, unit tests, and production build.
+
+Migration/schema-inclusive CI run `36122964462` also passed the complete quality gate.
+
+A fresh post-documentation CI run is required before merge.
