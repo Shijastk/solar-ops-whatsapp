@@ -96,6 +96,64 @@ describe("extractWhatsAppMessages", () => {
     });
   });
 
+  it("normalizes an interactive reply button without inventing command text", () => {
+    const result = extractWhatsAppMessages(
+      makePayload({
+        from: sender,
+        id: "wamid.button-1",
+        timestamp: "1789966900",
+        type: "interactive",
+        interactive: {
+          type: "button_reply",
+          button_reply: {
+            id: "so:doc:edit:draft-1",
+            title: "Edit",
+          },
+        },
+      }),
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "interactive",
+      textBody: "Edit",
+      interactiveReply: {
+        type: "button_reply",
+        id: "so:doc:edit:draft-1",
+        title: "Edit",
+      },
+    });
+  });
+
+  it("normalizes an interactive list reply", () => {
+    const result = extractWhatsAppMessages(
+      makePayload({
+        from: sender,
+        id: "wamid.list-1",
+        timestamp: "1789966901",
+        type: "interactive",
+        interactive: {
+          type: "list_reply",
+          list_reply: {
+            id: "so:doc:field:vehicle_number:draft-1",
+            title: "Vehicle number",
+            description: "KL11AA1234",
+          },
+        },
+      }),
+    );
+
+    expect(result[0]).toMatchObject({
+      textBody: "Vehicle number",
+      interactiveReply: {
+        type: "list_reply",
+        id: "so:doc:field:vehicle_number:draft-1",
+        title: "Vehicle number",
+        description: "KL11AA1234",
+      },
+    });
+  });
+
   it("ignores webhook changes that are not message events", () => {
     const result = extractWhatsAppMessages({
       object: "whatsapp_business_account",
