@@ -72,6 +72,11 @@ const documentDraftSchema = z.object({
   parse_error: z.string().nullable(),
   extracted_at: z.string(),
   approved_at: z.string().nullable(),
+  verification_status: z.string(),
+  verification_provider: z.string().nullable(),
+  verification_model: z.string().nullable(),
+  workflow_status: z.string(),
+  summary_sent_at: z.string().nullable(),
 });
 
 const outboundMessageSchema = z.object({
@@ -79,6 +84,7 @@ const outboundMessageSchema = z.object({
   reply_to_message_id: z.string().uuid().nullable(),
   recipient_phone: z.string(),
   body: z.string(),
+  message_kind: z.string(),
   status: z.string(),
   sent_at: z.string().nullable(),
   status_updated_at: z.string().nullable(),
@@ -166,6 +172,11 @@ const DRAFT_SELECT = [
   "parse_error",
   "extracted_at",
   "approved_at",
+  "verification_status",
+  "verification_provider",
+  "verification_model",
+  "workflow_status",
+  "summary_sent_at",
 ].join(",");
 
 export function conversationKey(senderPhone: string): string {
@@ -194,7 +205,7 @@ export async function listOpsOutboundMessages(
   const { data, error } = await supabase
     .from("whatsapp_outbound_messages")
     .select(
-      "id, reply_to_message_id, recipient_phone, body, status, sent_at, status_updated_at, error_message, created_at",
+      "id, reply_to_message_id, recipient_phone, body, message_kind, status, sent_at, status_updated_at, error_message, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
