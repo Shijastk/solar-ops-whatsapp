@@ -115,8 +115,7 @@ export function buildDocumentSummary(
     | "vehicleNumber"
     | "totalAmount"
     | "items"
-    | "stockStatus"
-  >,
+  > & { stockStatus?: string },
   heading = "✅ Bill data recorded",
 ): string {
   const lines = [heading];
@@ -158,7 +157,7 @@ export function buildDocumentSummary(
   const total = formatMoney(input.totalAmount);
   if (total) lines.push("", "Total: " + total);
 
-  const stockStatus = "stockStatus" in input ? input.stockStatus : "not_ready";
+  const stockStatus = input.stockStatus ?? "not_ready";
   if (stockStatus === "applied") {
     lines.push("", "✅ Stock updated.");
   } else if (stockStatus === "reversed") {
