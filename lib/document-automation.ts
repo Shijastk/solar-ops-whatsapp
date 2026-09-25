@@ -342,7 +342,18 @@ async function recordAction(input: {
   newValue?: unknown;
 }) {
   const supabase = getSupabaseAdmin();
+  const actionKey = deterministicUuid(
+    [
+      "document-action",
+      input.draftId,
+      input.sourceMessageId ?? "",
+      input.action,
+      input.fieldKey ?? "",
+    ].join(":"),
+  );
+
   const { error } = await supabase.from("document_actions").insert({
+    action_key: actionKey,
     draft_id: input.draftId,
     source_message_id: input.sourceMessageId ?? null,
     action: input.action,
@@ -351,6 +362,8 @@ async function recordAction(input: {
       input.previousValue === undefined ? null : input.previousValue,
     new_value: input.newValue === undefined ? null : input.newValue,
   });
+
+  if (error?.code === "23505") return;
 
   if (error) {
     throw new Error("Failed to write document audit action: " + error.message);
@@ -420,6 +433,22 @@ async function sendReviewNotice(
     replyToMessageId: draft.messageId,
     body,
   });
+}
+
+async function trySendReviewNotice(
+  draft: DraftContext,
+  reason: "needs_review" | "verification_failed",
+) {
+  try {
+    await sendReviewNotice(draft, reason);
+  } catch (error) {
+    console.warn("Document review notice was not sent", {
+      reason:
+        error instanceof Error
+          ? error.message.slice(0, 180)
+          : "Unknown outbound error",
+    });
+  }
 }
 
 function verificationCandidate(draft: DraftContext): VerificationCandidate {
@@ -507,7 +536,7 @@ export async function runDocumentAutomationForDraft(
       action: "review_required",
       newValue: { reason: draft.parseStatus },
     });
-    await sendReviewNotice(draft, "needs_review");
+    await trySendReviewNotice(draft, "needs_review");
     return "review_required";
   }
 
@@ -522,7 +551,7 @@ export async function runDocumentAutomationForDraft(
       action: "review_required",
       newValue: { reason: "parser_not_ready" },
     });
-    await sendReviewNotice(draft, "needs_review");
+    await trySendReviewNotice(draft, "needs_review");
     return "review_required";
   }
 
@@ -550,7 +579,7 @@ export async function runDocumentAutomationForDraft(
         action: "review_required",
         newValue: { mismatches: decision.mismatches },
       });
-      await sendReviewNotice(draft, "needs_review");
+      await trySendReviewNotice(draft, "needs_review");
       return "review_required";
     }
 
@@ -586,11 +615,21 @@ export async function runDocumentAutomationForDraft(
       workflowStatus: "recorded",
       verificationStatus: "verified",
     };
-    await sendSummary(
-      recorded,
-      draft.messageId,
-      "document-summary:" + draft.id,
-    );
+    try {
+      await sendSummary(
+        recorded,
+        draft.messageId,
+        "document-summary:" + draft.id,
+      );
+    } catch (error) {
+      console.warn("Verified document summary was not sent", {
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown outbound error",
+      });
+    }
+
     return "recorded";
   } catch (error) {
     const safeReason =
@@ -612,7 +651,7 @@ export async function runDocumentAutomationForDraft(
       action: "automation_failed",
       newValue: { error: safeReason },
     });
-    await sendReviewNotice(draft, "verification_failed");
+    await trySendReviewNotice(draft, "verification_failed");
     return "review_required";
   }
 }
