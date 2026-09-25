@@ -265,3 +265,36 @@ Observed on 2026-09-25 from the production UI:
 The current source change isolates message-row styling, uses a viewport-locked WhatsApp-Web-like layout, auto-scrolls newly opened conversations, adds visible-tab automatic refresh, guards duplicate submits, maps duplicate failed/queued states accurately, and retains bounded redacted Meta send diagnostics.
 
 The exact Meta HTTP 400 cause from the already-failed historical request cannot be recovered because the previous production code discarded Meta's response body. A new explicit operator-triggered reply test after deployment is required to capture any future provider rejection safely.
+
+## K027 - Groq document automation requires production configuration and live acceptance
+
+The source supports optional fail-closed Groq verification and interactive document summaries, but this provider path must not be called production-verified until all of the following are observed:
+
+- production database migration applied
+- Groq Zero Data Retention enabled
+- `GROQ_API_KEY` configured server-side
+- `DOCUMENT_AUTOMATION_ENABLED=true`
+- production Vercel deployment is READY on the expected main commit
+- a non-sensitive selectable-text PDF completes parser + Groq agreement
+- automatic WhatsApp summary with Edit/Delete is received
+- correction and cancellation paths are exercised
+
+Until those steps are completed, the feature must remain disabled.
+
+## K028 - Strict schema does not guarantee semantic AI accuracy
+
+Groq strict structured output guarantees the returned JSON matches the requested schema; it does not guarantee that extracted business facts are correct.
+
+Solar Ops therefore never auto-records based on Groq alone. The deterministic parser and Groq must independently agree across the entire persisted draft, and arithmetic checks must pass. Any disagreement becomes `review_required`.
+
+## K029 - Edit menu intentionally covers a bounded operational subset
+
+The WhatsApp Edit menu currently exposes document number, vehicle number, and up to eight line-item quantities. This keeps the interaction within WhatsApp list limits and focuses on the highest-value operational corrections.
+
+Other structured fields remain reviewable in `/ops`. Expand editable fields only when the operator workflow requires them; do not silently accept arbitrary free-form field names.
+
+## K030 - Stock automation is still intentionally unavailable
+
+A verified outgoing/dispatch PDF does not prove the rules for receiving stock.
+
+The user plans to provide a separate stock-IN PDF. Inventory remains blocked until that sample and the opening-balance, IN/OUT, return, cancellation, correction, product identity/unit, and negative-stock rules are explicitly defined.
