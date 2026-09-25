@@ -638,3 +638,19 @@ Rules:
 - the stock UI may disable the GSTIN field when an existing GSTIN-backed company is selected, but server/database validation remains authoritative
 
 This requirement applies to inventory company identity and must not be bypassed by client-side form manipulation.
+
+
+### R59 - Native mobile client uses authenticated real operations data
+
+The Flutter mobile client must not ship mock operational data once connected to production.
+
+Requirements:
+
+- authenticate through a dedicated native API using the existing operations access key
+- return a short-lived signed Bearer session; never embed `OPS_ACCESS_KEY`, Meta secrets, Supabase secret/service-role keys, or provider credentials in the APK
+- expose real inbound PDF/bill metadata, parsed drafts/items when present, stock companies/balances, and health state through the server
+- mobile Opening Stock and physical adjustment actions must reuse the existing validated server-side stock functions
+- mobile bill Parse and Approve actions must reuse the existing document-processing and stock workflow
+- raw PDF access must use a short-lived signed Storage URL created only after authenticated mobile authorization
+- Dispatch UI may use only actual parsed document fields such as vehicle/destination/consignee; it must not invent driver assignment or delivered states that do not exist in the current data model
+- responses must be no-store and must not return secret values or full sender phone numbers by default.
