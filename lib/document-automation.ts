@@ -16,6 +16,7 @@ const EDIT_ITEM_LIMIT = 8;
 type DraftItem = {
   id: string;
   description: string;
+  hsnSac: string | null;
   quantity: number | null;
   unit: string | null;
   rate: number | null;
@@ -35,9 +36,32 @@ type DraftContext = {
   extractedText: string | null;
   documentType: string | null;
   supplierName: string | null;
+  supplierGstin: string | null;
+  supplierAddress: string | null;
   documentNumber: string | null;
+  documentDate: string | null;
   ewayBillNumber: string | null;
+  consigneeName: string | null;
+  consigneeAddress: string | null;
+  consigneeGstin: string | null;
+  consigneePincode: string | null;
+  consigneePhone: string | null;
+  buyerName: string | null;
+  buyerAddress: string | null;
+  buyerGstin: string | null;
+  buyerPincode: string | null;
+  buyerPhone: string | null;
+  destination: string | null;
+  dispatchFromAddress: string | null;
   vehicleNumber: string | null;
+  approximateDistanceKm: number | null;
+  ewayGeneratedAtText: string | null;
+  ewayValidUntilText: string | null;
+  supplyType: string | null;
+  transactionType: string | null;
+  taxableAmount: number | null;
+  cgstAmount: number | null;
+  sgstAmount: number | null;
   totalAmount: number | null;
   items: DraftItem[];
 };
@@ -207,7 +231,7 @@ async function loadDraftContext(draftId: string): Promise<DraftContext | null> {
   const { data: draft, error: draftError } = await supabase
     .from("document_drafts")
     .select(
-      "id, message_id, parse_status, workflow_status, verification_status, verification_provider, verification_model, summary_sent_at, extracted_text, document_type, supplier_name, document_number, eway_bill_number, vehicle_number, total_amount",
+      "id, message_id, parse_status, workflow_status, verification_status, verification_provider, verification_model, summary_sent_at, extracted_text, document_type, supplier_name, supplier_gstin, supplier_address, document_number, document_date, eway_bill_number, consignee_name, consignee_address, consignee_gstin, consignee_pincode, consignee_phone, buyer_name, buyer_address, buyer_gstin, buyer_pincode, buyer_phone, destination, dispatch_from_address, vehicle_number, approximate_distance_km, eway_generated_at_text, eway_valid_until_text, supply_type, transaction_type, taxable_amount, cgst_amount, sgst_amount, total_amount",
     )
     .eq("id", draftId)
     .maybeSingle();
@@ -226,7 +250,7 @@ async function loadDraftContext(draftId: string): Promise<DraftContext | null> {
         .maybeSingle(),
       supabase
         .from("document_items")
-        .select("id, description, quantity, unit, rate, amount")
+        .select("id, description, hsn_sac, quantity, unit, rate, amount")
         .eq("draft_id", draft.id)
         .order("line_index", { ascending: true }),
     ]);
@@ -254,14 +278,42 @@ async function loadDraftContext(draftId: string): Promise<DraftContext | null> {
     extractedText: draft.extracted_text,
     documentType: draft.document_type,
     supplierName: draft.supplier_name,
+    supplierGstin: draft.supplier_gstin,
+    supplierAddress: draft.supplier_address,
     documentNumber: draft.document_number,
+    documentDate: draft.document_date,
     ewayBillNumber: draft.eway_bill_number,
+    consigneeName: draft.consignee_name,
+    consigneeAddress: draft.consignee_address,
+    consigneeGstin: draft.consignee_gstin,
+    consigneePincode: draft.consignee_pincode,
+    consigneePhone: draft.consignee_phone,
+    buyerName: draft.buyer_name,
+    buyerAddress: draft.buyer_address,
+    buyerGstin: draft.buyer_gstin,
+    buyerPincode: draft.buyer_pincode,
+    buyerPhone: draft.buyer_phone,
+    destination: draft.destination,
+    dispatchFromAddress: draft.dispatch_from_address,
     vehicleNumber: draft.vehicle_number,
+    approximateDistanceKm:
+      draft.approximate_distance_km === null
+        ? null
+        : Number(draft.approximate_distance_km),
+    ewayGeneratedAtText: draft.eway_generated_at_text,
+    ewayValidUntilText: draft.eway_valid_until_text,
+    supplyType: draft.supply_type,
+    transactionType: draft.transaction_type,
+    taxableAmount:
+      draft.taxable_amount === null ? null : Number(draft.taxable_amount),
+    cgstAmount: draft.cgst_amount === null ? null : Number(draft.cgst_amount),
+    sgstAmount: draft.sgst_amount === null ? null : Number(draft.sgst_amount),
     totalAmount:
       draft.total_amount === null ? null : Number(draft.total_amount),
     items: (items ?? []).map((item) => ({
       id: item.id,
       description: item.description,
+      hsnSac: item.hsn_sac,
       quantity: item.quantity === null ? null : Number(item.quantity),
       unit: item.unit,
       rate: item.rate === null ? null : Number(item.rate),
@@ -374,14 +426,40 @@ function verificationCandidate(draft: DraftContext): VerificationCandidate {
   return {
     documentType: draft.documentType,
     supplierName: draft.supplierName,
+    supplierGstin: draft.supplierGstin,
+    supplierAddress: draft.supplierAddress,
     documentNumber: draft.documentNumber,
+    documentDate: draft.documentDate,
     ewayBillNumber: draft.ewayBillNumber,
+    consigneeName: draft.consigneeName,
+    consigneeAddress: draft.consigneeAddress,
+    consigneeGstin: draft.consigneeGstin,
+    consigneePincode: draft.consigneePincode,
+    consigneePhone: draft.consigneePhone,
+    buyerName: draft.buyerName,
+    buyerAddress: draft.buyerAddress,
+    buyerGstin: draft.buyerGstin,
+    buyerPincode: draft.buyerPincode,
+    buyerPhone: draft.buyerPhone,
+    destination: draft.destination,
+    dispatchFromAddress: draft.dispatchFromAddress,
     vehicleNumber: draft.vehicleNumber,
+    approximateDistanceKm: draft.approximateDistanceKm,
+    ewayGeneratedAtText: draft.ewayGeneratedAtText,
+    ewayValidUntilText: draft.ewayValidUntilText,
+    supplyType: draft.supplyType,
+    transactionType: draft.transactionType,
+    taxableAmount: draft.taxableAmount,
+    cgstAmount: draft.cgstAmount,
+    sgstAmount: draft.sgstAmount,
     totalAmount: draft.totalAmount,
     items: draft.items.map((item) => ({
       description: item.description,
+      hsnSac: item.hsnSac,
       quantity: item.quantity,
       unit: item.unit,
+      rate: item.rate,
+      amount: item.amount,
     })),
   };
 }
