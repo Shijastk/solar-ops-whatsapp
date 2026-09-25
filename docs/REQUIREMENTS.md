@@ -417,3 +417,120 @@ Before real business documents are processed through Groq, enable Zero Data Rete
 ### N13 - Provider failure must not break inbound storage
 
 Once the original WhatsApp message/media is safely stored, Groq verification or automatic WhatsApp-send failure must not retroactively mark that stored inbound media as failed. The document workflow should fail closed to review while the original ingestion record remains intact.
+
+
+## Milestone 2E - Opening Stock and outgoing inventory ledger
+
+Status: approved for implementation. Live WhatsApp/provider acceptance remains separate.
+
+### R40 - One-time Opening Stock
+
+The protected operations UI must provide a one-time Opening Stock entry for each company/product/unit combination.
+
+Opening Stock must:
+
+- be positive
+- create or reuse an explicit company identity
+- create an explicit canonical product identity
+- retain unit and optional HSN/SAC
+- create an immutable positive ledger movement
+- refuse to silently overwrite an existing opening entry for the same product
+
+### R41 - Canonical identity and aliases
+
+Stock identity is scoped by company.
+
+Canonical company/product names are operator-controlled. Normalization may remove case/separator differences for lookup, but fuzzy similarity must never create a mapping automatically.
+
+Approved aliases may be saved after an operator explicitly selects a company/product through the WhatsApp workflow.
+
+### R42 - Approved outgoing bill means Stock OUT
+
+The currently handled bill/PDF is an outgoing/dispatch document.
+
+After its document data is approved/verified, the system must attempt Stock OUT for every line item.
+
+Automatic Stock OUT requires:
+
+- an identified stock company
+- an approved canonical/alias product match
+- matching normalized unit
+- positive quantity
+- optional HSN compatibility when both sides have HSN
+- sufficient current balance
+
+### R43 - Full-bill atomicity
+
+Stock OUT is all-or-nothing for a bill.
+
+If any line item is unknown, ambiguous, invalid, has a unit/HSN conflict, or exceeds available stock, no Stock OUT row from that bill may be inserted.
+
+The user must never receive a partially deducted bill.
+
+### R44 - Idempotent stock movements
+
+Repeated Meta webhook delivery, PDF reprocessing, page refresh, or provider retry must not deduct stock twice.
+
+Each opening, Stock OUT, correction, and reversal movement needs a stable idempotency key or equivalent uniqueness guarantee.
+
+### R45 - Current stock from immutable ledger
+
+Do not maintain current quantity by silently overwriting a mutable balance column.
+
+Current stock is derived from ledger deltas:
+
+`Opening + future Stock IN + corrections + reversals - Stock OUT`
+
+Only the movement types explicitly approved in the current milestone may be created.
+
+### R46 - WhatsApp-first mismatch resolution
+
+A company/product mismatch must be surfaced to the same WhatsApp sender, not only in the dashboard.
+
+The sender may receive an interactive list of existing stock companies/products. Suggestions may be ranked by normalized similarity, but the system must not auto-select the suggestion.
+
+After selection:
+
+- verify the selected target belongs to the correct company/unit
+- bind the action to the original sender server-side
+- save the approved alias
+- retry the complete bill atomically
+
+### R47 - Insufficient stock
+
+If required quantity exceeds available quantity:
+
+- deduct nothing from the bill
+- persist a safe blocked stock status
+- notify the WhatsApp sender with required and available quantities
+- allow the operator to correct or cancel the bill
+
+Negative stock must not be created silently.
+
+### R48 - Quantity edit after Stock OUT
+
+When an already-deducted bill quantity changes, do not rewrite historical Stock OUT rows.
+
+Create an immutable correction movement equal to the difference and update the structured bill quantity only when the correction is safe.
+
+If an increased quantity requires more stock than available, reject the correction and keep the previous quantity/stock unchanged.
+
+### R49 - Delete/cancellation reversal
+
+If a bill with applied Stock OUT is deleted/cancelled, restore the net document deduction through reversal ledger entries first.
+
+Only after a safe reversal may the document workflow be marked cancelled.
+
+If no deduction had been applied, cancellation may proceed without a stock reversal.
+
+### R50 - Opening Stock UI security
+
+`/ops/stock` and its mutation endpoint are internal operations surfaces and must require the same protected operations session and same-origin POST protection as other internal mutations.
+
+Stock master/ledger tables must not be directly accessible to `anon` or normal `authenticated` browser roles.
+
+### R51 - Stock-IN remains separate
+
+This milestone does not infer receiving/Stock IN from the current outgoing bill.
+
+A real stock-IN document sample and explicit receiving rules are still required before automatic Stock IN is implemented.

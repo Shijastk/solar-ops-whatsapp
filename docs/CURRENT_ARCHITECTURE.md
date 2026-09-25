@@ -417,3 +417,84 @@ No anon/authenticated policies are created for these internal tables. Server-sid
 `lib/ingest.ts` runs document automation only after successful PDF storage and parsing. Automation/provider errors are caught separately, so a Groq or outbound failure does not convert already-stored inbound media into an ingestion failure.
 
 No stock table exists or is modified by this workflow.
+
+
+## Opening stock and inventory ledger
+
+The approved outgoing-stock architecture adds a server-only inventory layer.
+
+### Stock master
+
+`stock_companies` stores canonical company identities.
+
+`stock_company_aliases` stores operator-approved supplier-name variants.
+
+`stock_products` stores canonical products scoped to a company with canonical unit and optional HSN/SAC.
+
+`stock_product_aliases` stores operator-approved bill-description variants scoped by company and unit.
+
+Similarity scoring in application code is used only to rank WhatsApp suggestions. It is never an automatic identity decision.
+
+### Ledger
+
+`stock_ledger` is append-only for normal operations. Current quantity is derived through the `stock_balances` security-invoker view.
+
+Current movement types in this milestone:
+
+- `opening`
+- `stock_out`
+- `correction`
+- `reversal`
+
+The system does not yet create automatic Stock IN movements.
+
+### Atomic database operations
+
+Postgres RPC functions own stock-critical mutations so validation, balance checking, locking, and ledger writes happen in one database transaction.
+
+The main operations are:
+
+- create one-time Opening Stock
+- apply full-bill Stock OUT
+- map a company alias
+- map a product alias
+- apply a quantity correction
+- reverse a bill's net deduction
+
+Stock OUT locks all matched product rows in deterministic order before checking balances. A bill is rejected before inserts if any line fails.
+
+### Document stock state
+
+`document_drafts` carries a separate `stock_status` so document verification and inventory application are not conflated.
+
+Possible operational states include:
+
+- `not_ready`
+- `pending`
+- `applied`
+- `needs_product_match`
+- `company_unmapped`
+- `insufficient_stock`
+- `invalid_item`
+- `inconsistent`
+- `reversed`
+
+### WhatsApp-first resolution
+
+`lib/stock-workflow.ts` converts blocked stock states into WhatsApp interactions.
+
+Unknown company/product spelling is resolved through interactive lists. The selected mapping is checked against the original WhatsApp sender, then saved as an alias and the entire bill is retried.
+
+Insufficient stock produces a WhatsApp warning with required/available quantities and performs no partial deduction.
+
+### Opening Stock UI
+
+`/ops/stock` is a protected internal page for one-time Opening Stock setup and current derived balances.
+
+The POST route uses existing operations-session authentication and same-origin protection.
+
+### Edit/Delete behavior
+
+Quantity corrections after applied Stock OUT call an atomic correction RPC instead of rewriting ledger history.
+
+Delete/cancellation calls the reversal RPC first. Workflow cancellation occurs only after a safe reversal or when no Stock OUT had been applied.

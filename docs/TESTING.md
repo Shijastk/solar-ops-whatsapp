@@ -371,7 +371,7 @@ Automated coverage includes:
 - inbound list-reply normalization
 - namespaced Edit/Delete action parsing
 - correction value validation
-- summary states that stock is unchanged
+- summary distinguishes stock applied from stock pending
 
 Provider/live acceptance is separate. Do not claim Groq verification or automatic interactive WhatsApp messaging works live merely because mocked CI passes.
 
@@ -383,5 +383,29 @@ After the feature is configured in production, use a non-sensitive selectable-te
 4. Edit opens a field menu
 5. selecting a quantity and sending a corrected value stores a `manual_override` audit action and sends an updated summary
 6. Delete requires confirmation and changes only workflow state to `cancelled`
-7. stock remains unchanged throughout
-8. a deliberately ambiguous/mismatching fixture becomes `review_required` instead of auto-recorded
+7. a verified bill with configured Opening Stock creates one Stock OUT and reduces the derived balance once
+8. replaying the same bill does not reduce balance again
+9. product/company alias selection in WhatsApp retries the full bill and remembers the alias
+10. an insufficient bill deducts nothing
+11. quantity edit creates a correction delta rather than rewriting the original movement
+12. Delete restores the bill's net deduction before cancellation
+13. a deliberately ambiguous/mismatching document-verification fixture becomes `review_required` instead of auto-recorded
+
+
+## Stock ledger tests
+
+Normal CI must cover pure stock validation/action parsing without contacting Supabase or Meta.
+
+Database acceptance must use synthetic rows only and clean every fixture.
+
+Required database invariants:
+
+- Opening 100, Stock OUT 30 => 70
+- replay same document => still 70
+- change deducted quantity 30 -> 20 => correction restores 10 => 80
+- Delete/reversal => 100
+- replay reversal => still 100
+- require 150 while 100 available => `insufficient_stock`, balance remains 100
+- unresolved product => `needs_product_match`, zero ledger rows for that bill
+- mapping the alias then retrying => exactly one full-bill Stock OUT
+- multi-line bill with one failing line => zero Stock OUT rows for the entire bill

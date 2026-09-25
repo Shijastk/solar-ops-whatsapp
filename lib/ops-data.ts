@@ -76,6 +76,9 @@ const documentDraftSchema = z.object({
   verification_provider: z.string().nullable(),
   verification_model: z.string().nullable(),
   workflow_status: z.string(),
+  stock_status: z.string(),
+  stock_error: z.string().nullable(),
+  stock_updated_at: z.string().nullable(),
   summary_sent_at: z.string().nullable(),
 });
 
@@ -176,6 +179,9 @@ const DRAFT_SELECT = [
   "verification_provider",
   "verification_model",
   "workflow_status",
+  "stock_status",
+  "stock_error",
+  "stock_updated_at",
   "summary_sent_at",
 ].join(",");
 

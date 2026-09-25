@@ -263,3 +263,56 @@ Reason: Hard deletion would remove the evidence needed to understand later corre
 Decision: Neither deterministic parsing, Groq verification, automatic recording, human edits, nor Delete may mutate inventory.
 
 Reason: The current document represents an outgoing/dispatch flow, while a separate stock-IN document sample and rules for opening balance, returns, cancellations, corrections, product identity, units, and negative stock have not yet been defined.
+
+
+## D030 - Opening Stock option A is the initial inventory source
+
+Decision: The operator manually enters existing quantity once per company/product/unit through the protected Stock screen.
+
+Reason: The current system has no historical receiving ledger from which the pre-existing warehouse balance can be reconstructed safely.
+
+Opening Stock is not repeatedly edited; later changes are represented by explicit movements.
+
+## D031 - Current handled bill is outgoing/dispatch Stock OUT
+
+Decision: Once the current bill's structured data is approved/verified, its quantities may reduce existing stock.
+
+Reason: The user explicitly confirmed that this document represents goods being taken from the godown.
+
+This decision does not define future receiving/Stock IN documents.
+
+## D032 - Stock ledger is immutable and derived
+
+Decision: Store inventory movements rather than a mutable current-stock number.
+
+Reason: Duplicate prevention, corrections, cancellation, and later audits are safer when each movement has an immutable reason and idempotency key.
+
+Current balance is the sum of ledger deltas.
+
+## D033 - A bill is all-or-nothing for Stock OUT
+
+Decision: Never partially deduct a multi-line bill.
+
+Reason: Partial success would make the WhatsApp document and warehouse balance disagree. Any unresolved product, invalid quantity/unit, HSN conflict, or insufficient balance blocks the whole bill.
+
+## D034 - Spelling similarity is suggestion-only
+
+Decision: Normalization/fuzzy similarity may rank existing companies/products for WhatsApp selection, but must never auto-map a new spelling.
+
+Reason: A wrong product identity can corrupt inventory even when quantities were parsed correctly.
+
+An explicit operator selection creates the alias for future automatic exact alias matches.
+
+## D035 - Stock exceptions are WhatsApp-first
+
+Decision: Company/product mapping and insufficient-stock warnings must be surfaced to the sender in WhatsApp.
+
+Reason: The product principle is to follow the existing WhatsApp workflow rather than require daily dashboard monitoring.
+
+The dashboard remains an internal setup/audit surface.
+
+## D036 - Quantity edits and Delete use ledger corrections/reversals
+
+Decision: An edit after Stock OUT writes a correction delta; Delete restores the net deduction with a reversal before cancelling the workflow.
+
+Reason: Rewriting or deleting historical movements would destroy auditability and make duplicate/retry behavior difficult to reason about.
