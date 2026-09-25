@@ -446,3 +446,18 @@ After deploying the stock-management client layer:
 Opening Stock remains the one-time starting point for a new product. Use **Adjust** for later physical-count corrections.
 
 The temporary GSTIN debugging metadata used during the earlier investigation has been removed; validation errors remain bounded and must not log the GSTIN value.
+
+
+## Phase K - Mobile stock UI acceptance
+
+After the mobile-first stock redesign is deployed:
+
+1. open `/ops/stock` on a phone-width viewport
+2. confirm Current stock is the first working section
+3. confirm each stock row shows company, product, unit/HSN, current quantity, and Adjust without horizontal page scrolling
+4. open Adjust and confirm Save/Cancel controls are comfortably tappable
+5. scroll to Add opening stock and confirm form fields fit the viewport at one-column mobile width
+6. confirm the stock surface is light while the separate WhatsApp operations surface retains its existing theme
+7. repeat Add/Adjust and confirm successful actions still refresh data without a normal document reload
+
+No external design library is required for this acceptance.
