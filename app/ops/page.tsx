@@ -348,6 +348,9 @@ export default async function OpsDashboardPage({
           {params.reply === "failed"
             ? "Reply failed. The message was not automatically retried."
             : null}
+          {params.reply === "pending"
+            ? "Reply is still being processed."
+            : null}
           {params.reply === "invalid" ? "Reply text was invalid." : null}
           {params.document === "approved" ? "Parsed bill approved." : null}
           {params.document === "approval_failed"
