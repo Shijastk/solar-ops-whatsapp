@@ -270,7 +270,7 @@ create index if not exists document_actions_draft_created_idx
 
 alter table public.document_actions enable row level security;
 
-revoke all on table public.document_actions from anon, authenticated;
+revoke all on table public.document_actions from anon, authenticated, service_role;
 grant select, insert, update, delete on table public.document_actions to service_role;
 
 create table if not exists public.document_edit_sessions (
@@ -301,7 +301,7 @@ create index if not exists document_edit_sessions_expires_at_idx
 
 alter table public.document_edit_sessions enable row level security;
 
-revoke all on table public.document_edit_sessions from anon, authenticated;
+revoke all on table public.document_edit_sessions from anon, authenticated, service_role;
 grant select, insert, update, delete on table public.document_edit_sessions to service_role;
 
 drop trigger if exists set_document_edit_sessions_updated_at
