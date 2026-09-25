@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createOpsSession,
+  getOpsSessionExpiresAt,
   isSameOriginRequest,
   isValidOpsAccessKey,
   verifyOpsSession,
@@ -46,6 +47,14 @@ describe("ops authentication", () => {
     const session = createOpsSession(now, 60_000);
 
     expect(verifyOpsSession(session, now + 30_000)).toBe(true);
+  });
+
+  it("returns expiry only for a currently valid signed session", () => {
+    const now = 1_800_000_000_000;
+    const session = createOpsSession(now, 60_000);
+
+    expect(getOpsSessionExpiresAt(session, now + 30_000)).toBe(now + 60_000);
+    expect(getOpsSessionExpiresAt(session, now + 60_001)).toBeNull();
   });
 
   it("rejects expired and tampered sessions", () => {

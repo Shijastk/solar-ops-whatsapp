@@ -225,3 +225,8 @@ feature branch
 ```
 
 Feature-branch commits still run GitHub Actions but do not automatically consume Vercel Preview deployment quota. Create a Preview deployment manually only when a browser/provider-level preview is specifically required.
+
+
+## Mobile client API
+
+The Flutter mobile client uses the authenticated `/api/mobile/v1` server surface for real operations data. Privileged Supabase/Meta credentials remain server-side.

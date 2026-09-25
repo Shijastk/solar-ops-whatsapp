@@ -511,3 +511,22 @@ The application as a whole is therefore not a pure client SPA. It is a hybrid se
 Quantity corrections after applied Stock OUT call an atomic correction RPC instead of rewriting ledger history.
 
 Delete/cancellation calls the reversal RPC first. Workflow cancellation occurs only after a safe reversal or when no Stock OUT had been applied.
+
+
+## Native mobile API
+
+The backend now exposes a versioned native surface under `/api/mobile/v1`.
+
+Available endpoints:
+
+- `POST /session` - access-key exchange for an expiring signed Bearer session
+- `GET /bootstrap` - real dashboard, PDF bills/drafts/items, document-derived dispatch fields, stock companies/balances and health state
+- `POST /stock/opening` - existing Opening Stock validation/ledger path
+- `POST /stock/adjust` - existing audited physical adjustment path
+- `POST /messages/:id/parse`
+- `POST /messages/:id/approve`
+- `GET /messages/:id/media` - 5-minute signed PDF URL
+
+Bearer authorization is validated server-side with the signed ops-session verifier. The mobile client never receives Supabase or Meta credentials.
+
+There is still no standalone driver-assignment/delivery table. “Dispatch” data currently means parsed bill fields such as vehicle number, destination, consignee, workflow status and stock status.

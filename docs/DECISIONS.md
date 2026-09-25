@@ -368,3 +368,12 @@ Decision: Every stock company must have a valid GSTIN.
 Reason: Company name spelling alone is not strong enough for inventory identity. GSTIN provides a stable company-level key for Opening Stock and later bill matching.
 
 New companies cannot be created without GSTIN. Existing companies reuse their saved GSTIN; operators do not need to retype it for each product.
+
+
+## D043 - Mobile app talks to Solar Ops backend, not directly to privileged Supabase
+
+Decision: the Flutter app uses authenticated `/api/mobile/v1/*` endpoints on the existing Solar Ops Next.js backend.
+
+The mobile login exchanges the existing operations access key for the same signed, expiring operations-session format used by the protected web surface. The app stores only that short-lived session token. Supabase service-role access remains server-side.
+
+This keeps inventory/document rules centralized and avoids duplicating privileged database logic in the APK.
