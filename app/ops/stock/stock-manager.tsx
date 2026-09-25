@@ -57,6 +57,8 @@ function resultMessage(status: string): string {
       return "Current stock already matches that quantity. No ledger entry was added.";
     case "not_ready":
       return "That stock product is no longer available for adjustment.";
+    case "inconsistent":
+      return "Stock adjustment was blocked because the existing ledger state is inconsistent.";
     case "failed":
       return "The stock change could not be saved. Check the entered values and try again.";
     default:
