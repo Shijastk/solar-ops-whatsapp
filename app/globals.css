@@ -1892,6 +1892,183 @@ ul {
   font-size: 11px;
 }
 
+.stockSheetHeader {
+  position: relative;
+}
+
+.stockSheetHandle,
+.stockSheetClose,
+.stockAddFab,
+.stockSheetBackdrop {
+  display: none;
+}
+
+@media (max-width: 959px) {
+  .stockShell {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .stockSetupSection {
+    position: fixed;
+    z-index: 50;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    max-height: min(88dvh, 760px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -18px 50px rgba(16, 23, 19, 0.16);
+    transform: translateY(calc(100% + 24px));
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform 180ms ease,
+      visibility 180ms step-end;
+  }
+
+  .stockSetupSectionOpen {
+    transform: translateY(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      transform 180ms ease,
+      visibility 0s step-start;
+  }
+
+  .stockSheetHeader {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    background: var(--stock-surface);
+    padding-top: 22px;
+  }
+
+  .stockSheetHandle {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    display: block;
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: #d5ddd8;
+    transform: translateX(-50%);
+  }
+
+  .stockSheetClose {
+    display: inline-flex;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--stock-border);
+    border-radius: 999px;
+    background: var(--stock-surface-muted);
+    color: #4c5952;
+    font: inherit;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .stockSetupSection .stockForm {
+    padding-bottom: calc(22px + env(safe-area-inset-bottom));
+  }
+
+  .stockSetupSection .stockPrimaryButton {
+    position: sticky;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    z-index: 1;
+    min-height: 50px;
+    box-shadow: 0 8px 22px rgba(23, 107, 77, 0.18);
+  }
+
+  .stockAddFab {
+    position: fixed;
+    z-index: 30;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(18px, calc(14px + env(safe-area-inset-bottom)));
+    display: inline-flex;
+    min-height: 52px;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--stock-accent);
+    border-radius: 999px;
+    background: var(--stock-accent);
+    box-shadow: 0 10px 28px rgba(23, 107, 77, 0.24);
+    color: #ffffff;
+    padding: 0 18px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+      opacity 140ms ease,
+      transform 140ms ease,
+      background 140ms ease;
+  }
+
+  .stockAddFab > span {
+    font-size: 22px;
+    font-weight: 450;
+    line-height: 1;
+  }
+
+  .stockAddFab:active {
+    transform: translateY(1px);
+  }
+
+  .stockAddFabHidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+  }
+
+  .stockSheetBackdrop {
+    position: fixed;
+    z-index: 40;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: rgba(20, 28, 24, 0.34);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    cursor: default;
+    transition:
+      opacity 180ms ease,
+      visibility 180ms step-end;
+  }
+
+  .stockSheetBackdropOpen {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      opacity 180ms ease,
+      visibility 0s step-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stockSetupSection,
+  .stockAddFab,
+  .stockSheetBackdrop {
+    transition: none;
+  }
+}
+
 @media (min-width: 640px) {
   .stockShell {
     padding: 22px;
