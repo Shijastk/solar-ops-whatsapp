@@ -17,7 +17,11 @@ import {
   type OpsOutboundMessage,
 } from "@/lib/ops-data";
 import { isWithinCustomerServiceWindow } from "@/lib/replies";
-import { ChatTimeline, OpsLiveRefresh } from "./ops-live-client";
+import {
+  ChatTimeline,
+  OpsLiveRefresh,
+  ReplyForm,
+} from "./ops-live-client";
 
 export const dynamic = "force-dynamic";
 
@@ -453,25 +457,10 @@ export default async function OpsDashboardPage({
 
               <footer className="waComposer">
                 {latestInbound && canReply ? (
-                  <form
+                  <ReplyForm
                     action={"/api/ops/messages/" + latestInbound.id + "/reply"}
-                    method="post"
-                  >
-                    <input
-                      type="hidden"
-                      name="requestId"
-                      value={randomUUID()}
-                    />
-                    <textarea
-                      aria-label="WhatsApp reply"
-                      maxLength={2000}
-                      name="body"
-                      placeholder="Type a message"
-                      required
-                      rows={1}
-                    />
-                    <button type="submit">Send</button>
-                  </form>
+                    requestId={randomUUID()}
+                  />
                 ) : (
                   <p>
                     Free-form reply unavailable: no inbound message in the last
