@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getStockGstinDiagnostics,
   normalizeStockGstin,
   normalizeStockName,
   normalizeStockUnit,
@@ -28,6 +29,52 @@ describe("stock input helpers", () => {
         quantity: "18",
       }).companyGstin,
     ).toBe("32ABMCS6908B1ZG");
+  });
+
+  it("extracts one valid GSTIN from copied label text", () => {
+    expect(
+      normalizeStockGstin("Company GSTIN: 32ABMCS6908B1ZG, Kerala"),
+    ).toBe("32ABMCS6908B1ZG");
+
+    expect(
+      validateOpeningStockInput({
+        companyName: "Sun Grid Solutions",
+        companyGstin: "GSTIN: 32ABMCS6908B1ZG",
+        productName: "Solar panel",
+        unit: "NOS",
+        quantity: "18",
+      }).companyGstin,
+    ).toBe("32ABMCS6908B1ZG");
+  });
+
+  it("accepts NFKC-compatible full-width pasted GSTIN text", () => {
+    expect(normalizeStockGstin("３２ＡＢＭＣＳ６９０８Ｂ１ＺＧ")).toBe(
+      "32ABMCS6908B1ZG",
+    );
+  });
+
+  it("reports safe diagnostics without exposing the GSTIN value", () => {
+    expect(getStockGstinDiagnostics("GSTIN: 32ABMCS6908B1ZG")).toEqual({
+      rawCodePointLength: 22,
+      normalizedCodePointLength: 22,
+      compactLength: 20,
+      candidateCount: 1,
+      outputLength: 15,
+      outputMatchesGstinShape: true,
+    });
+  });
+
+  it("rejects ambiguous text containing more than one GSTIN", () => {
+    expect(() =>
+      validateOpeningStockInput({
+        companyName: "Sun Grid Solutions",
+        companyGstin:
+          "32ABMCS6908B1ZG and 32ABCDE1234F1Z5",
+        productName: "Solar panel",
+        unit: "NOS",
+        quantity: "18",
+      }),
+    ).toThrow("standard 15-character GSTIN format");
   });
 
   it("validates opening stock and creates deterministic normalized fields", () => {

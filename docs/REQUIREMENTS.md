@@ -300,7 +300,7 @@ Structured fields may include document/supplier/e-Way data, consignee and buyer 
 
 Parser output is saved as a draft. Only a complete parser draft may be marked `approved`.
 
-Approval is a data-review state only. It must not change stock/current stock until stock-direction and opening-balance rules are explicitly approved.
+Unapproved parser/OCR/AI output must not mutate inventory. For the currently approved outgoing/dispatch workflow, an approved/verified draft may proceed to the separate Milestone 2E stock-ledger checks.
 
 ### R25 - WhatsApp-style internal UI
 
@@ -368,17 +368,17 @@ Automatic document recording is allowed only when:
 
 Any mismatch, missing text layer, timeout, rate limit, provider error, invalid output, or incomplete parser state must become `review_required`. Never choose whichever extractor looks more likely.
 
-### R33 - Auto-record is not stock mutation
+### R33 - Auto-record is the stock-processing gate, not the stock decision
 
 A safely verified document may move to the document workflow state `recorded` and parser state `approved`.
 
-This state is document-data acceptance only. It must not create stock IN, stock OUT, opening balance, returns, corrections, or current-stock changes.
+Those states mean the document data is accepted. They do not by themselves prove that inventory can move. After recording, the separate Milestone 2E stock engine may create outgoing Stock OUT only if company/product identity, unit, quantity, available balance, idempotency, and all-or-nothing checks pass. Automatic Stock IN remains out of scope.
 
 ### R34 - Automatic WhatsApp summary
 
 While the customer-service window is open, a safely verified inbound PDF may trigger one idempotent transactional WhatsApp summary containing only the operational fields needed for quick review.
 
-The summary must state that stock is unchanged.
+The summary must report stock state accurately: applied when Stock OUT succeeds, pending/blocked when stock cannot safely move, and reversed after a successful cancellation reversal.
 
 ### R35 - Interactive correction controls
 
@@ -390,7 +390,9 @@ Edit should use a bounded menu where possible. After choosing a field, the opera
 
 Delete must require an explicit destructive confirmation.
 
-Delete means cancellation from the active document workflow. It must not hard-delete the structured document or its audit history, and it must not mutate stock.
+Delete means cancellation from the active document workflow. It must not hard-delete the structured document or its audit history.
+
+If Stock OUT was already applied, the system must restore the document's net deduction through immutable reversal entries before marking the workflow cancelled. If a safe reversal cannot be completed, cancellation must fail closed.
 
 ### R37 - Sender binding
 
@@ -534,3 +536,16 @@ Stock master/ledger tables must not be directly accessible to `anon` or normal `
 This milestone does not infer receiving/Stock IN from the current outgoing bill.
 
 A real stock-IN document sample and explicit receiving rules are still required before automatic Stock IN is implemented.
+
+### R52 - Opening Stock GSTIN input safety
+
+GSTIN is optional for manual Opening Stock setup.
+
+When supplied, the server must:
+
+- normalize NFKC-compatible clipboard characters
+- resolve only a standard 15-character GSTIN-shaped value
+- allow one unambiguous GSTIN token to be extracted from surrounding copied label text
+- reject multiple GSTIN candidates rather than guess
+- never log the GSTIN value on validation failure
+- expose only safe diagnostic metadata such as lengths/counts/shape validity when troubleshooting

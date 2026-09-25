@@ -5,7 +5,10 @@ import {
   isSameOriginRequest,
   verifyOpsSession,
 } from "@/lib/ops-auth";
-import { createOpeningStock } from "@/lib/stock";
+import {
+  createOpeningStock,
+  getStockGstinDiagnostics,
+} from "@/lib/stock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,13 +24,16 @@ export async function POST(request: Request) {
   }
 
   const target = new URL("/ops/stock", request.url);
+  let companyGstinInput = "";
 
   try {
     const form = await request.formData();
+    companyGstinInput = String(form.get("companyGstin") ?? "");
+
     const result = await createOpeningStock({
       companyId: String(form.get("companyId") ?? ""),
       companyName: String(form.get("companyName") ?? ""),
-      companyGstin: String(form.get("companyGstin") ?? ""),
+      companyGstin: companyGstinInput,
       productName: String(form.get("productName") ?? ""),
       unit: String(form.get("unit") ?? ""),
       hsnSac: String(form.get("hsnSac") ?? ""),
@@ -41,7 +47,14 @@ export async function POST(request: Request) {
     const message =
       error instanceof Error ? error.message : "Unknown opening stock error";
 
-    console.error("Opening stock setup failed", { message });
+    const safeDetails = message.includes("GSTIN")
+      ? { gstin: getStockGstinDiagnostics(companyGstinInput) }
+      : {};
+
+    console.error("Opening stock setup failed", {
+      message,
+      ...safeDetails,
+    });
 
     if (message.includes("GSTIN")) {
       target.searchParams.set("result", "invalid_gstin");
