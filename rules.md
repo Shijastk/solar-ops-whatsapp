@@ -83,6 +83,7 @@ Avoid:
 Stock safety rules:
 
 - Opening Stock is a one-time positive ledger entry per company/product/unit.
+- Manual current-stock corrections must be represented by immutable `adjustment` deltas; never rewrite the opening row or historical bill movements.
 - Never overwrite an opening entry silently.
 - Current stock is derived from immutable ledger deltas, not a mutable balance field.
 - If one bill line cannot be mapped or has insufficient stock, apply zero Stock OUT entries for that bill.
