@@ -6,7 +6,7 @@ import {
 } from "../lib/document-automation";
 
 describe("document automation helpers", () => {
-  it("builds a concise summary and explicitly leaves stock unchanged", () => {
+  it("builds a concise summary with pending stock state", () => {
     const summary = buildDocumentSummary({
       supplierName: "Sun Grid Solutions Limited",
       documentNumber: "SG000123",
@@ -27,8 +27,29 @@ describe("document automation helpers", () => {
 
     expect(summary).toContain("Bill data recorded");
     expect(summary).toContain("Solar 560 Wp Topcon Panel — 6 NOS");
-    expect(summary).toContain("Stock unchanged");
+    expect(summary).toContain("Stock update pending");
     expect(summary.length).toBeLessThanOrEqual(950);
+
+    const applied = buildDocumentSummary({
+      supplierName: "Sun Grid Solutions Limited",
+      documentNumber: "SG000123",
+      vehicleNumber: "KL11AA1234",
+      totalAmount: 176026.86,
+      stockStatus: "applied",
+      items: [
+        {
+          id: "item-1",
+          description: "Solar 560 Wp Topcon Panel",
+          hsnSac: "8541",
+          quantity: 6,
+          unit: "NOS",
+          rate: 20000,
+          amount: 120000,
+        },
+      ],
+    });
+
+    expect(applied).toContain("Stock updated");
   });
 
   it("parses only namespaced document workflow actions", () => {
