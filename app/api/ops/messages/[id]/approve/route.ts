@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { approveDocumentDraft } from "@/lib/document-processing";
+import { processStockForDraft } from "@/lib/stock-workflow";
 import {
   OPS_SESSION_COOKIE,
   isSameOriginRequest,
@@ -37,8 +38,14 @@ export async function POST(
   const dashboardUrl = new URL("/ops", request.url);
 
   try {
-    await approveDocumentDraft(id);
+    const draftId = await approveDocumentDraft(id);
+    const stock = await processStockForDraft({
+      draftId,
+      replyToMessageId: id,
+      notifySuccess: true,
+    });
     dashboardUrl.searchParams.set("document", "approved");
+    dashboardUrl.searchParams.set("stock", stock.status);
     return NextResponse.redirect(dashboardUrl, 303);
   } catch (error) {
     console.error("Document approval failed", {
