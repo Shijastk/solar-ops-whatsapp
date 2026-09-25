@@ -75,6 +75,18 @@ export function verifyOpsSession(
   return safeEqual(signature, expectedSignature);
 }
 
+export function getOpsSessionExpiresAt(
+  session: string | undefined,
+  now = Date.now(),
+): number | null {
+  if (!verifyOpsSession(session, now) || !session) {
+    return null;
+  }
+
+  const expiresAt = Number(session.split(".")[1]);
+  return Number.isSafeInteger(expiresAt) ? expiresAt : null;
+}
+
 export function opsSessionCookieOptions() {
   return {
     httpOnly: true,
