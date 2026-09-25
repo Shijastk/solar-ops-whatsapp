@@ -255,6 +255,33 @@ describe("extractDocumentWithGroq", () => {
     expect(JSON.stringify(body)).not.toContain("groq-test-secret");
   });
 
+  it("captures bounded provider diagnostics when verification is rejected", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              type: "invalid_request_error",
+              code: "bad_request",
+              message: "Unsupported request option",
+            },
+          }),
+          { status: 400, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+
+    await expect(
+      extractDocumentWithGroq("DELIVERY NOTE\nSolar Panel"),
+    ).rejects.toThrow(
+      "HTTP 400: invalid_request_error: bad_request: Unsupported request option",
+    );
+  });
+
   it("fails closed when the provider rejects verification", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
