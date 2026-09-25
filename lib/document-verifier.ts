@@ -230,6 +230,10 @@ function normalizeUnit(value: string): string {
   return normalizeIdentifier(value);
 }
 
+function normalizeSupplierName(value: string): string {
+  return normalizeLooseText(value).replace(/\s+(?:20)?\d{2}\s+(?:20)?\d{2}$/, "").trim();
+}
+
 function numbersEqual(
   left: number | null,
   right: number | null,
@@ -350,19 +354,22 @@ export function compareDocumentVerification(
     candidate.documentType,
     extraction.document_type,
   );
-  compareTextField(
-    mismatches,
-    "supplier_name",
-    candidate.supplierName,
-    extraction.supplier_name,
-  );
-  compareTextField(
-    mismatches,
-    "supplier_gstin",
+  const supplierGstinMatches = compareNullableString(
     candidate.supplierGstin,
     extraction.supplier_gstin,
     normalizeIdentifier,
   );
+  if (
+    !supplierGstinMatches ||
+    !compareNullableString(
+      candidate.supplierName,
+      extraction.supplier_name,
+      supplierGstinMatches ? normalizeSupplierName : normalizeLooseText,
+    )
+  ) {
+    mismatches.push("supplier_name");
+  }
+  if (!supplierGstinMatches) mismatches.push("supplier_gstin");
   compareTextField(
     mismatches,
     "supplier_address",
@@ -664,6 +671,10 @@ export async function extractDocumentWithGroq(
   const parsedExtraction = groqDocumentExtractionSchema.safeParse(payload);
   if (!parsedExtraction.success) {
     throw new Error("Groq verification output failed local validation");
+  }
+
+  if (/(?:^|\n)Dispatch From\s+Ship To\s*(?:\n|$)/i.test(extractedText)) {
+    return { ...parsedExtraction.data, dispatch_from_address: null };
   }
 
   return parsedExtraction.data;

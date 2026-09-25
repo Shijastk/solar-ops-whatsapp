@@ -25,7 +25,7 @@ describe("document automation helpers", () => {
       ],
     });
 
-    expect(summary).toContain("Bill data recorded");
+    expect(summary).toContain("Bill verified");
     expect(summary).toContain("Solar 560 Wp Topcon Panel — 6 NOS");
     expect(summary).toContain("Stock update pending");
     expect(summary.length).toBeLessThanOrEqual(950);
