@@ -416,4 +416,15 @@ After successful Stock OUT:
 Do not call this inventory flow production-live-verified until these observations are completed after deployment.
 
 
-Opening Stock GSTIN input is optional. Pasted GSTIN text is normalized server-side by removing spaces, punctuation, and invisible non-alphanumeric characters before the 15-character validation. If validation still fails, the Stock page shows a specific GSTIN error instead of a generic save failure.
+Opening Stock GSTIN input is optional.
+
+For clipboard safety, the server normalizes Unicode with NFKC and accepts a GSTIN only when it can resolve one unambiguous standard GSTIN-shaped value. This supports:
+
+- the exact 15-character GSTIN typed normally
+- spaces/punctuation/invisible characters around pasted text
+- NFKC-compatible full-width characters
+- a copied label such as `GSTIN: 32ABMCS6908B1ZG`
+
+If more than one GSTIN-shaped value is present, or no valid standard shape can be resolved, the request is rejected rather than guessed.
+
+On validation failure the server logs only non-sensitive diagnostics such as raw/normalized lengths, candidate count, and shape-valid boolean. It must never log the GSTIN value itself.
