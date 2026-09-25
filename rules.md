@@ -83,6 +83,7 @@ Avoid:
 Stock safety rules:
 
 - Opening Stock is a one-time positive ledger entry per company/product/unit.
+- Every stock company used for Opening Stock must have a valid GSTIN; do not create GSTIN-less stock company records.
 - Manual current-stock corrections must be represented by immutable `adjustment` deltas; never rewrite the opening row or historical bill movements.
 - Never overwrite an opening entry silently.
 - Current stock is derived from immutable ledger deltas, not a mutable balance field.

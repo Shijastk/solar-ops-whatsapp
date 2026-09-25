@@ -157,6 +157,9 @@ export function validateOpeningStockInput(input: {
   if (companyName && companyName.length > 160) {
     throw new Error("Company name is too long");
   }
+  if (!companyId && !companyGstin) {
+    throw new Error("GSTIN is required for a new company");
+  }
   if (companyGstin && !GSTIN_PATTERN.test(companyGstin)) {
     throw new Error("GSTIN must match the standard 15-character GSTIN format");
   }
@@ -237,6 +240,27 @@ export async function createOpeningStock(input: {
 
   const companies = await listStockCompanies();
   let resolvedCompanyId = parsed.companyId;
+
+  if (parsed.companyId) {
+    const selectedCompany = companies.find(
+      (company) => company.id === parsed.companyId,
+    );
+
+    if (!selectedCompany) {
+      throw new Error("Selected company was not found");
+    }
+
+    if (!selectedCompany.gstin) {
+      throw new Error("Selected company must have a GSTIN before adding stock");
+    }
+
+    if (
+      parsed.companyGstin &&
+      selectedCompany.gstin !== parsed.companyGstin
+    ) {
+      throw new Error("Selected company GSTIN does not match");
+    }
+  }
 
   if (!resolvedCompanyId && parsed.companyGstin) {
     resolvedCompanyId =

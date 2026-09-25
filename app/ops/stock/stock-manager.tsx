@@ -40,8 +40,10 @@ function resultMessage(status: string): string {
       return "A very similar company already exists. Select it, or explicitly confirm that this is genuinely a different company.";
     case "potential_product_duplicate":
       return "A very similar product already exists for this company and unit. Use Adjust if it is the same product.";
+    case "gstin_required":
+      return "GSTIN is required before a new company can be added to stock.";
     case "invalid_gstin":
-      return "GSTIN is invalid. Enter a standard 15-character GSTIN or leave it blank.";
+      return "GSTIN is invalid. Enter a standard 15-character GSTIN.";
     case "company_required":
       return "Select an existing company or enter a new company name.";
     case "product_required":
@@ -79,6 +81,7 @@ export default function StockManager({
     initialResult ? resultMessage(initialResult) : "",
   );
   const [openingPending, setOpeningPending] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [adjustingProductId, setAdjustingProductId] = useState<string | null>(
     null,
   );
@@ -149,6 +152,7 @@ export default function StockManager({
 
       if (response.ok && status === "opening_created") {
         openingFormRef.current?.reset();
+        setSelectedCompanyId("");
         setIsAddSheetOpen(false);
         router.refresh();
         window.requestAnimationFrame(() => addButtonRef.current?.focus());
@@ -384,8 +388,12 @@ export default function StockManager({
             >
               <label className="stockField">
                 <span>Existing company</span>
-                <select name="companyId">
-                  <option value="">Create or match a new company</option>
+                <select
+                  name="companyId"
+                  onChange={(event) => setSelectedCompanyId(event.target.value)}
+                  value={selectedCompanyId}
+                >
+                  <option value="">Create a new company</option>
                   {companies.map((company) => (
                     <option key={company.id} value={company.id}>
                       {company.canonical_name}
@@ -399,21 +407,33 @@ export default function StockManager({
                 <label className="stockField">
                   <span>New company name</span>
                   <input
+                    disabled={Boolean(selectedCompanyId)}
                     maxLength={160}
                     name="companyName"
-                    placeholder="Only for a new company"
+                    placeholder={
+                      selectedCompanyId
+                        ? "Using selected company"
+                        : "Required for a new company"
+                    }
+                    required={!selectedCompanyId}
                     type="text"
                   />
                 </label>
 
                 <label className="stockField">
-                  <span>Company GSTIN</span>
+                  <span>Company GSTIN *</span>
                   <input
                     autoCapitalize="characters"
                     autoCorrect="off"
+                    disabled={Boolean(selectedCompanyId)}
                     maxLength={80}
                     name="companyGstin"
-                    placeholder="Optional"
+                    placeholder={
+                      selectedCompanyId
+                        ? "Using saved GSTIN"
+                        : "15-character GSTIN"
+                    }
+                    required={!selectedCompanyId}
                     spellCheck={false}
                     type="text"
                   />

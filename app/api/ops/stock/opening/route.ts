@@ -15,6 +15,7 @@ function wantsJson(request: Request): boolean {
 }
 
 export function openingStockErrorState(message: string): string {
+  if (message.includes("GSTIN is required")) return "gstin_required";
   if (message.includes("GSTIN")) return "invalid_gstin";
   if (message.includes("existing company")) return "company_required";
   if (message.includes("Product name")) return "product_required";

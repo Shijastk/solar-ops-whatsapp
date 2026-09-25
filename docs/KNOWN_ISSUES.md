@@ -397,3 +397,18 @@ Resolution in source:
 - no additional UI library
 
 Production-live mobile acceptance remains required after deployment.
+
+
+## K039 - Opening Stock previously allowed GSTIN-less companies
+
+The initial Opening Stock form treated GSTIN as optional, which allowed company identity to rely too heavily on name spelling.
+
+Resolution in source/database:
+
+- new stock companies require GSTIN
+- existing selected companies reuse their saved GSTIN
+- conflicting GSTIN is rejected
+- `stock_companies.gstin` is now `NOT NULL`
+- current production stock companies were checked before the constraint and none had missing GSTIN
+
+Production-live form acceptance remains required after deployment.
