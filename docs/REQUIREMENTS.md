@@ -549,3 +549,33 @@ When supplied, the server must:
 - reject multiple GSTIN candidates rather than guess
 - never log the GSTIN value on validation failure
 - expose only safe diagnostic metadata such as lengths/counts/shape validity when troubleshooting
+
+
+### R53 - SPA-like stock mutations
+
+The protected Stock page must not require a browser document reload for normal Opening Stock or current-stock adjustment actions.
+
+Use client-side mutation requests and refresh server-rendered stock data through the Next.js App Router after a successful mutation.
+
+A hard navigation fallback may remain available for non-JavaScript form compatibility, but the normal authenticated operator path should preserve the single-page feel.
+
+### R54 - Manual current-stock adjustment
+
+An operator may set the current physical quantity of an existing stock product.
+
+The system must:
+
+- accept a target quantity greater than or equal to zero
+- lock the product while calculating its current derived balance
+- compute only the delta needed to reach the target
+- append an immutable `adjustment` ledger movement when the delta is non-zero
+- return `no_change` without writing a movement when the target already equals the balance
+- reject/fail closed if the existing derived balance is already negative/inconsistent
+- never rewrite Opening Stock, Stock OUT, correction, or reversal history
+- keep the operation server-only and protected by the existing operations session and same-origin request check
+
+### R55 - Adjustment idempotency and concurrency
+
+Manual stock adjustments must remain safe if the operator double-clicks, the browser retries, or two requests serialize close together.
+
+The database operation must lock the product row before deriving the balance. Replaying the same idempotency key must not add a second delta; a later request targeting an already-achieved quantity must return `no_change`.
