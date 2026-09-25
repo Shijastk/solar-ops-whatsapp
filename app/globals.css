@@ -1667,3 +1667,19 @@ ul {
     grid-template-columns: 1fr;
   }
 }
+
+
+.stockConfirm {
+  grid-template-columns: auto 1fr !important;
+  align-items: start;
+  gap: 10px !important;
+  font-weight: 400 !important;
+  color: #aebac1 !important;
+}
+
+.stockConfirm input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: #00a884;
+}
