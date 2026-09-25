@@ -155,7 +155,7 @@ Current source also includes:
 - optional fail-closed Groq verification of selectable-text PDFs
 - automatic verified bill summaries with WhatsApp Edit/Delete controls
 - protected one-time Opening Stock setup at `/ops/stock`
-- mobile-first light stock-management UI with scoped design tokens
+- mobile-first light stock-management UI with scoped design tokens and a mobile Add Stock bottom sheet
 - SPA-like stock add/adjust interactions without normal browser page reloads
 - immutable outgoing stock ledger with Stock OUT, manual adjustments, corrections, and reversals
 - WhatsApp-first company/product alias resolution for spelling mismatches
