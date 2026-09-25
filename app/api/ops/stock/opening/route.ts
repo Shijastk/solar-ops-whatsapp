@@ -32,6 +32,8 @@ export async function POST(request: Request) {
       unit: String(form.get("unit") ?? ""),
       hsnSac: String(form.get("hsnSac") ?? ""),
       quantity: String(form.get("quantity") ?? ""),
+      allowSimilarCompany: form.get("allowSimilarCompany") === "on",
+      allowSimilarProduct: form.get("allowSimilarProduct") === "on",
     });
 
     target.searchParams.set("result", result.status);
