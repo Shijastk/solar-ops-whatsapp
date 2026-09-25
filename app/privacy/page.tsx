@@ -12,7 +12,7 @@ const sections = [
     title: "1. What Solar Ops does",
     paragraphs: [
       "Solar Ops is an internal operations prototype that receives WhatsApp messages and supported media through the WhatsApp Business Platform so operational communications can be stored and handled securely.",
-      "Solar Ops may allow an authorized operator to manually reply to an operational WhatsApp message from the protected internal dashboard. It does not automatically send marketing messages or advertising through WhatsApp.",
+      "Solar Ops may allow an authorized operator to manually reply to an operational WhatsApp message from the protected internal dashboard. When the optional document-automation feature is enabled, the service may also send a transactional bill summary and correction controls in response to a document received from that same WhatsApp user. It does not automatically send marketing messages or advertising through WhatsApp.",
     ],
   },
   {
@@ -25,21 +25,21 @@ const sections = [
   {
     title: "3. Why we process this information",
     paragraphs: [
-      "We process this information to receive and preserve operational communications, maintain message history, prevent duplicate processing, extract useful structured fields from supported business documents for operator review, securely retain raw media temporarily, support authorized manual replies, troubleshoot delivery problems, and validate the reliability and security of the Solar Ops workflow.",
+      "We process this information to receive and preserve operational communications, maintain message history, prevent duplicate processing, extract and verify useful structured fields from supported business documents, securely retain raw media temporarily, support authorized replies and corrections, troubleshoot delivery problems, and validate the reliability and security of the Solar Ops workflow.",
       "We do not use WhatsApp message content for advertising, profiling, or sale to third parties.",
     ],
   },
   {
     title: "4. Service providers",
     paragraphs: [
-      "Solar Ops relies on service providers to operate the system. WhatsApp and Meta deliver messages through the WhatsApp Business Platform, Vercel hosts the application runtime, and Supabase provides database and private file storage services.",
+      "Solar Ops relies on service providers to operate the system. WhatsApp and Meta deliver messages through the WhatsApp Business Platform, Vercel hosts the application runtime, Supabase provides database and private file storage services, and Groq may process bounded extracted document text when optional AI-assisted document verification is enabled.",
       "These providers may process data as necessary to provide their services and are subject to their own terms and privacy practices.",
     ],
   },
   {
     title: "5. Storage and retention",
     paragraphs: [
-      "Operational message metadata, operator-approved document fields, bounded extracted document text, and manual reply history may be stored in the Solar Ops database. Supported raw media is copied from temporary Meta download locations into private Supabase Storage and is intended to be temporary working data rather than permanent archival storage.",
+      "Operational message metadata, verified or manually corrected document fields, bounded extracted document text, document workflow audit records, and reply history may be stored in the Solar Ops database. Supported raw media is copied from temporary Meta download locations into private Supabase Storage and is intended to be temporary working data rather than permanent archival storage.",
       "Successfully processed raw media is cleanup-targeted after approximately 24 hours, although scheduler timing may delay deletion. Structured operational records may be retained longer when needed for the operational purpose, security, troubleshooting, or applicable legal obligations. Test fixtures used by the automated integration suite are designed to be deleted after each test run.",
     ],
   },
@@ -94,7 +94,7 @@ export default function PrivacyPolicy() {
 
         <p className="eyebrow">PRIVACY</p>
         <h1 className="policyTitle">Privacy Policy</h1>
-        <p className="policyMeta">Effective date: 21 September 2026</p>
+        <p className="policyMeta">Effective date: 25 September 2026</p>
 
         <p className="policyIntro">
           This Privacy Policy explains how the Solar Ops WhatsApp ingestion
