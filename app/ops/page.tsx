@@ -9,7 +9,6 @@ import {
 } from "@/lib/ops-auth";
 import {
   buildOpsConversations,
-  getOpsSummary,
   listOpsDraftsForMessages,
   listOpsMessages,
   listOpsOutboundMessages,
@@ -18,6 +17,7 @@ import {
   type OpsOutboundMessage,
 } from "@/lib/ops-data";
 import { isWithinCustomerServiceWindow } from "@/lib/replies";
+import { ChatTimeline, OpsLiveRefresh } from "./ops-live-client";
 
 export const dynamic = "force-dynamic";
 
@@ -263,7 +263,7 @@ function OutboundBubble({ message }: { message: OpsOutboundMessage }) {
       <div className="waBubble waOutboundBubble">
         <p className="waMessageText">{message.body}</p>
         {message.error_message ? (
-          <p className="waSendError">Delivery failed</p>
+          <p className="waSendError">{message.error_message}</p>
         ) : null}
         <footer>
           <span>{message.status}</span>
@@ -288,10 +288,9 @@ export default async function OpsDashboardPage({
   if (!verifyOpsSession(session)) redirect("/ops/login");
 
   const params = await searchParams;
-  const [messages, outbound, summary] = await Promise.all([
+  const [messages, outbound] = await Promise.all([
     listOpsMessages(),
     listOpsOutboundMessages(),
-    getOpsSummary(),
   ]);
   const drafts = await listOpsDraftsForMessages(
     messages.map((message) => message.id),
@@ -327,34 +326,29 @@ export default async function OpsDashboardPage({
   const latestInbound = selected?.messages[selected.messages.length - 1] ?? null;
   const canReply =
     latestInbound && isWithinCustomerServiceWindow(latestInbound.received_at);
+  const lastTimelineEntry = timeline[timeline.length - 1];
+  const lastEventKey = lastTimelineEntry
+    ? lastTimelineEntry.type + "-" + lastTimelineEntry.message.id
+    : "empty";
 
   return (
     <main className="waShell">
-      <header className="waTopbar">
-        <div>
-          <p className="opsBrand">SOLAR OPS</p>
-          <strong>WhatsApp Operations</strong>
-        </div>
-        <div className="waTopActions">
-          <span className={runtimeHealthy ? "waOnline" : "waOffline"}>
-            {runtimeHealthy ? "System online" : "Check config"}
-          </span>
-          <form action="/api/ops/logout" method="post">
-            <button type="submit">Sign out</button>
-          </form>
-        </div>
-      </header>
+      <OpsLiveRefresh />
 
       {(params.reply || params.document) && (
-        <div className="waNotice">
+        <div className="waNotice" role="status">
           {params.reply === "sent" ? "Reply sent." : null}
           {params.reply === "window_closed"
             ? "24-hour reply window is closed. A Meta template would be required."
             : null}
-          {params.reply === "failed" ? "Reply failed. No automatic retry was sent." : null}
+          {params.reply === "failed"
+            ? "Reply failed. The message was not automatically retried."
+            : null}
           {params.reply === "invalid" ? "Reply text was invalid." : null}
           {params.document === "approved" ? "Parsed bill approved." : null}
-          {params.document === "approval_failed" ? "Bill approval was not allowed." : null}
+          {params.document === "approval_failed"
+            ? "Bill approval was not allowed."
+            : null}
           {params.document === "failed" ? "Bill parsing failed." : null}
           {params.document &&
           !["approved", "approval_failed", "failed"].includes(params.document)
@@ -363,48 +357,64 @@ export default async function OpsDashboardPage({
         </div>
       )}
 
-      <section className="waStats">
-        <span>{summary.totalMessages} received</span>
-        <span>{summary.availableFiles} files</span>
-        <span>{summary.reviewDrafts} to review</span>
-        <span>{summary.failedMessages} failed</span>
-      </section>
-
       <div className="waApp">
         <aside className="waConversationList">
+          <header className="waSidebarHeader">
+            <div className="waAvatar waBrandAvatar">S</div>
+            <div className="waSidebarIdentity">
+              <strong>Solar Ops</strong>
+              <span className={runtimeHealthy ? "waOnline" : "waOffline"}>
+                {runtimeHealthy ? "Live" : "Check config"}
+              </span>
+            </div>
+            <form action="/api/ops/logout" method="post">
+              <button className="waHeaderAction" type="submit">
+                Sign out
+              </button>
+            </form>
+          </header>
+
           <div className="waListHeader">
             <h1>Chats</h1>
-            <a href="/ops">Refresh</a>
+            <span>{conversations.length}</span>
           </div>
 
-          {conversations.length === 0 ? (
-            <p className="waEmptyList">No WhatsApp messages yet.</p>
-          ) : (
-            conversations.map((conversation) => {
-              const latest =
-                conversation.messages[conversation.messages.length - 1];
-              return (
-                <a
-                  className={
-                    "waConversation " +
-                    (selected?.key === conversation.key ? "waConversationActive" : "")
-                  }
-                  href={"/ops?conversation=" + conversation.key}
-                  key={conversation.key}
-                >
-                  <div className="waAvatar">
-                    {(conversation.senderName || "W").slice(0, 1).toUpperCase()}
-                  </div>
-                  <div>
-                    <strong>{conversation.senderName || "WhatsApp sender"}</strong>
-                    <span>{maskSender(conversation.senderPhone)}</span>
-                    <p>{documentTitle(latest)}</p>
-                  </div>
-                  <time>{formatTime(conversation.latestReceivedAt)}</time>
-                </a>
-              );
-            })
-          )}
+          <div className="waConversationScroll">
+            {conversations.length === 0 ? (
+              <p className="waEmptyList">No WhatsApp messages yet.</p>
+            ) : (
+              conversations.map((conversation) => {
+                const latest =
+                  conversation.messages[conversation.messages.length - 1];
+                return (
+                  <a
+                    className={
+                      "waConversation " +
+                      (selected?.key === conversation.key
+                        ? "waConversationActive"
+                        : "")
+                    }
+                    href={"/ops?conversation=" + conversation.key}
+                    key={conversation.key}
+                  >
+                    <div className="waAvatar">
+                      {(conversation.senderName || "W")
+                        .slice(0, 1)
+                        .toUpperCase()}
+                    </div>
+                    <div>
+                      <strong>
+                        {conversation.senderName || "WhatsApp sender"}
+                      </strong>
+                      <p>{documentTitle(latest)}</p>
+                      <span>{maskSender(conversation.senderPhone)}</span>
+                    </div>
+                    <time>{formatTime(conversation.latestReceivedAt)}</time>
+                  </a>
+                );
+              })
+            )}
+          </div>
         </aside>
 
         <section className="waChat">
@@ -414,13 +424,17 @@ export default async function OpsDashboardPage({
                 <div className="waAvatar">
                   {(selected.senderName || "W").slice(0, 1).toUpperCase()}
                 </div>
-                <div>
+                <div className="waChatIdentity">
                   <strong>{selected.senderName || "WhatsApp sender"}</strong>
                   <span>{maskSender(selected.senderPhone)}</span>
                 </div>
+                <span className="waLiveLabel">Live updates</span>
               </header>
 
-              <div className="waTimeline">
+              <ChatTimeline
+                conversationKey={selected.key}
+                lastEventKey={lastEventKey}
+              >
                 {timeline.map((entry) =>
                   entry.type === "inbound" ? (
                     <InboundBubble
@@ -435,7 +449,7 @@ export default async function OpsDashboardPage({
                     />
                   ),
                 )}
-              </div>
+              </ChatTimeline>
 
               <footer className="waComposer">
                 {latestInbound && canReply ? (
@@ -452,7 +466,7 @@ export default async function OpsDashboardPage({
                       aria-label="WhatsApp reply"
                       maxLength={2000}
                       name="body"
-                      placeholder="Type a reply…"
+                      placeholder="Type a message"
                       required
                       rows={1}
                     />
