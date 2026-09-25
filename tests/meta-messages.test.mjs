@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { sendWhatsAppTextReply } from "../lib/meta-messages.ts";
+import {
+  sendWhatsAppList,
+  sendWhatsAppReplyButtons,
+  sendWhatsAppTextReply,
+} from "../lib/meta-messages.ts";
 
 const keys = [
   "WHATSAPP_ACCESS_TOKEN",
@@ -69,6 +73,100 @@ describe("sendWhatsAppTextReply", () => {
       context: { message_id: "wamid.inbound-1" },
       type: "text",
       text: { preview_url: false, body: "Received" },
+    });
+  });
+
+  it("sends interactive reply buttons using the documented Cloud API shape", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ messages: [{ id: "wamid.buttons-1" }] }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      sendWhatsAppReplyButtons({
+        recipientPhone: "919999999999",
+        replyToMessageId: "wamid.inbound-1",
+        body: "Bill recorded",
+        buttons: [
+          { id: "so:doc:edit:draft-1", title: "Edit" },
+          { id: "so:doc:delete:draft-1", title: "Delete" },
+        ],
+      }),
+    ).resolves.toBe("wamid.buttons-1");
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toMatchObject({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: "919999999999",
+      context: { message_id: "wamid.inbound-1" },
+      type: "interactive",
+      interactive: {
+        type: "button",
+        body: { text: "Bill recorded" },
+        action: {
+          buttons: [
+            {
+              type: "reply",
+              reply: { id: "so:doc:edit:draft-1", title: "Edit" },
+            },
+            {
+              type: "reply",
+              reply: { id: "so:doc:delete:draft-1", title: "Delete" },
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it("sends interactive edit lists with bounded rows", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ messages: [{ id: "wamid.list-1" }] }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      sendWhatsAppList({
+        recipientPhone: "919999999999",
+        replyToMessageId: "wamid.inbound-1",
+        body: "Choose a field",
+        buttonText: "Choose field",
+        rows: [
+          {
+            id: "so:doc:field:vehicle_number:draft-1",
+            title: "Vehicle number",
+          },
+        ],
+      }),
+    ).resolves.toBe("wamid.list-1");
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toMatchObject({
+      type: "interactive",
+      interactive: {
+        type: "list",
+        action: {
+          button: "Choose field",
+          sections: [
+            {
+              title: "Edit field",
+              rows: [
+                {
+                  id: "so:doc:field:vehicle_number:draft-1",
+                  title: "Vehicle number",
+                },
+              ],
+            },
+          ],
+        },
+      },
     });
   });
 

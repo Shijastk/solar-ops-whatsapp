@@ -66,11 +66,21 @@ SUPABASE_URL=
 SUPABASE_SECRET_KEY=
 SUPABASE_STORAGE_BUCKET=whatsapp-media
 MAX_MEDIA_BYTES=15728640
+
+# Optional; disabled by default
+DOCUMENT_AUTOMATION_ENABLED=false
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_TIMEOUT_MS=7000
 ```
 
 Meta Graph API is intentionally pinned to `v26.0` based on the version table verified for this project on 2026-09-21. Re-check before production rollout or when Meta publishes a v26.0 expiration date.
 
 Never commit real environment values.
+
+Document automation remains disabled unless `DOCUMENT_AUTOMATION_ENABLED=true` and a server-side `GROQ_API_KEY` are both present. Before enabling it for real business documents, enable Groq Zero Data Retention in the Groq console Data Controls.
+
+When enabled, the deterministic parser remains the first extractor. Groq independently extracts the same persisted structured fields using strict JSON Schema output. A draft is automatically recorded only when every compared field/item and deterministic arithmetic check agrees. Any mismatch, timeout, provider error, scanned PDF, or incomplete parser output goes to review instead. Automatic document recording never changes stock.
 
 ## Meta webhook
 
@@ -132,12 +142,14 @@ Current source also includes:
 - WhatsApp-style internal operations UI
 - authorized manual text replies within the active customer-service window
 - outbound delivery-status tracking
+- optional fail-closed Groq verification of selectable-text PDFs
+- automatic verified bill summaries with WhatsApp Edit/Delete controls
 
 Still intentionally excluded:
 
 - OCR for image-only/scanned PDFs
 - automatic stock mutation
-- automatic WhatsApp replies
+- OCR-driven stock mutation
 - template messaging outside the service window
 - customer-facing dashboards
 

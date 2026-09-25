@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
 import { extname } from "node:path";
+import {
+  handleDocumentWorkflowInbound,
+  runDocumentAutomationForDraft,
+} from "@/lib/document-automation";
 import { processPdfBytesForMessage } from "@/lib/document-processing";
 import { getIngestionEnv } from "@/lib/env";
 import { downloadWhatsAppMedia } from "@/lib/meta";
@@ -117,6 +121,18 @@ export async function ingestWhatsAppMessage(
   }
 
   if (!message.media || !MEDIA_TYPES.has(message.type)) {
+    try {
+      await handleDocumentWorkflowInbound(message, persistedMessage.id);
+    } catch (error) {
+      console.warn("WhatsApp document workflow interaction did not complete", {
+        messageStored: true,
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown workflow error",
+      });
+    }
+
     return "stored";
   }
 
@@ -180,6 +196,23 @@ export async function ingestWhatsAppMessage(
           itemCount: parsed.itemCount,
           skippedApproved: parsed.skippedApproved,
         });
+
+        try {
+          const automationResult = await runDocumentAutomationForDraft(
+            parsed.draftId,
+          );
+          console.info("WhatsApp document automation summary", {
+            result: automationResult,
+          });
+        } catch (error) {
+          console.warn("WhatsApp document automation did not complete", {
+            messageStored: true,
+            reason:
+              error instanceof Error
+                ? error.message.slice(0, 180)
+                : "Unknown automation error",
+          });
+        }
       } catch {
         console.warn("WhatsApp PDF parsing did not complete", {
           messageStored: true,

@@ -72,6 +72,13 @@ function documentTitle(message: OpsMessage): string {
 
 function documentStatus(draft: OpsDocumentDraft | undefined): string {
   if (!draft) return "Not parsed";
+  if (draft.workflow_status === "cancelled") return "Deleted";
+  if (draft.workflow_status === "recorded") {
+    if (draft.verification_status === "verified") return "Auto verified";
+    if (draft.verification_status === "manual_override") return "Manually verified";
+    return "Recorded";
+  }
+  if (draft.workflow_status === "review_required") return "Review required";
   if (draft.parse_status === "approved") return "Approved";
   if (draft.parse_status === "ready_for_review") return "Ready to review";
   if (draft.parse_status === "needs_review") return "Needs review";
@@ -101,9 +108,14 @@ function DraftCard({
           <span>PARSED BILL</span>
           <strong>{documentStatus(draft)}</strong>
         </div>
-        <span className={"waParseState waParseState-" + draft.parse_status}>
-          {draft.parse_status.replaceAll("_", " ")}
-        </span>
+        <div className="waParseBadges">
+          <span className={"waParseState waParseState-" + draft.parse_status}>
+            {draft.parse_status.replaceAll("_", " ")}
+          </span>
+          <span className={"waParseState waWorkflowState-" + draft.workflow_status}>
+            {draft.workflow_status.replaceAll("_", " ")}
+          </span>
+        </div>
       </div>
 
       <dl className="waParsedGrid">
@@ -167,15 +179,28 @@ function DraftCard({
         </p>
       ) : null}
 
+      <p className="waVerificationMeta">
+        Verification: {draft.verification_status.replaceAll("_", " ")}
+        {draft.verification_provider
+          ? " · " +
+            draft.verification_provider +
+            (draft.verification_model ? " / " + draft.verification_model : "")
+          : ""}
+        {" · Stock unchanged"}
+      </p>
+
       <div className="waParseActions">
-        {draft.parse_status === "ready_for_review" ? (
+        {draft.parse_status === "ready_for_review" &&
+        draft.workflow_status !== "cancelled" ? (
           <form action={"/api/ops/messages/" + message.id + "/approve"} method="post">
             <button className="waApproveButton" type="submit">
               Approve data
             </button>
           </form>
         ) : null}
-        {draft.parse_status !== "approved" && message.storage_path ? (
+        {draft.parse_status !== "approved" &&
+        draft.workflow_status !== "cancelled" &&
+        message.storage_path ? (
           <form action={"/api/ops/messages/" + message.id + "/parse"} method="post">
             <button className="waSecondaryAction" type="submit">
               Parse again

@@ -67,18 +67,23 @@ Current Milestone 2 scope:
 - human approval of complete parser drafts
 - manual WhatsApp text replies from the internal UI while Meta's 24-hour customer-service window is open
 - outbound delivery-status tracking
+- optional Groq second-pass verification of selectable-text PDFs
+- automatic transactional WhatsApp summaries only after fail-closed verification
+- WhatsApp Edit/Delete workflow controls with audit-safe corrections/cancellation
 
-The user has approved parsing and manual operator replies.
+The user has approved parsing, manual operator replies, and this bounded automatic document-summary workflow.
 
 Still do not invent stock semantics. Parsed or approved document data must not silently mutate stock/current-stock records until the business rule for stock IN/OUT and opening balance is explicitly defined.
 
 Image-only/scanned PDFs that do not contain a usable text layer must be marked for OCR rather than guessed.
 
+AI verification is not an authority by itself. Automatic recording requires deterministic parser output, an independent Groq extraction, exact normalized agreement across all persisted structured fields/items, and deterministic arithmetic checks. Any uncertainty must fail closed to review. Automatic recording means document workflow state only; it must not mutate stock.
+
 Still out of scope unless explicitly approved:
 
 - automatic stock mutation
 - customer-facing portal
-- automatic WhatsApp replies
+- any automatic WhatsApp message that is not part of the approved verified-document workflow
 - template messaging outside the 24-hour service window
 - n8n
 - paid automation services

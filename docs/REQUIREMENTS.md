@@ -337,6 +337,83 @@ A failed or queued duplicate reply request must never be displayed as successful
 
 When Meta rejects a send request, persist only bounded, redacted provider diagnostics suitable for internal troubleshooting. Never persist access tokens, full phone numbers, raw payloads, or provider trace identifiers.
 
-### N11 - No extra paid parsing provider
+### N11 - Local parsing remains the first pass
 
-Selectable-text PDF parsing is local/server-side. No OCR or LLM provider is introduced for this phase.
+Selectable-text PDF parsing remains local/server-side. A later explicitly approved verification milestone may use a low-cost external verifier, but external AI must never become the sole authority for operational data.
+
+## Milestone 2D - Fail-closed verified document automation
+
+Status: approved for implementation. Provider/live validation is separate from source completion.
+
+### R30 - Deterministic parser remains primary
+
+The existing semantic PDF parser remains the first extraction pass. Do not replace it with an AI-only parser.
+
+### R31 - Independent Groq verification
+
+When document automation is enabled, bounded extracted text may be sent server-side to Groq using the configured small production model.
+
+The verifier must use strict JSON Schema output and independently extract every persisted structured document field and every line-item field. The deterministic parser result itself must not be supplied as the answer to copy.
+
+### R32 - Fail-closed agreement
+
+Automatic document recording is allowed only when:
+
+- the deterministic parser is complete enough for review
+- the Groq response passes local runtime validation
+- every persisted structured field agrees after documented normalization
+- item count and every item description/HSN/quantity/unit/rate/amount agree
+- deterministic line arithmetic checks pass
+- the document is not cancelled
+
+Any mismatch, missing text layer, timeout, rate limit, provider error, invalid output, or incomplete parser state must become `review_required`. Never choose whichever extractor looks more likely.
+
+### R33 - Auto-record is not stock mutation
+
+A safely verified document may move to the document workflow state `recorded` and parser state `approved`.
+
+This state is document-data acceptance only. It must not create stock IN, stock OUT, opening balance, returns, corrections, or current-stock changes.
+
+### R34 - Automatic WhatsApp summary
+
+While the customer-service window is open, a safely verified inbound PDF may trigger one idempotent transactional WhatsApp summary containing only the operational fields needed for quick review.
+
+The summary must state that stock is unchanged.
+
+### R35 - Interactive correction controls
+
+The automatic summary may include WhatsApp interactive Edit/Delete controls.
+
+Edit should use a bounded menu where possible. After choosing a field, the operator may type only the corrected value. Corrections must be validated and recorded as a human override with previous/new values retained in the audit log.
+
+### R36 - Audit-safe delete
+
+Delete must require an explicit destructive confirmation.
+
+Delete means cancellation from the active document workflow. It must not hard-delete the structured document or its audit history, and it must not mutate stock.
+
+### R37 - Sender binding
+
+Interactive action IDs are not authorization by themselves.
+
+Every Edit/Delete/correction action must be resolved server-side and rejected unless the target document belongs to the same stored WhatsApp sender that submitted the interaction.
+
+### R38 - Automatic outbound idempotency
+
+Automatic summaries, review notices, edit prompts, and delete confirmations must use deterministic request identifiers so webhook retries cannot create duplicate sends.
+
+### R39 - Feature flag and secret isolation
+
+Document automation must be disabled by default.
+
+It may be enabled only when `DOCUMENT_AUTOMATION_ENABLED=true` and a server-side `GROQ_API_KEY` is configured. The Groq key must never be exposed in browser code, logs, reports, or committed source.
+
+### N12 - AI privacy and cost boundary
+
+Only bounded extracted text is sent to the verifier; the raw PDF is not sent to Groq in this milestone.
+
+Before real business documents are processed through Groq, enable Zero Data Retention in Groq Data Controls. Keep the configured model and request volume compatible with the approved low-cost/free-tier prototype unless the user explicitly approves paid usage.
+
+### N13 - Provider failure must not break inbound storage
+
+Once the original WhatsApp message/media is safely stored, Groq verification or automatic WhatsApp-send failure must not retroactively mark that stored inbound media as failed. The document workflow should fail closed to review while the original ingestion record remains intact.

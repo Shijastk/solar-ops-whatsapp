@@ -221,3 +221,45 @@ Decision: The protected `/ops` UI automatically refreshes server-rendered data o
 Reason: The current dashboard uses a custom HttpOnly operations session and server-only Supabase admin access. Adding a browser-side Supabase Realtime subscription would require a separate client authorization model and must not be implemented by exposing the server secret or weakening RLS.
 
 The polling layer is intentionally small, pauses effectively when the tab is hidden, and preserves the operator's scroll position when they move upward to inspect history. This is a near-live UI behavior, not a claim of true push realtime.
+
+## D024 - Use Groq only as an independent second verifier
+
+Decision: Keep the deterministic semantic parser as the first extractor and use Groq only as an independent second extraction pass.
+
+Reason: A single LLM output cannot provide a 100% semantic-accuracy guarantee. Requiring normalized agreement between two different extraction methods makes automatic acceptance stricter and allows uncertainty to fail closed.
+
+The selected default verifier is `openai/gpt-oss-20b` because current Groq documentation lists it as a production model with strict JSON Schema structured output support and it fits the prototype's low-volume cost target.
+
+## D025 - Verify the entire persisted draft before auto-recording
+
+Decision: Automatic `recorded/approved` state requires agreement across every persisted structured document field and every line-item field, plus deterministic arithmetic checks.
+
+Reason: Verifying only the few fields displayed in the WhatsApp summary could falsely imply that unverified hidden fields were approved.
+
+Any mismatch sends the document to review. False review is preferred over false automatic acceptance.
+
+## D026 - Automatic document summary is approved, general auto-messaging is not
+
+Decision: A verified inbound PDF may automatically receive one transactional summary with Edit/Delete controls inside the active customer-service window.
+
+Reason: This follows the existing WhatsApp workflow and removes the need for a confirmation reply on every correct bill.
+
+This approval does not authorize marketing, arbitrary automatic replies, or template messaging outside the service window.
+
+## D027 - Human corrections override verification but remain auditable
+
+Decision: A correction explicitly entered by the operator after selecting an Edit field is stored as `manual_override`, with previous/new values in `document_actions`.
+
+Reason: Human correction is intentional business input. It should not be mislabeled as AI-verified, and history must remain inspectable.
+
+## D028 - Delete means workflow cancellation, not destructive data deletion
+
+Decision: The WhatsApp Delete action requires confirmation and changes the document workflow to `cancelled`.
+
+Reason: Hard deletion would remove the evidence needed to understand later corrections, duplicates, or future stock reversals. Cancellation removes the record from active work while preserving audit history.
+
+## D029 - Stock automation remains blocked
+
+Decision: Neither deterministic parsing, Groq verification, automatic recording, human edits, nor Delete may mutate inventory.
+
+Reason: The current document represents an outgoing/dispatch flow, while a separate stock-IN document sample and rules for opening balance, returns, cancellations, corrections, product identity, units, and negative stock have not yet been defined.

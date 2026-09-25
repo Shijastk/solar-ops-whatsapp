@@ -94,6 +94,12 @@ SUPABASE_URL
 SUPABASE_SECRET_KEY
 SUPABASE_STORAGE_BUCKET=whatsapp-media
 MAX_MEDIA_BYTES=15728640
+
+# Optional verified-document automation
+DOCUMENT_AUTOMATION_ENABLED=false
+GROQ_API_KEY
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_TIMEOUT_MS=7000
 ```
 
 Important temporary test state:
@@ -288,3 +294,55 @@ If it is not configured, the prototype temporarily accepts the existing webhook 
 Available files are opened using a 5-minute signed Supabase URL generated only after server-side session validation.
 
 The dashboard also provides authenticated manual deletion for raw files. Message rows and metadata remain after file deletion.
+
+## Phase H - Optional verified-document automation
+
+Do not enable this feature until the corresponding database migration is applied and the production code deployment is READY.
+
+### H1. Groq privacy control
+
+In the Groq Console, open Data Controls and enable Zero Data Retention before sending real business document text to the verifier.
+
+Do not paste the Groq API key into chat, GitHub, documentation, issues, or client-side code.
+
+### H2. Vercel server environment
+
+Add the production server-side secret:
+
+`GROQ_API_KEY`
+
+Keep:
+
+`GROQ_MODEL=openai/gpt-oss-20b`
+
+`GROQ_TIMEOUT_MS=7000`
+
+Only after ZDR and the key are ready, set:
+
+`DOCUMENT_AUTOMATION_ENABLED=true`
+
+A deployment/redeployment must use the updated environment before the feature is considered enabled.
+
+### H3. Health
+
+`/api/health` reports an `automation` validation object without exposing the key.
+
+Core `configured` health remains based on webhook + ingestion, so an optional automation setup problem cannot hide the fact that inbound capture itself is healthy.
+
+### H4. Safe live acceptance
+
+Use a non-sensitive selectable-text PDF.
+
+Expected:
+
+- deterministic parser completes
+- Groq independently extracts the full persisted draft
+- exact normalized agreement + arithmetic checks => `recorded / verified`
+- one WhatsApp summary arrives with Edit/Delete controls
+- summary says stock is unchanged
+- Edit -> choose field -> send corrected value => `manual_override` plus audit row
+- Delete -> confirmation => `cancelled`, not hard-deleted
+- any mismatch/provider failure => `review_required`, no silent auto-record
+- no stock/current-stock table is touched
+
+Do not describe this provider flow as live-verified until those observations are made on the production deployment.
