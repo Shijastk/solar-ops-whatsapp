@@ -27,6 +27,8 @@ const stockResultSchema = z.object({
     "company_alias_conflict",
     "opening_created",
     "opening_exists",
+    "potential_company_duplicate",
+    "potential_product_duplicate",
   ]),
   draft_id: z.string().uuid().optional(),
   company_id: z.string().uuid().optional(),
@@ -94,6 +96,8 @@ export function validateOpeningStockInput(input: {
   unit: string;
   hsnSac?: string | null;
   quantity: number | string;
+  allowSimilarCompany?: boolean;
+  allowSimilarProduct?: boolean;
 }) {
   const companyId = input.companyId?.trim() || null;
   const companyName = input.companyName?.trim() || null;
@@ -137,6 +141,8 @@ export function validateOpeningStockInput(input: {
     unitNormalized: normalizeStockUnit(unit),
     hsnSac,
     quantity,
+    allowSimilarCompany: Boolean(input.allowSimilarCompany),
+    allowSimilarProduct: Boolean(input.allowSimilarProduct),
   };
 }
 
@@ -151,6 +157,110 @@ export async function createOpeningStock(input: {
 }): Promise<StockResult> {
   const parsed = validateOpeningStockInput(input);
   const supabase = getSupabaseAdmin();
+
+  const companies = await listStockCompanies();
+  let resolvedCompanyId = parsed.companyId;
+
+  if (!resolvedCompanyId && parsed.companyGstin) {
+    resolvedCompanyId =
+      companies.find((company) => company.gstin === parsed.companyGstin)?.id ??
+      null;
+  }
+
+  if (!resolvedCompanyId && parsed.companyNormalized) {
+    resolvedCompanyId =
+      companies.find(
+        (company) =>
+          normalizeStockName(company.canonical_name) ===
+          parsed.companyNormalized,
+      )?.id ?? null;
+  }
+
+  if (
+    !resolvedCompanyId &&
+    parsed.companyName &&
+    !parsed.allowSimilarCompany
+  ) {
+    const target = tokenSet(parsed.companyName);
+    const similar = companies
+      .map((company) => ({
+        company,
+        score: similarityScore(target, tokenSet(company.canonical_name)),
+      }))
+      .filter((entry) => entry.score >= 0.78)
+      .sort((left, right) => right.score - left.score)[0];
+
+    if (similar) {
+      return stockResultSchema.parse({
+        status: "potential_company_duplicate",
+        company_id: similar.company.id,
+        company_name: similar.company.canonical_name,
+      });
+    }
+  }
+
+  if (resolvedCompanyId && !parsed.allowSimilarProduct) {
+    const normalizedUnit = parsed.unitNormalized;
+    const { data: existingData, error: existingError } = await supabase
+      .from("stock_products")
+      .select("id, company_id, canonical_name, unit, hsn_sac")
+      .eq("company_id", resolvedCompanyId)
+      .eq("normalized_unit", normalizedUnit)
+      .eq("active", true)
+      .limit(100);
+
+    if (existingError) {
+      throw new Error(
+        "Failed to validate opening stock product identity: " +
+          existingError.message,
+      );
+    }
+
+    const existingProducts = z.array(productSchema).parse(existingData ?? []);
+    const targetTokens = tokenSet(parsed.productName);
+    const targetNumbers = numericTokens(targetTokens);
+
+    const potential = existingProducts
+      .filter(
+        (product) =>
+          normalizeProductDescription(product.canonical_name) !==
+          parsed.productNormalized,
+      )
+      .map((product) => {
+        const productTokens = tokenSet(product.canonical_name);
+        const sameNumbers =
+          equalStringArrays(targetNumbers, numericTokens(productTokens));
+        const sameHsn =
+          Boolean(parsed.hsnSac) &&
+          Boolean(product.hsn_sac) &&
+          normalizeIdentifier(parsed.hsnSac ?? "") ===
+            normalizeIdentifier(product.hsn_sac ?? "");
+
+        return {
+          product,
+          score: similarityScore(targetTokens, productTokens),
+          sameNumbers,
+          sameHsn,
+        };
+      })
+      .filter(
+        (entry) =>
+          entry.sameHsn ||
+          (entry.sameNumbers && entry.score >= 0.72) ||
+          entry.score >= 0.88,
+      )
+      .sort((left, right) => right.score - left.score)[0];
+
+    if (potential) {
+      return stockResultSchema.parse({
+        status: "potential_product_duplicate",
+        company_id: resolvedCompanyId,
+        product_id: potential.product.id,
+        product_name: potential.product.canonical_name,
+      });
+    }
+  }
+
   const { data, error } = await supabase.rpc("create_opening_stock", {
     p_company_id: parsed.companyId,
     p_company_name: parsed.companyName,
@@ -363,6 +473,23 @@ export async function listProductSuggestions(input: {
     )
     .slice(0, Math.min(Math.max(input.limit ?? 8, 1), 9))
     .map((entry) => entry.product);
+}
+
+function normalizeIdentifier(value: string): string {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function numericTokens(value: Set<string>): string[] {
+  return [...value]
+    .filter((token) => /^\d+(?:\.\d+)?$/.test(token))
+    .sort();
+}
+
+function equalStringArrays(left: string[], right: string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
 }
 
 function tokenSet(value: string): Set<string> {
