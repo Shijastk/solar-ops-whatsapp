@@ -186,7 +186,7 @@ function DraftCard({
             draft.verification_provider +
             (draft.verification_model ? " / " + draft.verification_model : "")
           : ""}
-        {" · Stock unchanged"}
+        {" · Stock: " + draft.stock_status.replaceAll("_", " ")}
       </p>
 
       <div className="waParseActions">
@@ -310,6 +310,7 @@ export default async function OpsDashboardPage({
     conversation?: string;
     reply?: string;
     document?: string;
+    stock?: string;
   }>;
 }) {
   const cookieStore = await cookies();
@@ -364,7 +365,7 @@ export default async function OpsDashboardPage({
     <main className="waShell">
       <OpsLiveRefresh />
 
-      {(params.reply || params.document) && (
+      {(params.reply || params.document || params.stock) && (
         <div className="waNotice" role="status">
           {params.reply === "sent" ? "Reply sent." : null}
           {params.reply === "window_closed"
@@ -386,6 +387,9 @@ export default async function OpsDashboardPage({
           !["approved", "approval_failed", "failed"].includes(params.document)
             ? "Bill parsed: " + params.document.replaceAll("_", " ") + "."
             : null}
+          {params.stock
+            ? " Stock: " + params.stock.replaceAll("_", " ") + "."
+            : null}
         </div>
       )}
 
@@ -399,11 +403,16 @@ export default async function OpsDashboardPage({
                 {runtimeHealthy ? "Live" : "Check config"}
               </span>
             </div>
-            <form action="/api/ops/logout" method="post">
-              <button className="waHeaderAction" type="submit">
-                Sign out
-              </button>
-            </form>
+            <div className="waHeaderActions">
+              <a className="waHeaderAction" href="/ops/stock">
+                Stock
+              </a>
+              <form action="/api/ops/logout" method="post">
+                <button className="waHeaderAction" type="submit">
+                  Sign out
+                </button>
+              </form>
+            </div>
           </header>
 
           <div className="waListHeader">
