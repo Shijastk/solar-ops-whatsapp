@@ -2,47 +2,106 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   compareDocumentVerification,
   extractDocumentWithGroq,
+  type GroqDocumentExtraction,
   type VerificationCandidate,
 } from "../lib/document-verifier";
 
 const candidate: VerificationCandidate = {
   documentType: "Delivery Note",
   supplierName: "SUN GRID SOLUTIONS LIMITED",
+  supplierGstin: "32ABCDE1234F1Z5",
+  supplierAddress: null,
   documentNumber: "SG000123",
+  documentDate: "2026-05-05",
   ewayBillNumber: "531999351397",
+  consigneeName: "CUSTOMER ONE",
+  consigneeAddress: null,
+  consigneeGstin: null,
+  consigneePincode: "673600",
+  consigneePhone: null,
+  buyerName: "CUSTOMER ONE",
+  buyerAddress: null,
+  buyerGstin: null,
+  buyerPincode: "673600",
+  buyerPhone: null,
+  destination: null,
+  dispatchFromAddress: null,
   vehicleNumber: "KL11AA1234",
-  totalAmount: 176026.86,
+  approximateDistanceKm: 45,
+  ewayGeneratedAtText: null,
+  ewayValidUntilText: null,
+  supplyType: "Outward-Job Work",
+  transactionType: "Bill From - Dispatch From",
+  taxableAmount: 138000,
+  cgstAmount: null,
+  sgstAmount: null,
+  totalAmount: 138000,
   items: [
     {
       description: "Solar 560 Wp Topcon Panel",
+      hsnSac: "8541",
       quantity: 6,
       unit: "NOS",
+      rate: 20000,
+      amount: 120000,
     },
     {
       description: "3 KW Inverter",
+      hsnSac: "8541",
       quantity: 1,
       unit: "NOS",
+      rate: 18000,
+      amount: 18000,
     },
   ],
 };
 
-const extraction = {
+const extraction: GroqDocumentExtraction = {
   document_type: "delivery note",
   supplier_name: "Sun Grid Solutions Limited",
+  supplier_gstin: "32ABCDE1234F1Z5",
+  supplier_address: null,
   document_number: "SG-000123",
+  document_date: "2026-05-05",
   eway_bill_number: "531999351397",
+  consignee_name: "Customer One",
+  consignee_address: null,
+  consignee_gstin: null,
+  consignee_pincode: "673600",
+  consignee_phone: null,
+  buyer_name: "Customer One",
+  buyer_address: null,
+  buyer_gstin: null,
+  buyer_pincode: "673600",
+  buyer_phone: null,
+  destination: null,
+  dispatch_from_address: null,
   vehicle_number: "KL 11 AA 1234",
-  total_amount: 176026.86,
+  approximate_distance_km: 45,
+  eway_generated_at_text: null,
+  eway_valid_until_text: null,
+  supply_type: "Outward Job Work",
+  transaction_type: "Bill From Dispatch From",
+  taxable_amount: 138000,
+  cgst_amount: null,
+  sgst_amount: null,
+  total_amount: 138000,
   items: [
     {
       description: "Solar 560-Wp Topcon Panel",
+      hsn_sac: "8541",
       quantity: 6,
       unit: "nos",
+      rate: 20000,
+      amount: 120000,
     },
     {
       description: "3 KW Inverter",
+      hsn_sac: "8541",
       quantity: 1,
       unit: "NOS",
+      rate: 18000,
+      amount: 18000,
     },
   ],
 };
@@ -70,7 +129,7 @@ afterEach(() => {
 });
 
 describe("compareDocumentVerification", () => {
-  it("accepts only an independent extraction that matches the parser", () => {
+  it("accepts only an independent extraction that matches every persisted field", () => {
     expect(compareDocumentVerification(candidate, extraction)).toMatchObject({
       verified: true,
       mismatches: [],
@@ -78,7 +137,7 @@ describe("compareDocumentVerification", () => {
   });
 
   it("fails closed when quantity or item count changes", () => {
-    const changedQuantity = {
+    const changedQuantity: GroqDocumentExtraction = {
       ...extraction,
       items: [
         { ...extraction.items[0], quantity: 60 },
@@ -112,6 +171,38 @@ describe("compareDocumentVerification", () => {
 
     expect(result.verified).toBe(false);
     expect(result.mismatches).toContain("vehicle_number");
+  });
+
+  it("fails closed when parser arithmetic is internally inconsistent", () => {
+    const result = compareDocumentVerification(
+      {
+        ...candidate,
+        items: [
+          {
+            ...candidate.items[0],
+            amount: 119999,
+          },
+          candidate.items[1],
+        ],
+        taxableAmount: 137999,
+        totalAmount: 137999,
+      },
+      {
+        ...extraction,
+        taxable_amount: 137999,
+        total_amount: 137999,
+        items: [
+          {
+            ...extraction.items[0],
+            amount: 119999,
+          },
+          extraction.items[1],
+        ],
+      },
+    );
+
+    expect(result.verified).toBe(false);
+    expect(result.mismatches).toContain("item_arithmetic_1");
   });
 });
 
@@ -159,6 +250,7 @@ describe("extractDocumentWithGroq", () => {
         strict: true,
       },
     });
+    expect(body.include_reasoning).toBe(false);
     expect(body.stream).toBe(false);
     expect(JSON.stringify(body)).not.toContain("groq-test-secret");
   });
