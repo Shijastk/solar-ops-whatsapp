@@ -83,7 +83,9 @@ function normalizeCompanyGstin(value: string | null | undefined): string | null 
 }
 
 export function resolveMobileCompany(
-  draft: OpsDocumentDraft | undefined,
+  draft:
+    | Pick<OpsDocumentDraft, "stock_company_id" | "supplier_gstin">
+    | undefined,
   companies: StockCompany[],
 ): StockCompany | null {
   if (!draft) return null;
