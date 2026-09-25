@@ -5,6 +5,7 @@ import { getDocumentAutomationEnv } from "@/lib/env";
 const MAX_GROQ_SOURCE_CHARS = 24_000;
 const MONEY_TOLERANCE = 0.05;
 const QUANTITY_TOLERANCE = 0.001;
+const MAX_PROVIDER_ERROR_CHARS = 320;
 
 const nullableString = z.string().nullable();
 const nullableNumber = z.number().finite().nullable();
@@ -543,6 +544,47 @@ export function compareDocumentVerification(
   };
 }
 
+function sanitizeProviderErrorText(value: string): string | null {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return null;
+  return compact
+    .replace(/Bearer\s+[A-Za-z0-9._~+\/-]+/gi, "Bearer [redacted]")
+    .slice(0, MAX_PROVIDER_ERROR_CHARS);
+}
+
+async function readGroqErrorDetail(response: Response): Promise<string | null> {
+  try {
+    const body = await response.text();
+    if (!body) return null;
+
+    try {
+      const parsed = JSON.parse(body) as {
+        error?: { message?: unknown; type?: unknown; code?: unknown };
+      };
+      const parts = [
+        typeof parsed.error?.type === "string" ? parsed.error.type : null,
+        typeof parsed.error?.code === "string" ||
+        typeof parsed.error?.code === "number"
+          ? String(parsed.error.code)
+          : null,
+        typeof parsed.error?.message === "string"
+          ? parsed.error.message
+          : null,
+      ].filter((part): part is string => Boolean(part));
+
+      if (parts.length > 0) {
+        return sanitizeProviderErrorText(parts.join(": "));
+      }
+    } catch {
+      // Fall back to a bounded plain-text provider error.
+    }
+
+    return sanitizeProviderErrorText(body);
+  } catch {
+    return null;
+  }
+}
+
 export async function extractDocumentWithGroq(
   extractedText: string,
 ): Promise<GroqDocumentExtraction> {
@@ -599,8 +641,11 @@ export async function extractDocumentWithGroq(
   );
 
   if (!response.ok) {
+    const detail = await readGroqErrorDetail(response);
     throw new Error(
-      "Groq verification request failed with HTTP " + response.status,
+      "Groq verification request failed with HTTP " +
+        response.status +
+        (detail ? ": " + detail : ""),
     );
   }
 
