@@ -3,6 +3,9 @@ import { openingStockErrorState } from "../app/api/ops/stock/opening/route";
 
 describe("opening stock route error mapping", () => {
   it("maps validation failures to safe UI states", () => {
+    expect(openingStockErrorState("GSTIN is required for a new company")).toBe(
+      "gstin_required",
+    );
     expect(
       openingStockErrorState(
         "GSTIN must match the standard 15-character GSTIN format",
