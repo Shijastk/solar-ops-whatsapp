@@ -4,6 +4,7 @@ import {
   isPdfOpsMessage,
   maskMobilePhone,
   readMobileBearerToken,
+  resolveMobileCompany,
   verifyMobileRequest,
 } from "../lib/mobile-api";
 
@@ -73,4 +74,49 @@ describe("mobile API authentication helpers", () => {
       }),
     ).toBe(true);
   });
+  it("resolves mobile company by canonical mapping or exact GSTIN only", () => {
+    const companies = [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        canonical_name: "Solar Supplier One",
+        gstin: "32ABMCS6908B1ZG",
+      },
+      {
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        canonical_name: "Solar Supplier Two",
+        gstin: "32AAAAA0000A1Z5",
+      },
+    ];
+
+    expect(
+      resolveMobileCompany(
+        {
+          stock_company_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          supplier_gstin: "32ABMCS6908B1ZG",
+        },
+        companies,
+      )?.id,
+    ).toBe("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+
+    expect(
+      resolveMobileCompany(
+        {
+          stock_company_id: null,
+          supplier_gstin: "32 ABMCS 6908 B1ZG",
+        },
+        companies,
+      )?.id,
+    ).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+
+    expect(
+      resolveMobileCompany(
+        {
+          stock_company_id: null,
+          supplier_gstin: "32ZZZZZ9999Z9Z9",
+        },
+        companies,
+      ),
+    ).toBeNull();
+  });
+
 });
