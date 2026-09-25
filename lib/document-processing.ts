@@ -249,7 +249,7 @@ export async function processStoredPdfMessage(
 
 export async function approveDocumentDraft(
   messageId: string,
-): Promise<void> {
+): Promise<string> {
   const supabase = getSupabaseAdmin();
 
   const { data: draft, error: readError } = await supabase
@@ -286,4 +286,6 @@ export async function approveDocumentDraft(
   if (error) {
     throw new Error("Failed to approve document draft: " + error.message);
   }
+
+  return draft.id;
 }
