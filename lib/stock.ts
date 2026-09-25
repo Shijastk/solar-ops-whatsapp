@@ -17,6 +17,7 @@ const stockResultSchema = z.object({
     "company_unmapped",
     "needs_product_match",
     "insufficient_stock",
+    "duplicate_document",
     "invalid_item",
     "not_ready",
     "inconsistent",
