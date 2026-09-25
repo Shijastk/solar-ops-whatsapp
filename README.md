@@ -78,6 +78,16 @@ Meta Graph API is intentionally pinned to `v26.0` based on the version table ver
 
 Never commit real environment values.
 
+## Opening stock and outgoing inventory
+
+The current outgoing/dispatch bill workflow can reduce inventory after document approval.
+
+Use the protected `/ops/stock` screen to enter the physical Opening Stock once per company/product/unit. Current balances are derived from immutable ledger movements rather than a mutable balance field.
+
+Stock OUT is fail-closed and all-or-nothing per bill. Company/product spelling variations are never auto-mapped by fuzzy matching; WhatsApp suggestions require an explicit operator selection, and the approved alias is then remembered. Insufficient stock, invalid units/HSN, or unresolved identities deduct nothing. Quantity edits create correction movements and Delete restores prior deductions through reversal entries.
+
+Automatic Stock IN is not implemented until a receiving-document sample and rules are explicitly approved.
+
 Document automation remains disabled unless `DOCUMENT_AUTOMATION_ENABLED=true` and a server-side `GROQ_API_KEY` are both present. Before enabling it for real business documents, enable Groq Zero Data Retention in the Groq console Data Controls.
 
 When enabled, the deterministic parser remains the first extractor. Groq independently extracts the same persisted structured fields using strict JSON Schema output. A draft is automatically recorded only when every compared field/item and deterministic arithmetic check agrees. Any mismatch, timeout, provider error, scanned PDF, or incomplete parser output goes to review instead. Automatic document recording never changes stock.
@@ -144,11 +154,14 @@ Current source also includes:
 - outbound delivery-status tracking
 - optional fail-closed Groq verification of selectable-text PDFs
 - automatic verified bill summaries with WhatsApp Edit/Delete controls
+- protected one-time Opening Stock setup at `/ops/stock`
+- immutable outgoing stock ledger with idempotent Stock OUT, corrections, and reversals
+- WhatsApp-first company/product alias resolution for spelling mismatches
 
 Still intentionally excluded:
 
 - OCR for image-only/scanned PDFs
-- automatic stock mutation
+- automatic Stock IN / receiving-document mutation
 - OCR-driven stock mutation
 - template messaging outside the service window
 - customer-facing dashboards
