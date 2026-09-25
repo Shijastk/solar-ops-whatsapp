@@ -503,7 +503,9 @@ export default function StockManager({
         <button
           aria-controls="stock-add-sheet"
           aria-expanded={isAddSheetOpen}
-          className="stockAddFab"
+          className={
+            "stockAddFab" + (isAddSheetOpen ? " stockAddFabHidden" : "")
+          }
           onClick={openAddSheet}
           ref={addButtonRef}
           type="button"
