@@ -434,7 +434,6 @@ async function startTrip(
     await sendOpsReply({
       requestId: deterministicUuid("trip-already-open:" + storedMessageId),
       replyToMessageId: storedMessageId,
-      knownInboundAt,
       body:
         "🚚 ഒരു trip ഇതിനകം open ആണ്. " +
         stateText +
@@ -712,7 +711,7 @@ async function closeTripCollection(
     await sendOpsReply({
       requestId: deterministicUuid("trip-done-no-active:" + storedMessageId),
       replyToMessageId: storedMessageId,
-      knownInboundAt,
+      knownInboundAt: message.timestamp,
       body: "Open trip ഒന്നുമില്ല. പുതിയ trip തുടങ്ങാൻ trip എന്ന് അയക്കൂ.",
     });
     return;
@@ -740,6 +739,7 @@ async function closeTripCollection(
       await sendOpsReply({
         requestId: deterministicUuid("trip-driver-name-reminder:" + storedMessageId),
         replyToMessageId: storedMessageId,
+        knownInboundAt: message.timestamp,
         body: "പുതിയ driver-ന്റെ പേര് അയക്കൂ.",
       });
     }
@@ -752,6 +752,7 @@ async function closeTripCollection(
       await sendOpsReply({
         requestId: deterministicUuid("trip-empty:" + storedMessageId),
         replyToMessageId: storedMessageId,
+        knownInboundAt: message.timestamp,
         body: "ഈ trip-ൽ bill ഒന്നും ലഭിച്ചിട്ടില്ല. PDF bills അയച്ച ശേഷം done എന്ന് അയക്കൂ.",
       });
       return;
@@ -773,7 +774,7 @@ async function closeTripCollection(
     await sendOpsReply({
       requestId: deterministicUuid("trip-processing:" + trip.id),
       replyToMessageId: storedMessageId,
-      knownInboundAt,
+      knownInboundAt: message.timestamp,
       body:
         "⏳ " +
         pending +
