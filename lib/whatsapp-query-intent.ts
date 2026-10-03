@@ -9,6 +9,8 @@ const supportedIntentSchema = z.enum([
   "pending_bill_count",
   "latest_bill",
   "stock_balance",
+  "today_trip_summary",
+  "latest_trip",
   "unsupported",
 ]);
 
@@ -39,6 +41,8 @@ const strictResponseSchema = {
         "pending_bill_count",
         "latest_bill",
         "stock_balance",
+        "today_trip_summary",
+        "latest_trip",
         "unsupported",
       ],
     },
@@ -69,6 +73,14 @@ const DOMAIN_HINTS = [
   "പാനൽ",
   "ഇൻവെർട്ടർ",
   "സാധനം",
+  "trip",
+  "trips",
+  "route",
+  "driver",
+  "ട്രിപ്പ്",
+  "ട്രിപ്പുകൾ",
+  "റൂട്ട്",
+  "ഡ്രൈവർ",
 ];
 
 export type AiOperationalQueryClassification = z.infer<
@@ -155,7 +167,7 @@ export async function classifyOperationalQueryWithGroq(
           {
             role: "system",
             content:
-              "Classify a Solar Ops operator question. Do not answer the question and do not invent business facts. Supported intents only: today_bill_count = asks how many PDF bills were received today; pending_bill_count = asks how many bills need review/are pending; latest_bill = asks for the most recently received bill; stock_balance = asks the current stock quantity for one named product. For stock_balance, copy only the product phrase from the user into product_query; use null when the product is not named. For every other request, including customer history, routes, trips, totals other than these counts, edits, commands, greetings, explanations, or ambiguous meaning, return unsupported. Understand Malayalam, Manglish and English.",
+              "Classify a Solar Ops operator question. Do not answer the question and do not invent business facts. Supported intents only: today_bill_count = asks how many PDF bills were received today; pending_bill_count = asks how many bills need review/are pending; latest_bill = asks for the most recently received bill; stock_balance = asks the current stock quantity for one named product; today_trip_summary = asks which trips were completed today; latest_trip = asks for the latest completed trip. For stock_balance, copy only the product phrase from the user into product_query; use null when the product is not named. For every other request, including customer history, routes, trips, totals other than these counts, edits, commands, greetings, explanations, or ambiguous meaning, return unsupported. Understand Malayalam, Manglish and English.",
           },
           {
             role: "user",
