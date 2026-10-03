@@ -94,6 +94,7 @@ const balanceSchema = z.object({
   unit: z.string(),
   hsn_sac: z.string().nullable(),
   current_quantity: z.coerce.number(),
+  balance_known: z.boolean(),
 });
 
 const stockMovementSchema = z.object({
@@ -118,7 +119,7 @@ const stockMovementSchema = z.object({
   draft_id: z.string().uuid().nullable(),
   document_number: z.string().nullable(),
   document_date: z.string().nullable(),
-  balance_after: z.coerce.number(),
+  balance_after: z.coerce.number().nullable(),
 });
 
 export type StockResult = z.infer<typeof stockResultSchema>;
@@ -818,10 +819,28 @@ export async function createOpeningStock(input: {
     });
 
     if (duplicateDecision?.status === "opening_exists") {
-      return recordStockIn({
+      const adjusted = await adjustStockBalance({
         productId: duplicateDecision.product_id,
-        quantity: parsed.quantity,
+        targetQuantity: parsed.quantity,
         actionKey: input.actionKey ?? randomUUID(),
+      });
+
+      if (adjusted.status === "not_ready" || adjusted.status === "inconsistent") {
+        return stockResultSchema.parse({
+          status: adjusted.status,
+          product_id: duplicateDecision.product_id,
+          product_name: duplicateDecision.product_name,
+        });
+      }
+
+      return stockResultSchema.parse({
+        status:
+          adjusted.status === "no_change" || adjusted.status === "already_adjusted"
+            ? "opening_exists"
+            : "opening_created",
+        product_id: duplicateDecision.product_id,
+        product_name: duplicateDecision.product_name,
+        current_quantity: parsed.quantity,
       });
     }
 
@@ -883,7 +902,7 @@ export async function listStockBalances(): Promise<StockBalance[]> {
   const { data, error } = await supabase
     .from("stock_balances")
     .select(
-      "product_id, company_id, company_name, company_gstin, product_name, unit, hsn_sac, current_quantity",
+      "product_id, company_id, company_name, company_gstin, product_name, unit, hsn_sac, current_quantity, balance_known",
     )
     .order("company_name", { ascending: true })
     .order("product_name", { ascending: true });
