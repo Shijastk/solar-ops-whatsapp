@@ -71,6 +71,33 @@ function buildStoragePath(
   ].join("/");
 }
 
+async function sendUnsupportedMessageAck(
+  message: NormalizedWhatsAppMessage,
+  storedMessageId: string,
+) {
+  const labels: Record<string, string> = {
+    image: "Image",
+    video: "Video",
+    sticker: "Sticker",
+    document: "Document",
+    location: "Location",
+    contacts: "Contact",
+    reaction: "Reaction",
+  };
+
+  const label = labels[message.type] ?? "Message";
+  await sendOpsReply({
+    requestId: deterministicUuid(
+      "unsupported-message:" + message.messageId,
+    ),
+    replyToMessageId: storedMessageId,
+    knownInboundAt: message.timestamp,
+    body:
+      label +
+      " ലഭിച്ചു. PDF bill, text, അല്ലെങ്കിൽ voice message അയച്ചാൽ Solar Ops അത് process ചെയ്ത് മറുപടി നൽകും.",
+  });
+}
+
 export async function ingestWhatsAppMessage(
   message: NormalizedWhatsAppMessage,
 ): Promise<"stored" | "ignored"> {
@@ -153,8 +180,12 @@ export async function ingestWhatsAppMessage(
   }
 
   if (!message.media || !MEDIA_TYPES.has(message.type)) {
+    let workflowResult: "handled" | "ignored" = "ignored";
     try {
-      await handleDocumentWorkflowInbound(message, persistedMessage.id);
+      workflowResult = await handleDocumentWorkflowInbound(
+        message,
+        persistedMessage.id,
+      );
     } catch (error) {
       console.warn("WhatsApp document workflow interaction did not complete", {
         messageStored: true,
@@ -163,6 +194,30 @@ export async function ingestWhatsAppMessage(
             ? error.message.slice(0, 180)
             : "Unknown workflow error",
       });
+    }
+
+    if (workflowResult === "ignored") {
+      try {
+        await sendUnsupportedMessageAck(message, persistedMessage.id);
+      } catch (error) {
+        console.warn("WhatsApp unsupported-message acknowledgement failed", {
+          reason:
+            error instanceof Error
+              ? error.message.slice(0, 180)
+              : "Unknown acknowledgement error",
+        });
+      }
+    } else {
+      try {
+        await sendUnsupportedMessageAck(message, persistedMessage.id);
+      } catch (error) {
+        console.warn("WhatsApp stored-media acknowledgement failed", {
+          reason:
+            error instanceof Error
+              ? error.message.slice(0, 180)
+              : "Unknown acknowledgement error",
+        });
+      }
     }
 
     return "stored";
