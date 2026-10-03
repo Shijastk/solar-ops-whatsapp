@@ -377,3 +377,20 @@ Decision: the Flutter app uses authenticated `/api/mobile/v1/*` endpoints on the
 The mobile login exchanges the existing operations access key for the same signed, expiring operations-session format used by the protected web surface. The app stores only that short-lived session token. Supabase service-role access remains server-side.
 
 This keeps inventory/document rules centralized and avoids duplicating privileged database logic in the APK.
+
+## D044 - Operational questions use a deterministic fast path before AI
+
+Decision: inbound operator questions with a clear supported intent are answered from stored structured data using narrow database queries. Groq is not called for these exact intents.
+
+The initial intents are today's PDF-bill count, pending-bill count, latest-bill summary, and exact canonical/approved-alias stock balance.
+
+Reason: the operational source of truth is already in Postgres after ingestion. Re-reading PDFs, loading broad history, or calling an LLM for simple counts/balances would add latency, token cost, and new failure modes without adding accuracy.
+
+Safety boundaries:
+
+- document Edit sessions are resolved before query routing
+- stock identity remains exact/fail-closed; fuzzy similarity is still suggestion-only
+- automatic query replies stay inside the existing WhatsApp customer-service window and use the existing outbound idempotency layer
+- this decision extends D026 only for direct replies to bounded operator questions; it does not authorize marketing, unsolicited messaging, or arbitrary AI-generated automation
+- future AI intent fallback may interpret language, but the final facts must come from targeted database retrieval
+
