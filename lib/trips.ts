@@ -507,21 +507,37 @@ async function loadTripDrafts(ids: string[]): Promise<TripDraftRow[]> {
     .in("id", ids);
 
   if (error) throw new Error("Failed to load trip bill drafts: " + error.message);
-  return (data ?? []) as TripDraftRow[];
+
+  const byId = new Map(
+    ((data ?? []) as TripDraftRow[]).map((draft) => [draft.id, draft]),
+  );
+  return ids
+    .map((id) => byId.get(id))
+    .filter((draft): draft is TripDraftRow => Boolean(draft));
 }
 
-function chooseMostFrequent(values: Array<string | null>): string | null {
+export function choosePrimaryDestination(
+  values: Array<string | null>,
+): string | null {
   const counts = new Map<string, number>();
+  let best: string | null = null;
+  let bestCount = 0;
+
   for (const value of values) {
     const compact = value?.trim();
     if (!compact) continue;
-    counts.set(compact, (counts.get(compact) ?? 0) + 1);
+
+    const count = (counts.get(compact) ?? 0) + 1;
+    counts.set(compact, count);
+
+    // Strictly greater preserves the first-uploaded destination when counts tie.
+    if (count > bestCount) {
+      best = compact;
+      bestCount = count;
+    }
   }
-  return (
-    [...counts.entries()].sort(
-      (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
-    )[0]?.[0] ?? null
-  );
+
+  return best;
 }
 
 async function sendDriverPicker(
@@ -601,7 +617,7 @@ async function finalizeTripCollection(
   const failed = docs.filter((doc) => doc.processing_status === "failed").length;
 
   const destinations = drafts.map((draft) => cleanDestination(draft.destination));
-  const primaryDestination = chooseMostFrequent(destinations);
+  const primaryDestination = choosePrimaryDestination(destinations);
   const primaryDraft =
     drafts.find(
       (draft) => cleanDestination(draft.destination) === primaryDestination,
