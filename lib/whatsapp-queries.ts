@@ -541,18 +541,24 @@ export async function handleFastWhatsAppQuery(
     resolver = "ai_intent";
   }
 
+  const lookupStartedAt = performance.now();
   const body = await answerFastQuery(query);
+  const lookupDurationMs = Math.round(performance.now() - lookupStartedAt);
 
+  const sendStartedAt = performance.now();
   await sendOpsReply({
     requestId: deterministicUuid("fast-query:" + message.messageId),
     replyToMessageId: storedMessageId,
     body,
     knownInboundAt: message.timestamp,
   });
+  const sendDurationMs = Math.round(performance.now() - sendStartedAt);
 
   console.info("Fast WhatsApp operational query completed", {
     intent: query.type,
     resolver,
+    lookupDurationMs,
+    sendDurationMs,
     durationMs: Math.round(performance.now() - startedAt),
   });
 
