@@ -22,6 +22,7 @@ type PersistedSendInput = {
   replyToMessageId: string;
   body: string;
   messageKind: "text" | "interactive";
+  knownInboundAt?: string | Date;
   send: (target: {
     recipientPhone: string;
     whatsappMessageId: string;
@@ -53,58 +54,68 @@ async function sendPersistedReply(input: PersistedSendInput): Promise<SendResult
 
   const supabase = getSupabaseAdmin();
 
-  const { data: duplicate, error: duplicateError } = await supabase
-    .from("whatsapp_outbound_messages")
-    .select("status, meta_message_id")
-    .eq("request_id", input.requestId)
-    .maybeSingle();
+  const [duplicateResult, targetResult] = await Promise.all([
+    supabase
+      .from("whatsapp_outbound_messages")
+      .select("status, meta_message_id")
+      .eq("request_id", input.requestId)
+      .maybeSingle(),
+    supabase
+      .from("whatsapp_messages")
+      .select("id, whatsapp_message_id, sender_phone, received_at")
+      .eq("id", input.replyToMessageId)
+      .maybeSingle(),
+  ]);
 
-  if (duplicateError) {
+  if (duplicateResult.error) {
     throw new Error(
-      "Failed to check reply idempotency: " + duplicateError.message,
+      "Failed to check reply idempotency: " + duplicateResult.error.message,
     );
   }
-  if (duplicate) {
+  if (duplicateResult.data) {
     return {
-      status: duplicate.status,
-      metaMessageId: duplicate.meta_message_id,
+      status: duplicateResult.data.status,
+      metaMessageId: duplicateResult.data.meta_message_id,
       duplicate: true,
     };
   }
 
-  const { data: target, error: targetError } = await supabase
-    .from("whatsapp_messages")
-    .select("id, whatsapp_message_id, sender_phone")
-    .eq("id", input.replyToMessageId)
-    .maybeSingle();
-
-  if (targetError) {
-    throw new Error("Failed to load reply target: " + targetError.message);
+  if (targetResult.error) {
+    throw new Error("Failed to load reply target: " + targetResult.error.message);
   }
+  const target = targetResult.data;
   if (!target) {
     throw new Error("Reply target was not found");
   }
 
-  const { data: latestInbound, error: latestError } = await supabase
-    .from("whatsapp_messages")
-    .select("received_at")
-    .eq("sender_phone", target.sender_phone)
-    .order("received_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  if (input.knownInboundAt) {
+    if (!isWithinCustomerServiceWindow(input.knownInboundAt)) {
+      throw new Error(
+        "The 24-hour WhatsApp customer service window is closed",
+      );
+    }
+  } else {
+    const { data: latestInbound, error: latestError } = await supabase
+      .from("whatsapp_messages")
+      .select("received_at")
+      .eq("sender_phone", target.sender_phone)
+      .order("received_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (latestError) {
-    throw new Error(
-      "Failed to inspect WhatsApp service window: " + latestError.message,
-    );
-  }
-  if (
-    !latestInbound ||
-    !isWithinCustomerServiceWindow(latestInbound.received_at)
-  ) {
-    throw new Error(
-      "The 24-hour WhatsApp customer service window is closed",
-    );
+    if (latestError) {
+      throw new Error(
+        "Failed to inspect WhatsApp service window: " + latestError.message,
+      );
+    }
+    if (
+      !latestInbound ||
+      !isWithinCustomerServiceWindow(latestInbound.received_at)
+    ) {
+      throw new Error(
+        "The 24-hour WhatsApp customer service window is closed",
+      );
+    }
   }
 
   const { error: queueError } = await supabase
@@ -184,6 +195,7 @@ export async function sendOpsReply(input: {
   requestId: string;
   replyToMessageId: string;
   body: string;
+  knownInboundAt?: string | Date;
 }): Promise<SendResult> {
   return sendPersistedReply({
     ...input,
