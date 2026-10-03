@@ -1,5 +1,9 @@
 import { normalizeProductDescription } from "@/lib/document-parser";
 import { deterministicUuid } from "@/lib/idempotency";
+import {
+  classifyOperationalQueryWithGroq,
+  type AiOperationalQueryClassification,
+} from "@/lib/whatsapp-query-intent";
 import { sendOpsReply } from "@/lib/replies";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
@@ -152,6 +156,20 @@ export function parseFastWhatsAppQuery(
   }
 
   return null;
+}
+
+export function mapAiClassificationToFastQuery(
+  classification: AiOperationalQueryClassification,
+): FastWhatsAppQuery | null {
+  if (classification.intent === "unsupported") return null;
+
+  if (classification.intent === "stock_balance") {
+    return classification.product_query
+      ? { type: "stock_balance", productQuery: classification.product_query }
+      : { type: "stock_product_required" };
+  }
+
+  return { type: classification.intent };
 }
 
 export function indiaDayBounds(now = new Date()): {
@@ -401,10 +419,21 @@ export async function handleFastWhatsAppQuery(
 ): Promise<"handled" | "ignored"> {
   if (message.type !== "text" || !message.textBody) return "ignored";
 
-  const query = parseFastWhatsAppQuery(message.textBody);
-  if (!query) return "ignored";
-
   const startedAt = performance.now();
+  let resolver: "deterministic" | "ai_intent" = "deterministic";
+  let query = parseFastWhatsAppQuery(message.textBody);
+
+  if (!query) {
+    const classification = await classifyOperationalQueryWithGroq(
+      message.textBody,
+    );
+    if (!classification) return "ignored";
+
+    query = mapAiClassificationToFastQuery(classification);
+    if (!query) return "ignored";
+    resolver = "ai_intent";
+  }
+
   const body = await answerFastQuery(query);
 
   await sendOpsReply({
@@ -415,6 +444,7 @@ export async function handleFastWhatsAppQuery(
 
   console.info("Fast WhatsApp operational query completed", {
     intent: query.type,
+    resolver,
     durationMs: Math.round(performance.now() - startedAt),
   });
 
