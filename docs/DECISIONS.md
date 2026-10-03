@@ -412,3 +412,11 @@ This does not change D034 for inventory mutation. Fuzzy search does not save ali
 
 Reason: requiring exact spelling adds unnecessary operator friction for read-only questions, while silently changing inventory identity would be unsafe.
 
+## D047 - Product creation identity is deterministic and cannot be AI-overridden
+
+Decision: opening-stock product identity uses local deterministic normalization plus a company/unit-scoped indexed candidate search. AI is not part of this decision.
+
+Hard-equivalent wording variants such as singular/plural inventory nouns cannot be bypassed with the existing `allowSimilarProduct` confirmation. The confirmation remains available only for soft similarity warnings where the products may genuinely be distinct.
+
+Reason: inventory identity is an accounting boundary. Local deterministic rules are faster, cheaper, reproducible, testable, and safer than model inference for this job.
+
