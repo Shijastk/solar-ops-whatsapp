@@ -107,6 +107,15 @@ const DOMAIN_HINTS = [
   "ട്രിപ്പുകൾ",
   "റൂട്ട്",
   "ഡ്രൈവർ",
+  "summary",
+  "week",
+  "month",
+  "year",
+  "ആഴ്ച",
+  "വാരം",
+  "മാസം",
+  "വർഷം",
+  "സമ്മറി",
 ];
 
 export type AiOperationalQueryClassification = z.infer<
