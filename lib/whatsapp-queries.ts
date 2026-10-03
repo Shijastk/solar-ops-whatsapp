@@ -1,0 +1,422 @@
+import { normalizeProductDescription } from "@/lib/document-parser";
+import { deterministicUuid } from "@/lib/idempotency";
+import { sendOpsReply } from "@/lib/replies";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const MAX_STOCK_MATCHES = 8;
+
+export type FastWhatsAppQuery =
+  | { type: "today_bill_count" }
+  | { type: "pending_bill_count" }
+  | { type: "latest_bill" }
+  | { type: "stock_balance"; productQuery: string }
+  | { type: "stock_product_required" };
+
+const BILL_TERMS = [
+  "bill",
+  "bills",
+  "invoice",
+  "invoices",
+  "ബിൽ",
+  "ബില്ല്",
+  "ബില്ലുകൾ",
+];
+
+const COUNT_TERMS = [
+  "count",
+  "how many",
+  "number",
+  "ethra",
+  "എത്ര",
+  "എണ്ണം",
+];
+
+const TODAY_TERMS = [
+  "today",
+  "innu",
+  "innathe",
+  "ഇന്ന്",
+  "ഇന്നത്തെ",
+];
+
+const PENDING_TERMS = [
+  "pending",
+  "review",
+  "pendingulla",
+  "പെൻഡിങ്",
+  "പെൻഡിംഗ്",
+  "പരിശോധിക്കാനുള്ള",
+  "കാത്തിരിക്കുന്ന",
+];
+
+const LATEST_TERMS = [
+  "latest",
+  "last bill",
+  "recent bill",
+  "avasana",
+  "അവസാന",
+  "അവസാനത്തെ",
+  "ലാസ്റ്റ്",
+];
+
+const STOCK_TERMS = ["stock", "സ്റ്റോക്ക്"];
+
+const STOCK_QUESTION_TERMS = [
+  "balance",
+  "available",
+  "availability",
+  "remaining",
+  "left",
+  "qty",
+  "quantity",
+  "ethra",
+  "undo",
+  "bakki",
+  "എത്ര",
+  "ബാക്കി",
+  "ഉണ്ടോ",
+  "ഉണ്ട്",
+  "എണ്ണം",
+];
+
+function normalizeQueryText(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[?!,;:()[\]{}"'’“”]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function includesAny(value: string, terms: string[]): boolean {
+  return terms.some((term) => value.includes(term));
+}
+
+function extractStockProductQuery(value: string): string | null {
+  let cleaned = value.normalize("NFKC");
+
+  cleaned = cleaned
+    .replace(
+      /\b(?:stock|balance|available|availability|remaining|left|qty|quantity|how|many|much|is|there|what|current|please|tell|me|of|ethra|undo|bakki|aanu|aan)\b/gi,
+      " ",
+    )
+    .replace(
+      /സ്റ്റോക്ക്|എത്രയാണ്|എത്ര|ബാക്കി|ഉണ്ടോ|ഉണ്ട്|എണ്ണം|എന്താണ്|പറയാമോ|പറയൂ/g,
+      " ",
+    )
+    .replace(/[?!,;:()[\]{}"'’“”]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) return null;
+
+  const normalized = normalizeProductDescription(cleaned);
+  return normalized ? cleaned : null;
+}
+
+export function parseFastWhatsAppQuery(
+  text: string,
+): FastWhatsAppQuery | null {
+  const normalized = normalizeQueryText(text);
+  if (!normalized) return null;
+
+  const hasBill = includesAny(normalized, BILL_TERMS);
+  const hasCount = includesAny(normalized, COUNT_TERMS);
+
+  if (hasBill && includesAny(normalized, PENDING_TERMS)) {
+    return { type: "pending_bill_count" };
+  }
+
+  if (
+    hasBill &&
+    hasCount &&
+    includesAny(normalized, TODAY_TERMS)
+  ) {
+    return { type: "today_bill_count" };
+  }
+
+  if (hasBill && includesAny(normalized, LATEST_TERMS)) {
+    return { type: "latest_bill" };
+  }
+
+  if (
+    includesAny(normalized, STOCK_TERMS) &&
+    includesAny(normalized, STOCK_QUESTION_TERMS)
+  ) {
+    const productQuery = extractStockProductQuery(text);
+    return productQuery
+      ? { type: "stock_balance", productQuery }
+      : { type: "stock_product_required" };
+  }
+
+  return null;
+}
+
+export function indiaDayBounds(now = new Date()): {
+  start: string;
+  end: string;
+} {
+  const shifted = new Date(now.getTime() + IST_OFFSET_MS);
+  const startShiftedUtc = Date.UTC(
+    shifted.getUTCFullYear(),
+    shifted.getUTCMonth(),
+    shifted.getUTCDate(),
+  );
+
+  return {
+    start: new Date(startShiftedUtc - IST_OFFSET_MS).toISOString(),
+    end: new Date(
+      startShiftedUtc + 24 * 60 * 60 * 1000 - IST_OFFSET_MS,
+    ).toISOString(),
+  };
+}
+
+async function todayBillCount(now = new Date()): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const bounds = indiaDayBounds(now);
+
+  const { count, error } = await supabase
+    .from("whatsapp_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("message_type", "document")
+    .gte("received_at", bounds.start)
+    .lt("received_at", bounds.end)
+    .or("mime_type.eq.application/pdf,original_filename.ilike.%.pdf");
+
+  if (error) {
+    throw new Error("Failed to count today's bills: " + error.message);
+  }
+
+  return count ?? 0;
+}
+
+async function pendingBillCount(): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const { count, error } = await supabase
+    .from("document_drafts")
+    .select("id", { count: "exact", head: true })
+    .in("workflow_status", ["pending", "review_required"]);
+
+  if (error) {
+    throw new Error("Failed to count pending bills: " + error.message);
+  }
+
+  return count ?? 0;
+}
+
+async function latestBillSummary(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { data: message, error: messageError } = await supabase
+    .from("whatsapp_messages")
+    .select("id, original_filename, received_at")
+    .eq("message_type", "document")
+    .or("mime_type.eq.application/pdf,original_filename.ilike.%.pdf")
+    .order("received_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (messageError) {
+    throw new Error("Failed to load latest bill: " + messageError.message);
+  }
+
+  if (!message) {
+    return "ഇതുവരെ PDF ബിൽ ലഭിച്ചിട്ടില്ല.";
+  }
+
+  const { data: draft, error: draftError } = await supabase
+    .from("document_drafts")
+    .select(
+      "supplier_name, document_number, total_amount, workflow_status, stock_status",
+    )
+    .eq("message_id", message.id)
+    .maybeSingle();
+
+  if (draftError) {
+    throw new Error("Failed to load latest bill details: " + draftError.message);
+  }
+
+  const lines = ["ഏറ്റവും പുതിയ ബിൽ:"];
+  if (draft?.supplier_name) lines.push("കമ്പനി: " + draft.supplier_name);
+  if (draft?.document_number) lines.push("ബിൽ നമ്പർ: " + draft.document_number);
+  if (!draft?.document_number && message.original_filename) {
+    lines.push("ഫയൽ: " + message.original_filename);
+  }
+  if (draft?.total_amount !== null && draft?.total_amount !== undefined) {
+    lines.push(
+      "ആകെ: " +
+        new Intl.NumberFormat("en-IN", {
+          style: "currency",
+          currency: "INR",
+          maximumFractionDigits: 2,
+        }).format(Number(draft.total_amount)),
+    );
+  }
+  if (draft?.workflow_status) {
+    lines.push("നില: " + draft.workflow_status.replaceAll("_", " "));
+  }
+  if (draft?.stock_status) {
+    lines.push("സ്റ്റോക്ക്: " + draft.stock_status.replaceAll("_", " "));
+  }
+
+  return lines.join("\n");
+}
+
+type StockMatch = {
+  product_id: string;
+  company_id: string;
+  company_name: string;
+  product_name: string;
+  unit: string;
+  current_quantity: number;
+};
+
+async function stockBalanceAnswer(productQuery: string): Promise<string> {
+  const normalized = normalizeProductDescription(productQuery);
+  if (!normalized) {
+    return "ഏത് സാധനത്തിന്റെ സ്റ്റോക്കാണെന്ന് പേര് കൂടി അയക്കൂ.";
+  }
+
+  const supabase = getSupabaseAdmin();
+  const [canonicalResult, aliasResult] = await Promise.all([
+    supabase
+      .from("stock_products")
+      .select("id")
+      .eq("normalized_name", normalized)
+      .eq("active", true)
+      .limit(MAX_STOCK_MATCHES),
+    supabase
+      .from("stock_product_aliases")
+      .select("product_id")
+      .eq("normalized_alias", normalized)
+      .limit(MAX_STOCK_MATCHES),
+  ]);
+
+  if (canonicalResult.error) {
+    throw new Error(
+      "Failed to resolve stock product: " + canonicalResult.error.message,
+    );
+  }
+  if (aliasResult.error) {
+    throw new Error(
+      "Failed to resolve stock product alias: " + aliasResult.error.message,
+    );
+  }
+
+  const productIds = Array.from(
+    new Set([
+      ...(canonicalResult.data ?? []).map((row) => row.id),
+      ...(aliasResult.data ?? []).map((row) => row.product_id),
+    ]),
+  ).slice(0, MAX_STOCK_MATCHES);
+
+  if (productIds.length === 0) {
+    return (
+      "“" +
+      productQuery.trim().slice(0, 80) +
+      "” എന്ന പേരിൽ കൃത്യമായി match ചെയ്യുന്ന stock item കണ്ടെത്തിയില്ല. " +
+      "തെറ്റായി മറ്റൊരു item തിരഞ്ഞെടുക്കാതിരിക്കാൻ ഞാൻ guess ചെയ്തിട്ടില്ല."
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("stock_balances")
+    .select(
+      "product_id, company_id, company_name, product_name, unit, current_quantity",
+    )
+    .in("product_id", productIds)
+    .limit(MAX_STOCK_MATCHES);
+
+  if (error) {
+    throw new Error("Failed to load stock balance: " + error.message);
+  }
+
+  const matches = (data ?? []).map((row) => ({
+    product_id: row.product_id,
+    company_id: row.company_id,
+    company_name: row.company_name,
+    product_name: row.product_name,
+    unit: row.unit,
+    current_quantity: Number(row.current_quantity),
+  })) as StockMatch[];
+
+  if (matches.length === 0) {
+    return "ഈ സാധനം കണ്ടെത്തി, പക്ഷേ നിലവിലെ stock balance ലഭിച്ചില്ല.";
+  }
+
+  if (matches.length === 1) {
+    const item = matches[0];
+    return [
+      item.product_name,
+      "കമ്പനി: " + item.company_name,
+      "സ്റ്റോക്ക്: " +
+        String(item.current_quantity) +
+        (item.unit ? " " + item.unit : ""),
+    ].join("\n");
+  }
+
+  return [
+    "ഒരേ പേരിലുള്ള stock ഒന്നിലധികം കമ്പനികളിലുണ്ട്:",
+    ...matches.map(
+      (item) =>
+        "• " +
+        item.company_name +
+        " — " +
+        item.product_name +
+        ": " +
+        String(item.current_quantity) +
+        (item.unit ? " " + item.unit : ""),
+    ),
+  ].join("\n");
+}
+
+async function answerFastQuery(
+  query: FastWhatsAppQuery,
+): Promise<string> {
+  if (query.type === "today_bill_count") {
+    const count = await todayBillCount();
+    return "ഇന്ന് ലഭിച്ച PDF ബില്ലുകൾ: " + String(count) + ".";
+  }
+
+  if (query.type === "pending_bill_count") {
+    const count = await pendingBillCount();
+    return "പരിശോധിക്കാനുള്ള ബില്ലുകൾ: " + String(count) + ".";
+  }
+
+  if (query.type === "latest_bill") {
+    return latestBillSummary();
+  }
+
+  if (query.type === "stock_product_required") {
+    return "ഏത് സാധനത്തിന്റെ സ്റ്റോക്കാണെന്ന് product name കൂടി അയക്കൂ.";
+  }
+
+  return stockBalanceAnswer(query.productQuery);
+}
+
+export async function handleFastWhatsAppQuery(
+  message: NormalizedWhatsAppMessage,
+  storedMessageId: string,
+): Promise<"handled" | "ignored"> {
+  if (message.type !== "text" || !message.textBody) return "ignored";
+
+  const query = parseFastWhatsAppQuery(message.textBody);
+  if (!query) return "ignored";
+
+  const startedAt = performance.now();
+  const body = await answerFastQuery(query);
+
+  await sendOpsReply({
+    requestId: deterministicUuid("fast-query:" + message.messageId),
+    replyToMessageId: storedMessageId,
+    body,
+  });
+
+  console.info("Fast WhatsApp operational query completed", {
+    intent: query.type,
+    durationMs: Math.round(performance.now() - startedAt),
+  });
+
+  return "handled";
+}

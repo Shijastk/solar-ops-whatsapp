@@ -530,3 +530,23 @@ Available endpoints:
 Bearer authorization is validated server-side with the signed ops-session verifier. The mobile client never receives Supabase or Meta credentials.
 
 There is still no standalone driver-assignment/delivery table. “Dispatch” data currently means parsed bill fields such as vehicle number, destination, consignee, workflow status and stock status.
+
+## Fast WhatsApp operational query path
+
+lib/whatsapp-queries.ts adds a bounded read-only path for routine operator questions that can be answered from already-persisted data.
+
+The first deterministic intents are:
+
+- today's received PDF-bill count
+- pending/review-required bill count
+- latest bill summary
+- current stock for an exact canonical product name or operator-approved alias
+
+The query path does not call Groq and does not re-open or re-parse a PDF. It reads only the rows required for the selected intent. Stock results come from stock_balances, which remains derived from the immutable ledger rather than a separate mutable cache.
+
+lib/document-automation.ts runs this query handler only after stock/document interactive actions and any active text-correction session. This ordering prevents a correction such as a quantity-only reply from being reinterpreted as an operational question.
+
+Unknown product spelling is not fuzzy-selected for a stock answer. The current fast path fails closed instead of returning a potentially incorrect balance. A later AI language/intent layer may be added only around targeted retrieval; it must not replace database facts or receive raw PDFs.
+
+The outbound response reuses lib/replies.ts, including the active customer-service-window check and deterministic request-id idempotency.
+
