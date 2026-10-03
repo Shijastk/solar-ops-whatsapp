@@ -182,4 +182,34 @@ describe("document parser", () => {
     expect(parsed.items).toHaveLength(2);
   });
 
+
+  it("keeps multiline product description continuation with its delivery row", () => {
+    const source = [
+      "DELIVERY NOTE",
+      "ACME SOLAR LIMITED",
+      "GSTIN/UIN: 32ABCDE1234F1Z5",
+      "Consignee (Ship to)",
+      "CUSTOMER ONE",
+      "Buyer (Bill to)",
+      "CUSTOMER ONE",
+      "Delivery Note No. e-Way Bill No. Dated",
+      "DN001 531999351397 1-Oct-26",
+      "Sl Description of Goods HSN/SAC Quantity Rate per Amount",
+      "1 POM POWER 5 KW ON GRID SOLAR 8541 1.00 NOS 25,000.00 NOS 25,000.00",
+      "INVERTER",
+      "25,000.00",
+      "continued ...",
+    ].join("\n");
+
+    const parsed = parseOperationalDocumentText(source);
+
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.items[0]).toMatchObject({
+      description: "POM POWER 5 KW ON GRID SOLAR INVERTER",
+      normalizedDescription: "pom power 5 kw on grid solar inverter",
+      quantity: 1,
+      unit: "NOS",
+      amount: 25000,
+    });
+  });
 });
