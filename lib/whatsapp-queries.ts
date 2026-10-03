@@ -2,10 +2,12 @@ import { normalizeProductDescription } from "@/lib/document-parser";
 import { deterministicUuid } from "@/lib/idempotency";
 import {
   classifyOperationalQueryWithGroq,
+  looksLikeOperationalQuery,
   type AiOperationalQueryClassification,
 } from "@/lib/whatsapp-query-intent";
 import { sendOpsReply } from "@/lib/replies";
 import {
+  fixedOperationalFallback,
   fixedUniversalFallback,
   generateUniversalWhatsAppReply,
 } from "@/lib/whatsapp-fallback";
@@ -647,10 +649,13 @@ export async function handleFastWhatsAppQuery(
   if (message.type !== "text" || !message.textBody) return "ignored";
 
   const startedAt = performance.now();
-  let resolver: "deterministic" | "ai_intent" = "deterministic";
+  let resolver: "deterministic" | "ai_intent" | "ai_fallback" | "fixed_fallback" =
+    "deterministic";
   let query = parseFastWhatsAppQuery(message.textBody);
+  const likelyOperational = !query && looksLikeOperationalQuery(message.textBody);
+  let operationalClassifierFailed = false;
 
-  if (!query) {
+  if (!query && likelyOperational) {
     try {
       const classification = await classifyOperationalQueryWithGroq(
         message.textBody,
@@ -660,6 +665,7 @@ export async function handleFastWhatsAppQuery(
         if (query) resolver = "ai_intent";
       }
     } catch (error) {
+      operationalClassifierFailed = true;
       console.warn("WhatsApp operational intent classification failed", {
         reason:
           error instanceof Error
@@ -674,13 +680,21 @@ export async function handleFastWhatsAppQuery(
 
   if (query) {
     body = await answerFastQuery(query);
+  } else if (likelyOperational) {
+    resolver = "fixed_fallback";
+    body = fixedOperationalFallback();
+
+    if (operationalClassifierFailed) {
+      console.info("Operational fallback used after classifier failure");
+    }
   } else {
-    resolver = "ai_intent";
+    resolver = "ai_fallback";
     try {
       body =
         (await generateUniversalWhatsAppReply(message.textBody)) ??
         fixedUniversalFallback(message.textBody);
     } catch (error) {
+      resolver = "fixed_fallback";
       console.warn("Universal WhatsApp fallback reply failed", {
         reason:
           error instanceof Error
