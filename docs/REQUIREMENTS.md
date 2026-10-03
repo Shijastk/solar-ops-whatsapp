@@ -721,3 +721,30 @@ Rules:
 - merely similar products may still require explicit operator confirmation because genuinely different products can have very similar names
 - this path must not call Groq or any other AI model
 
+### R64 - Ledger-first inventory from verified outgoing bills
+
+A verified outgoing bill is an inventory event even when no positive stock balance has been entered yet.
+
+Rules:
+
+- approved + recorded bills may create/resolve their company and product catalogue entries from verified structured bill data
+- the outgoing quantity must be recorded as an immutable negative stock-ledger movement
+- current balance may be negative; negative means stock baseline/incoming data is incomplete, not that the outgoing event should be discarded
+- sufficient positive stock is not a prerequisite for recording an outgoing bill
+- duplicate bills remain idempotent
+- corrections and cancellations remain delta/reversal movements
+- manual stock additions are positive ledger events and must be visible in the same history
+- history must be bounded in API responses and ordered newest first for the mobile UI
+
+### R65 - Deterministic operational replies and AI fallback verification
+
+User-facing WhatsApp operational replies must be deterministic templates selected from backend status. AI must not freely generate accounting/stock response text.
+
+For document verification:
+
+- local parser + required-field + arithmetic checks are the first path
+- clean, internally consistent documents may be verified without an AI call
+- AI verification is a fallback for documents that fail the deterministic safety gate
+- address/phone/display formatting is not sufficient by itself to require AI on an otherwise safe document
+- stock-critical fields remain fail-closed
+
