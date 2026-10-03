@@ -109,6 +109,7 @@ const stockMovementSchema = z.object({
   movement_type: z.enum([
     "opening",
     "stock_in",
+    "dispatch_inferred",
     "stock_out",
     "correction",
     "reversal",
