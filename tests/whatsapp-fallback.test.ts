@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  fixedOperationalFallback,
   fixedUniversalFallback,
   generateUniversalWhatsAppReply,
 } from "../lib/whatsapp-fallback";
@@ -27,9 +28,10 @@ afterEach(() => {
 });
 
 describe("universal WhatsApp fallback", () => {
-  it("has a deterministic fallback even when AI is unavailable", () => {
+  it("has deterministic fallbacks even when AI is unavailable", () => {
     expect(fixedUniversalFallback("thanks")).toContain("Trip");
     expect(fixedUniversalFallback("some random message")).toContain("Message");
+    expect(fixedOperationalFallback()).toContain("latest trip");
   });
 
   it("generates a bounded conversational reply with the configured Groq model", async () => {
