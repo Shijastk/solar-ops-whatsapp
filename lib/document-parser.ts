@@ -321,13 +321,27 @@ function cleanupEwayDescription(value: string): string {
   return cleanLine(value);
 }
 
+function isDeliveryDescriptionContinuation(line: string): boolean {
+  if (!line || /^\d/.test(line)) return false;
+  if (/^[₹\d,.\s]+$/.test(line)) return false;
+  if (
+    /^(?:continued|cgst|sgst|total|amount chargeable|hsn\/sac|tax amount|this is a computer generated|delivery note|e-way bill|recd\.|authorised)/i.test(
+      line,
+    )
+  ) {
+    return false;
+  }
+
+  return /^[A-Za-z][A-Za-z0-9 /().&+_-]{1,80}$/.test(line);
+}
+
 function parseDeliveryTableItems(lines: string[]): ParsedDocumentItem[] {
   const items: ParsedDocumentItem[] = [];
   const row =
     /^\s*(\d{1,3})\s+(.+?)\s+(\d{4,8})\s+([\d,.]+)\s+([A-Za-z][A-Za-z0-9.]*)\s+([\d,.]+)\s+(?:[A-Za-z][A-Za-z0-9.]*\s+)?([\d,.]+)\s*$/;
 
-  for (const line of lines) {
-    const match = line.match(row);
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(row);
     if (!match) continue;
 
     const quantity = parseNumber(match[4]);
@@ -335,7 +349,18 @@ function parseDeliveryTableItems(lines: string[]): ParsedDocumentItem[] {
     const amount = parseNumber(match[7]);
     if (quantity === null || amount === null) continue;
 
-    const description = cleanLine(match[2]);
+    const descriptionParts = [cleanLine(match[2])];
+    let cursor = index + 1;
+    while (
+      cursor < lines.length &&
+      isDeliveryDescriptionContinuation(lines[cursor]) &&
+      !row.test(lines[cursor])
+    ) {
+      descriptionParts.push(cleanLine(lines[cursor]));
+      cursor += 1;
+    }
+
+    const description = cleanLine(descriptionParts.join(" "));
     items.push({
       sourceLineNumber: Number(match[1]),
       description,
@@ -346,6 +371,8 @@ function parseDeliveryTableItems(lines: string[]): ParsedDocumentItem[] {
       rate,
       amount,
     });
+
+    index = cursor - 1;
   }
 
   return items;
