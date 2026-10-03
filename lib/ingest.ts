@@ -207,17 +207,6 @@ export async function ingestWhatsAppMessage(
               : "Unknown acknowledgement error",
         });
       }
-    } else {
-      try {
-        await sendUnsupportedMessageAck(message, persistedMessage.id);
-      } catch (error) {
-        console.warn("WhatsApp stored-media acknowledgement failed", {
-          reason:
-            error instanceof Error
-              ? error.message.slice(0, 180)
-              : "Unknown acknowledgement error",
-        });
-      }
     }
 
     return "stored";
@@ -414,6 +403,17 @@ export async function ingestWhatsAppMessage(
         } catch {
           // The inbound media is still stored even when the error reply fails.
         }
+      }
+    } else {
+      try {
+        await sendUnsupportedMessageAck(message, persistedMessage.id);
+      } catch (error) {
+        console.warn("WhatsApp stored-media acknowledgement failed", {
+          reason:
+            error instanceof Error
+              ? error.message.slice(0, 180)
+              : "Unknown acknowledgement error",
+        });
       }
     }
 
