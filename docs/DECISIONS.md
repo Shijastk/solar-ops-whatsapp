@@ -404,3 +404,11 @@ Reason: Malayalam/Manglish wording can vary enough that exact phrase rules alone
 
 Database retrieval remains authoritative. AI decides only which bounded read to attempt; it does not calculate balances, select fuzzy product identities, mutate stock, or generate the factual result.
 
+## D046 - Fuzzy matching is allowed for read-only stock answers, not stock mutation
+
+Decision: a WhatsApp stock-balance question may use indexed typo-tolerant product search when exact canonical/approved-alias matching fails.
+
+This does not change D034 for inventory mutation. Fuzzy search does not save aliases, approve a bill, or select a product for Stock OUT. Numeric/model tokens are guarded, weak matches are rejected, and multiple plausible products are returned separately.
+
+Reason: requiring exact spelling adds unnecessary operator friction for read-only questions, while silently changing inventory identity would be unsafe.
+
