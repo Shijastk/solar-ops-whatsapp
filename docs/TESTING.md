@@ -592,3 +592,5 @@ Automated tests cover:
 
 Database acceptance must verify the search_stock_product_candidates RPC is service-role-only, returns a bounded ranked set, and uses the production stock catalogue without changing aliases or ledger rows.
 
+Fast-query production acceptance should compare lookupDurationMs, sendDurationMs, and total durationMs from redacted runtime logs. The goal is to distinguish database/query cost from Meta outbound-delivery API cost before adding caching or more infrastructure.
+
