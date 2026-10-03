@@ -478,3 +478,9 @@ The deterministic identity fix prevents new hard-equivalent products from being 
 
 The current `Emmvee 560 Wp Topcon Dcr Panel` / `Panels` pair therefore remains two historical product IDs until the opening quantities and ledger history are explicitly reconciled. Automatic summing, deleting, or reassigning these balances is unsafe without confirming which opening quantity represents the intended physical stock.
 
+## K041 - Negative stock means incomplete stock input, not failed outgoing history
+
+With ledger-first inventory, current quantity may be negative when outgoing bills have been recorded before opening/incoming stock is entered. The mobile UI labels this as a pending stock entry rather than hiding the outgoing event.
+
+This is intentional. Operators must add Stock IN/opening data or use an audited physical adjustment when the real quantity becomes known.
+
