@@ -707,3 +707,17 @@ Rules:
 - multiple plausible matches must be shown as separate stock entries rather than silently selecting one
 - the lookup must return only a small bounded candidate set and must not load the full product catalogue into application memory
 
+### R63 - Deterministic product identity before opening stock creation
+
+Opening-stock creation must not depend on AI to decide whether a typed product is new.
+
+Rules:
+
+- resolve product identity inside the selected company and normalized unit
+- use deterministic normalization for casing, punctuation, word order, and a conservative set of singular/plural inventory terms
+- numeric/model tokens remain part of identity; 560 and 580 must never collapse
+- use the indexed database candidate search for spelling similarity instead of loading the full catalogue
+- a hard-equivalent identity such as `Panel` vs `Panels` must return the existing product even when the caller asks to override similar-product warnings
+- merely similar products may still require explicit operator confirmation because genuinely different products can have very similar names
+- this path must not call Groq or any other AI model
+
