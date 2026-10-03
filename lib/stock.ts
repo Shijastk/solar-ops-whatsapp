@@ -71,6 +71,16 @@ const openingProductCandidateSchema = z.object({
   similarity_score: z.coerce.number(),
 });
 
+type OpeningProductCandidate = z.infer<typeof openingProductCandidateSchema>;
+
+export type OpeningProductDuplicateDecision =
+  | {
+      status: "opening_exists" | "potential_product_duplicate";
+      product_id: string;
+      product_name: string;
+    }
+  | null;
+
 const balanceSchema = z.object({
   product_id: z.string().uuid(),
   company_id: z.string().uuid(),
@@ -157,6 +167,85 @@ export function normalizeStockGstin(value: string): string {
   const uniqueCandidates = [...new Set(candidates)];
 
   return uniqueCandidates.length === 1 ? uniqueCandidates[0] : compact;
+}
+
+export function decideOpeningProductDuplicate(input: {
+  productName: string;
+  hsnSac?: string | null;
+  allowSimilarProduct?: boolean;
+  candidates: OpeningProductCandidate[];
+}): OpeningProductDuplicateDecision {
+  const targetIdentity = normalizeProductIdentityName(input.productName);
+  const targetTokens = tokenSet(input.productName);
+  const targetNumbers = numericTokens(targetTokens);
+
+  const hardEquivalent = input.candidates.find((candidate) => {
+    if (
+      normalizeProductIdentityName(candidate.canonical_name) !== targetIdentity
+    ) {
+      return false;
+    }
+
+    if (
+      input.hsnSac &&
+      candidate.hsn_sac &&
+      normalizeIdentifier(input.hsnSac) !== normalizeIdentifier(candidate.hsn_sac)
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+  if (hardEquivalent) {
+    return {
+      status: "opening_exists",
+      product_id: hardEquivalent.product_id,
+      product_name: hardEquivalent.canonical_name,
+    };
+  }
+
+  if (input.allowSimilarProduct) return null;
+
+  const potential = input.candidates
+    .map((candidate) => {
+      const productTokens = tokenSet(candidate.canonical_name);
+      const sameNumbers = equalStringArrays(
+        targetNumbers,
+        numericTokens(productTokens),
+      );
+      const sameHsn =
+        Boolean(input.hsnSac) &&
+        Boolean(candidate.hsn_sac) &&
+        normalizeIdentifier(input.hsnSac ?? "") ===
+          normalizeIdentifier(candidate.hsn_sac ?? "");
+
+      return {
+        candidate,
+        score: similarityScore(targetTokens, productTokens),
+        sameNumbers,
+        sameHsn,
+      };
+    })
+    .filter(
+      (entry) =>
+        entry.sameHsn ||
+        (entry.sameNumbers && entry.score >= 0.72) ||
+        entry.score >= 0.88,
+    )
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.candidate.similarity_score - left.candidate.similarity_score,
+    )[0];
+
+  if (!potential) return null;
+
+  return {
+    status: "potential_product_duplicate",
+    product_id: potential.candidate.product_id,
+    product_name: potential.candidate.canonical_name,
+  };
 }
 
 export function validateOpeningStockInput(input: {
@@ -353,81 +442,20 @@ export async function createOpeningStock(input: {
     const candidates = z
       .array(openingProductCandidateSchema)
       .parse(candidateData ?? []);
-    const targetIdentity = normalizeProductIdentityName(parsed.productName);
-    const targetTokens = tokenSet(parsed.productName);
-    const targetNumbers = numericTokens(targetTokens);
-
-    const hardEquivalent = candidates.find((candidate) => {
-      if (
-        normalizeProductIdentityName(candidate.canonical_name) !==
-        targetIdentity
-      ) {
-        return false;
-      }
-
-      if (
-        parsed.hsnSac &&
-        candidate.hsn_sac &&
-        normalizeIdentifier(parsed.hsnSac) !==
-          normalizeIdentifier(candidate.hsn_sac)
-      ) {
-        return false;
-      }
-
-      return true;
+    const duplicateDecision = decideOpeningProductDuplicate({
+      productName: parsed.productName,
+      hsnSac: parsed.hsnSac,
+      allowSimilarProduct: parsed.allowSimilarProduct,
+      candidates,
     });
 
-    if (hardEquivalent) {
+    if (duplicateDecision) {
       return stockResultSchema.parse({
-        status: "opening_exists",
+        status: duplicateDecision.status,
         company_id: resolvedCompanyId,
-        product_id: hardEquivalent.product_id,
-        product_name: hardEquivalent.canonical_name,
+        product_id: duplicateDecision.product_id,
+        product_name: duplicateDecision.product_name,
       });
-    }
-
-    if (!parsed.allowSimilarProduct) {
-      const potential = candidates
-        .map((candidate) => {
-          const productTokens = tokenSet(candidate.canonical_name);
-          const sameNumbers = equalStringArrays(
-            targetNumbers,
-            numericTokens(productTokens),
-          );
-          const sameHsn =
-            Boolean(parsed.hsnSac) &&
-            Boolean(candidate.hsn_sac) &&
-            normalizeIdentifier(parsed.hsnSac ?? "") ===
-              normalizeIdentifier(candidate.hsn_sac ?? "");
-
-          return {
-            candidate,
-            score: similarityScore(targetTokens, productTokens),
-            sameNumbers,
-            sameHsn,
-          };
-        })
-        .filter(
-          (entry) =>
-            entry.sameHsn ||
-            (entry.sameNumbers && entry.score >= 0.72) ||
-            entry.score >= 0.88,
-        )
-        .sort(
-          (left, right) =>
-            right.score - left.score ||
-            right.candidate.similarity_score -
-              left.candidate.similarity_score,
-        )[0];
-
-      if (potential) {
-        return stockResultSchema.parse({
-          status: "potential_product_duplicate",
-          company_id: resolvedCompanyId,
-          product_id: potential.candidate.product_id,
-          product_name: potential.candidate.canonical_name,
-        });
-      }
     }
   }
 
