@@ -582,3 +582,13 @@ Regression coverage includes:
 
 Provider-live language acceptance remains separate from mocked CI.
 
+## Typo-tolerant stock query verification
+
+Automated tests cover:
+
+- misspelled product text can retain strong fuzzy candidates
+- explicit model-number conflicts are rejected even with a high text-similarity score
+- weak fuzzy matches are rejected instead of guessed
+
+Database acceptance must verify the search_stock_product_candidates RPC is service-role-only, returns a bounded ranked set, and uses the production stock catalogue without changing aliases or ledger rows.
+
