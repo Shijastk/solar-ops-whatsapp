@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  filterSafeFuzzyStockCandidates,
   indiaDayBounds,
   parseFastWhatsAppQuery,
 } from "../lib/whatsapp-queries";
@@ -53,5 +54,49 @@ describe("fast WhatsApp operational query parsing", () => {
       start: "2026-10-02T18:30:00.000Z",
       end: "2026-10-03T18:30:00.000Z",
     });
+  });
+
+  it("allows typo-tolerant stock candidates without requiring exact spelling", () => {
+    const matches = filterSafeFuzzyStockCandidates("Emvee 560 panel", [
+      {
+        product_id: "product-1",
+        matched_name: "emmvee 560 wp topcon dcr panel",
+        similarity_score: 0.61,
+      },
+      {
+        product_id: "product-2",
+        matched_name: "emmvee 560 wp topcon dcr panels",
+        similarity_score: 0.58,
+      },
+    ]);
+
+    expect(matches.map((match) => match.product_id)).toEqual([
+      "product-1",
+      "product-2",
+    ]);
+  });
+
+  it("rejects a fuzzy product candidate when the model number conflicts", () => {
+    expect(
+      filterSafeFuzzyStockCandidates("Emmvee 580 panel", [
+        {
+          product_id: "product-560",
+          matched_name: "emmvee 560 wp topcon dcr panel",
+          similarity_score: 0.92,
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("rejects weak fuzzy product candidates instead of guessing", () => {
+    expect(
+      filterSafeFuzzyStockCandidates("random product", [
+        {
+          product_id: "product-1",
+          matched_name: "electrical fittings",
+          similarity_score: 0.12,
+        },
+      ]),
+    ).toEqual([]);
   });
 });
