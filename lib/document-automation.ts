@@ -2,6 +2,7 @@ import { getDocumentAutomationEnv } from "@/lib/env";
 import {
   compareDocumentVerification,
   extractDocumentWithGroq,
+  verifyDocumentDeterministically,
   type VerificationCandidate,
 } from "@/lib/document-verifier";
 import { deterministicUuid } from "@/lib/idempotency";
@@ -160,7 +161,7 @@ export function buildDocumentSummary(
 
   const stockStatus = input.stockStatus ?? "not_ready";
   if (stockStatus === "applied") {
-    lines.push("", "✅ സ്റ്റോക്ക് വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു.");
+    lines.push("", "✅ Outgoing stock history-ൽ രേഖപ്പെടുത്തി.");
   } else if (stockStatus === "duplicate_document") {
     lines.push("", "ℹ️ ഈ ബിൽ നേരത്തെ സ്റ്റോക്കിൽ രേഖപ്പെടുത്തിയതാണ്. അതിനാൽ സ്റ്റോക്ക് വീണ്ടും കുറച്ചിട്ടില്ല.");
   } else if (stockStatus === "reversed") {
@@ -463,6 +464,87 @@ async function sendSummary(
   return result;
 }
 
+async function recordVerifiedDraft(
+  draft: DraftContext,
+  verification: {
+    provider: string;
+    model: string | null;
+    details: Record<string, unknown>;
+  },
+): Promise<"recorded"> {
+  const now = new Date().toISOString();
+  await updateAutomationState(draft.id, {
+    parse_status: "approved",
+    approved_at: now,
+    workflow_status: "recorded",
+    verification_status: "verified",
+    verification_provider: verification.provider,
+    verification_model: verification.model,
+    verification_details: verification.details,
+    parse_error: null,
+  });
+  await recordAction({
+    draftId: draft.id,
+    sourceMessageId: draft.messageId,
+    action: "auto_recorded",
+    newValue: {
+      verifier: verification.details.verifier ?? verification.provider,
+      model: verification.model,
+      item_count: draft.items.length,
+    },
+  });
+
+  let stockStatus = "pending";
+  try {
+    const stockResult = await processStockForDraft({
+      draftId: draft.id,
+      replyToMessageId: draft.messageId,
+      notifySuccess: false,
+    });
+    if (
+      stockResult.status === "applied" ||
+      stockResult.status === "already_applied"
+    ) {
+      stockStatus = "applied";
+    } else if (stockResult.status === "duplicate_document") {
+      stockStatus = "duplicate_document";
+    }
+  } catch (error) {
+    console.warn("Verified document stock update did not complete", {
+      reason:
+        error instanceof Error
+          ? error.message.slice(0, 180)
+          : "Unknown stock error",
+    });
+  }
+
+  const recorded = {
+    ...draft,
+    parseStatus: "approved",
+    workflowStatus: "recorded",
+    verificationStatus: "verified",
+    verificationProvider: verification.provider,
+    verificationModel: verification.model,
+    stockStatus,
+  };
+  try {
+    await sendSummary(
+      recorded,
+      draft.messageId,
+      "document-summary:" + draft.id,
+    );
+  } catch (error) {
+    console.warn("Verified document summary was not sent", {
+      reason:
+        error instanceof Error
+          ? error.message.slice(0, 180)
+          : "Unknown outbound error",
+    });
+  }
+
+  return "recorded";
+}
+
 async function sendReviewNotice(
   draft: DraftContext,
   reason: "needs_review" | "verification_failed",
@@ -626,12 +708,23 @@ export async function runDocumentAutomationForDraft(
     return "review_required";
   }
 
+  const candidate = verificationCandidate(draft);
+  const deterministicDecision = verifyDocumentDeterministically(candidate);
+  if (deterministicDecision.verified) {
+    return recordVerifiedDraft(draft, {
+      provider: "local",
+      model: null,
+      details: {
+        verifier: "deterministic-v1",
+        issues: [],
+        matched_item_count: draft.items.length,
+      },
+    });
+  }
+
   try {
     const extraction = await extractDocumentWithGroq(draft.extractedText);
-    const decision = compareDocumentVerification(
-      verificationCandidate(draft),
-      extraction,
-    );
+    const decision = compareDocumentVerification(candidate, extraction);
 
     if (!decision.verified) {
       await updateAutomationState(draft.id, {
@@ -641,6 +734,7 @@ export async function runDocumentAutomationForDraft(
         verification_model: env.model,
         verification_details: {
           verifier: "strict-json-v1",
+          deterministic_issues: deterministicDecision.issues,
           mismatches: decision.mismatches,
         },
       });
@@ -648,86 +742,25 @@ export async function runDocumentAutomationForDraft(
         draftId: draft.id,
         sourceMessageId: draft.messageId,
         action: "review_required",
-        newValue: { mismatches: decision.mismatches },
+        newValue: {
+          deterministic_issues: deterministicDecision.issues,
+          mismatches: decision.mismatches,
+        },
       });
       await trySendReviewNotice(draft, "needs_review");
       return "review_required";
     }
 
-    const now = new Date().toISOString();
-    await updateAutomationState(draft.id, {
-      parse_status: "approved",
-      approved_at: now,
-      workflow_status: "recorded",
-      verification_status: "verified",
-      verification_provider: "groq",
-      verification_model: env.model,
-      verification_details: {
+    return recordVerifiedDraft(draft, {
+      provider: "groq",
+      model: env.model,
+      details: {
         verifier: "strict-json-v1",
+        deterministic_issues: deterministicDecision.issues,
         matched_item_count: draft.items.length,
         mismatches: [],
       },
-      parse_error: null,
     });
-    await recordAction({
-      draftId: draft.id,
-      sourceMessageId: draft.messageId,
-      action: "auto_recorded",
-      newValue: {
-        verifier: "groq",
-        model: env.model,
-        item_count: draft.items.length,
-      },
-    });
-
-    let stockStatus = "pending";
-    try {
-      const stockResult = await processStockForDraft({
-        draftId: draft.id,
-        replyToMessageId: draft.messageId,
-        notifySuccess: false,
-      });
-      if (
-        stockResult.status === "applied" ||
-        stockResult.status === "already_applied"
-      ) {
-        stockStatus = "applied";
-      }
-      else if (stockResult.status === "duplicate_document") {
-        stockStatus = "duplicate_document";
-      }
-    } catch (error) {
-      console.warn("Verified document stock update did not complete", {
-        reason:
-          error instanceof Error
-            ? error.message.slice(0, 180)
-            : "Unknown stock error",
-      });
-    }
-
-    const recorded = {
-      ...draft,
-      parseStatus: "approved",
-      workflowStatus: "recorded",
-      verificationStatus: "verified",
-      stockStatus,
-    };
-    try {
-      await sendSummary(
-        recorded,
-        draft.messageId,
-        "document-summary:" + draft.id,
-      );
-    } catch (error) {
-      console.warn("Verified document summary was not sent", {
-        reason:
-          error instanceof Error
-            ? error.message.slice(0, 180)
-            : "Unknown outbound error",
-      });
-    }
-
-    return "recorded";
   } catch (error) {
     const safeReason =
       error instanceof Error ? error.message.slice(0, 180) : "Unknown error";
