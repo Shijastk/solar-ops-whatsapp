@@ -547,6 +547,7 @@ export async function handleFastWhatsAppQuery(
     requestId: deterministicUuid("fast-query:" + message.messageId),
     replyToMessageId: storedMessageId,
     body,
+    knownInboundAt: message.timestamp,
   });
 
   console.info("Fast WhatsApp operational query completed", {
