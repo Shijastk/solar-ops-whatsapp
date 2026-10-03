@@ -298,6 +298,22 @@ export async function ingestWhatsAppMessage(
                 ? error.message.slice(0, 180)
                 : "Unknown automation error",
           });
+
+          if (!reservedTripId) {
+            try {
+              await sendOpsReply({
+                requestId: deterministicUuid(
+                  "pdf-automation-failed:" + message.messageId,
+                ),
+                replyToMessageId: persistedMessage.id,
+                knownInboundAt: message.timestamp,
+                body:
+                  "📄 PDF ലഭിച്ചു. പക്ഷേ bill safely process ചെയ്യാൻ കഴിഞ്ഞില്ല. Stock auto-update ചെയ്തിട്ടില്ല.",
+              });
+            } catch {
+              // Message remains stored even if the fallback reply cannot be sent.
+            }
+          }
         }
 
         if (reservedTripId) {
@@ -331,6 +347,20 @@ export async function ingestWhatsAppMessage(
                   ? tripError.message.slice(0, 180)
                   : "Unknown trip status error",
             });
+          }
+        } else {
+          try {
+            await sendOpsReply({
+              requestId: deterministicUuid(
+                "pdf-processing-failed:" + message.messageId,
+              ),
+              replyToMessageId: persistedMessage.id,
+              knownInboundAt: message.timestamp,
+              body:
+                "📄 PDF ലഭിച്ചു. പക്ഷേ bill details read/process ചെയ്യാൻ കഴിഞ്ഞില്ല. Stock auto-update ചെയ്തിട്ടില്ല.",
+            });
+          } catch {
+            // The inbound PDF is still stored even if the fallback reply fails.
           }
         }
       }
