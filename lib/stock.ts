@@ -523,6 +523,10 @@ export async function ensureStockCatalogForDraft(
       companyId = data.id;
     }
 
+    if (!companyId) {
+      throw new Error("Failed to resolve created stock company");
+    }
+
     await insertStockCompanyAlias({
       companyId,
       aliasText: canonicalCompanyName,
@@ -569,7 +573,9 @@ export async function ensureStockCatalogForDraft(
       throw new Error("Verified bill contains an invalid stock item");
     }
 
-    const normalizedUnit = normalizeStockUnit(item.unit);
+    const itemUnit = item.unit;
+    const itemDescription = item.description;
+    const normalizedUnit = normalizeStockUnit(itemUnit);
     const { data: alias, error: aliasError } = await supabase
       .from("stock_product_aliases")
       .select("product_id")
@@ -605,7 +611,7 @@ export async function ensureStockCatalogForDraft(
         .array(openingProductCandidateSchema)
         .parse(candidateData ?? []);
       const hardEquivalent = decideOpeningProductDuplicate({
-        productName: item.description,
+        productName: itemDescription,
         hsnSac: item.hsn_sac,
         allowSimilarProduct: true,
         candidates,
@@ -621,9 +627,9 @@ export async function ensureStockCatalogForDraft(
         .from("stock_products")
         .insert({
           company_id: companyId,
-          canonical_name: item.description.trim(),
+          canonical_name: itemDescription.trim(),
           normalized_name: item.normalized_description,
-          unit: item.unit.trim().toUpperCase(),
+          unit: itemUnit.trim().toUpperCase(),
           normalized_unit: normalizedUnit,
           hsn_sac: item.hsn_sac,
         })
@@ -653,23 +659,30 @@ export async function ensureStockCatalogForDraft(
         productId = created.id;
       }
 
+      if (!productId) {
+        throw new Error("Failed to resolve created stock product");
+      }
+
       await insertStockProductAlias({
         companyId,
         productId,
-        aliasText: item.description,
-        unit: item.unit,
+        aliasText: itemDescription,
+        unit: itemUnit,
         source: "canonical",
       });
     } else {
       await insertStockProductAlias({
         companyId,
         productId,
-        aliasText: item.description,
-        unit: item.unit,
+        aliasText: itemDescription,
+        unit: itemUnit,
         source: "document",
       });
     }
 
+    if (!productId) {
+      throw new Error("Failed to resolve stock product");
+    }
     productIds.push(productId);
   }
 
