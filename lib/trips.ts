@@ -543,7 +543,7 @@ export function choosePrimaryDestination(
 async function sendDriverPicker(
   trip: TripRow,
   replyToMessageId: string,
-  stats: { total: number; ready: number; review: number; failed: number },
+  totalBills: number,
 ) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -556,22 +556,14 @@ async function sendDriverPicker(
 
   if (error) throw new Error("Failed to load drivers: " + error.message);
 
-  const statusLine =
-    "Bills: " +
-    stats.total +
-    " · Ready: " +
-    stats.ready +
-    (stats.review > 0 ? " · Review: " + stats.review : "") +
-    (stats.failed > 0 ? " · Failed: " + stats.failed : "");
-
   await sendOpsList({
     requestId: deterministicUuid("trip-driver-picker:" + trip.id),
     replyToMessageId,
     body:
       "🚚 " +
       (trip.display_name ?? "Trip") +
-      "\n" +
-      statusLine +
+      "\nBills: " +
+      totalBills +
       (trip.vehicle_number ? "\nVehicle: " + trip.vehicle_number : "") +
       "\n\nDriver തിരഞ്ഞെടുക്കൂ.",
     buttonText: "Choose driver",
@@ -590,6 +582,52 @@ async function sendDriverPicker(
   });
 }
 
+async function sendTripReadySummary(
+  trip: TripRow,
+  replyToMessageId: string,
+) {
+  const supabase = getSupabaseAdmin();
+  const docs = await loadTripDocuments(trip.id);
+  const drafts = await loadTripDrafts(
+    docs.map((doc) => doc.draft_id).filter((id): id is string => Boolean(id)),
+  );
+  const ready = drafts.filter(
+    (draft) =>
+      draft.workflow_status === "recorded" &&
+      draft.verification_status === "verified",
+  ).length;
+  const review = drafts.filter(
+    (draft) => draft.workflow_status === "review_required",
+  ).length;
+
+  let driverName: string | null = null;
+  if (trip.driver_id) {
+    const { data: driver, error } = await supabase
+      .from("ops_drivers")
+      .select("name")
+      .eq("id", trip.driver_id)
+      .maybeSingle();
+    if (error) {
+      throw new Error("Failed to load trip driver summary: " + error.message);
+    }
+    driverName = driver?.name ?? null;
+  }
+
+  await sendOpsReply({
+    requestId: deterministicUuid("trip-ready:" + trip.id),
+    replyToMessageId,
+    body:
+      "✅ Trip ready\n" +
+      (trip.display_name ?? "Trip") +
+      "\nBills: " +
+      docs.length +
+      (driverName ? "\nDriver: " + driverName : "") +
+      (trip.vehicle_number ? "\nVehicle: " + trip.vehicle_number : "") +
+      (review > 0 ? "\n⚠️ " + review + " bill needs review" : "") +
+      (ready > 0 ? "\n✅ " + ready + " bill verified" : ""),
+  });
+}
+
 async function finalizeTripCollection(
   tripId: string,
   replyToMessageId: string,
@@ -605,16 +643,6 @@ async function finalizeTripCollection(
     .map((doc) => doc.draft_id)
     .filter((id): id is string => Boolean(id));
   const drafts = await loadTripDrafts(draftIds);
-
-  const ready = drafts.filter(
-    (draft) =>
-      draft.workflow_status === "recorded" &&
-      draft.verification_status === "verified",
-  ).length;
-  const review = drafts.filter(
-    (draft) => draft.workflow_status === "review_required",
-  ).length;
-  const failed = docs.filter((doc) => doc.processing_status === "failed").length;
 
   const destinations = drafts.map((draft) => cleanDestination(draft.destination));
   const primaryDestination = choosePrimaryDestination(destinations);
@@ -650,34 +678,50 @@ async function finalizeTripCollection(
   );
   const vehicleNumber = vehicleNumbers.length === 1 ? vehicleNumbers[0] : null;
 
+  const current = await loadTripForSender(
+    tripId,
+    (await supabase
+      .from("delivery_trips")
+      .select("sender_phone")
+      .eq("id", tripId)
+      .single()).data?.sender_phone ?? "",
+  );
+  if (!current) {
+    throw new Error("Trip disappeared while finalizing");
+  }
+
+  const nextStatus: TripStatus = current.driver_id
+    ? "ready"
+    : current.status === "awaiting_driver_name"
+      ? "awaiting_driver_name"
+      : "awaiting_driver";
+
+  const now = new Date().toISOString();
   const { data: updated, error } = await supabase
     .from("delivery_trips")
     .update({
-      status: "awaiting_driver",
+      status: nextStatus,
       display_name: displayName,
       primary_destination: primaryDestination,
       destination_pincode: primaryPincode,
       destination_district: pincodeLocation?.district ?? null,
       destination_state: pincodeLocation?.state ?? null,
       vehicle_number: vehicleNumber,
-      updated_at: new Date().toISOString(),
+      finalized_at: nextStatus === "ready" ? now : null,
+      updated_at: now,
     })
     .eq("id", tripId)
-    .eq("status", "closing")
     .select(
       "id, sender_phone, status, display_name, primary_destination, destination_pincode, destination_district, destination_state, vehicle_number, driver_id",
     )
-    .maybeSingle();
+    .single();
 
   if (error) throw new Error("Failed to finalize trip bills: " + error.message);
-  if (!updated) return "finalized";
 
-  await sendDriverPicker(updated as TripRow, replyToMessageId, {
-    total: docs.length,
-    ready,
-    review,
-    failed,
-  });
+  if (nextStatus === "ready") {
+    await sendTripReadySummary(updated as TripRow, replyToMessageId);
+  }
+
   return "finalized";
 }
 
@@ -739,72 +783,63 @@ async function closeTripCollection(
     return;
   }
 
-  if (trip.status === "awaiting_driver" || trip.status === "awaiting_driver_name") {
-    if (trip.status === "awaiting_driver") {
-      const docs = await loadTripDocuments(trip.id);
-      const drafts = await loadTripDrafts(
-        docs.map((doc) => doc.draft_id).filter((id): id is string => Boolean(id)),
-      );
-      await sendDriverPicker(trip, storedMessageId, {
-        total: docs.length,
-        ready: drafts.filter(
-          (draft) =>
-            draft.workflow_status === "recorded" &&
-            draft.verification_status === "verified",
-        ).length,
-        review: drafts.filter(
-          (draft) => draft.workflow_status === "review_required",
-        ).length,
-        failed: docs.filter((doc) => doc.processing_status === "failed").length,
-      });
-    } else {
-      await sendOpsReply({
-        requestId: deterministicUuid("trip-driver-name-reminder:" + storedMessageId),
-        replyToMessageId: storedMessageId,
-        knownInboundAt: message.timestamp,
-        body: "പുതിയ driver-ന്റെ പേര് അയക്കൂ.",
-      });
-    }
+  const docs = await loadTripDocuments(trip.id);
+
+  if (trip.status === "awaiting_driver") {
+    await sendDriverPicker(trip, storedMessageId, docs.length);
     return;
   }
 
-  if (trip.status === "collecting") {
-    const docs = await loadTripDocuments(trip.id);
-    if (docs.length === 0) {
-      await sendOpsReply({
-        requestId: deterministicUuid("trip-empty:" + storedMessageId),
-        replyToMessageId: storedMessageId,
-        knownInboundAt: message.timestamp,
-        body: "ഈ trip-ൽ bill ഒന്നും ലഭിച്ചിട്ടില്ല. PDF bills അയച്ച ശേഷം done എന്ന് അയക്കൂ.",
-      });
-      return;
-    }
-
-    const supabase = getSupabaseAdmin();
-    const { error } = await supabase
-      .from("delivery_trips")
-      .update({ status: "closing", updated_at: new Date().toISOString() })
-      .eq("id", trip.id)
-      .eq("status", "collecting");
-    if (error) throw new Error("Failed to close trip collection: " + error.message);
-  }
-
-  const result = await finalizeTripCollection(trip.id, storedMessageId);
-  if (result === "waiting") {
-    const docs = await loadTripDocuments(trip.id);
-    const pending = docs.filter((doc) => doc.processing_status === "pending").length;
+  if (trip.status === "awaiting_driver_name") {
     await sendOpsReply({
-      requestId: deterministicUuid("trip-processing:" + trip.id),
+      requestId: deterministicUuid("trip-driver-name-reminder:" + storedMessageId),
       replyToMessageId: storedMessageId,
       knownInboundAt: message.timestamp,
-      body:
-        "⏳ " +
-        pending +
-        " bill" +
-        (pending === 1 ? "" : "s") +
-        " process ചെയ്യുന്നു. പൂർത്തിയായ ഉടൻ driver തിരഞ്ഞെടുക്കാനുള്ള option ഇവിടെ വരും.",
+      body: "പുതിയ driver-ന്റെ പേര് അയക്കൂ.",
     });
+    return;
   }
+
+  if (trip.status === "closing") {
+    await sendOpsReply({
+      requestId: deterministicUuid("trip-driver-already-set:" + storedMessageId),
+      replyToMessageId: storedMessageId,
+      knownInboundAt: message.timestamp,
+      body: "✅ Driver already set. Trip automatically complete ചെയ്യും.",
+    });
+    return;
+  }
+
+  if (trip.status !== "collecting") return;
+
+  if (docs.length === 0) {
+    await sendOpsReply({
+      requestId: deterministicUuid("trip-empty:" + storedMessageId),
+      replyToMessageId: storedMessageId,
+      knownInboundAt: message.timestamp,
+      body: "ഈ trip-ൽ bill ഒന്നും ലഭിച്ചിട്ടില്ല. PDF bills അയച്ച ശേഷം done എന്ന് അയക്കൂ.",
+    });
+    return;
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data: updated, error } = await supabase
+    .from("delivery_trips")
+    .update({
+      status: "awaiting_driver",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", trip.id)
+    .eq("status", "collecting")
+    .select(
+      "id, sender_phone, status, display_name, primary_destination, destination_pincode, destination_district, destination_state, vehicle_number, driver_id",
+    )
+    .single();
+
+  if (error) throw new Error("Failed to close trip collection: " + error.message);
+
+  // Ask for the driver immediately. Bill parsing/verification continues in the background.
+  await sendDriverPicker(updated as TripRow, storedMessageId, docs.length);
 }
 
 async function cancelTrip(message: NormalizedWhatsAppMessage, storedMessageId: string) {
@@ -844,13 +879,15 @@ async function assignDriver(input: {
   if (driverError) throw new Error("Failed to load driver: " + driverError.message);
   if (!driver) throw new Error("Driver was not found");
 
+  const docs = await loadTripDocuments(input.trip.id);
+  const pending = docs.filter((doc) => doc.processing_status === "pending").length;
   const now = new Date().toISOString();
+
   const { error } = await supabase
     .from("delivery_trips")
     .update({
-      status: "ready",
+      status: "closing",
       driver_id: driver.id,
-      finalized_at: now,
       updated_at: now,
     })
     .eq("id", input.trip.id)
@@ -863,35 +900,18 @@ async function assignDriver(input: {
     .update({ last_used_at: now, updated_at: now })
     .eq("id", driver.id);
 
-  const docs = await loadTripDocuments(input.trip.id);
-  const drafts = await loadTripDrafts(
-    docs.map((doc) => doc.draft_id).filter((id): id is string => Boolean(id)),
-  );
-  const ready = drafts.filter(
-    (draft) =>
-      draft.workflow_status === "recorded" &&
-      draft.verification_status === "verified",
-  ).length;
-  const review = drafts.filter(
-    (draft) => draft.workflow_status === "review_required",
-  ).length;
+  if (pending > 0) {
+    await sendOpsReply({
+      requestId: deterministicUuid(
+        "trip-driver-set:" + input.trip.id + ":" + driver.id,
+      ),
+      replyToMessageId: input.replyToMessageId,
+      body: "✅ Driver: " + driver.name + " set.",
+    });
+    return;
+  }
 
-  await sendOpsReply({
-    requestId: deterministicUuid(
-      "trip-ready:" + input.trip.id + ":" + driver.id,
-    ),
-    replyToMessageId: input.replyToMessageId,
-    body:
-      "✅ Trip ready\n" +
-      (input.trip.display_name ?? "Trip") +
-      "\nBills: " +
-      docs.length +
-      "\nDriver: " +
-      driver.name +
-      (input.trip.vehicle_number ? "\nVehicle: " + input.trip.vehicle_number : "") +
-      (review > 0 ? "\n⚠️ " + review + " bill needs review" : "") +
-      (ready > 0 ? "\n✅ " + ready + " bill verified" : ""),
-  });
+  await finalizeTripCollection(input.trip.id, input.replyToMessageId);
 }
 
 async function promptNewDriver(
@@ -993,7 +1013,7 @@ async function handleMenuAction(
       replyToMessageId: storedMessageId,
       knownInboundAt,
       body:
-        "Quick commands:\ntrip — പുതിയ trip\ndone / ശരി — trip bills complete\nHi — menu\nStock questions നേരിട്ട് type ചെയ്യാം.",
+        "Quick commands:\ntrip — പുതിയ trip\ndone / ശരി — trip bills complete\nHi — menu\nStock questions നേരിട്ട് type ചെയ്യാം.\nഈ ആഴ്ച / മാസം / വർഷം summary എന്നും ചോദിക്കാം.",
     });
     return true;
   }
