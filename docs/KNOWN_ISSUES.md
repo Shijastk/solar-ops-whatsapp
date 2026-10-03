@@ -430,3 +430,25 @@ WhatsApp message-id idempotency prevents a retried webhook from duplicating one 
 The pending cross-draft guard claims a normalized document identity atomically inside the Stock OUT transaction. It prefers e-Way Bill number; when that is absent it uses supplier GSTIN plus document number. A later draft with an already-claimed identity returns `duplicate_document` and must create zero additional Stock OUT rows. The claim remains after reversal so a cancelled/reversed document cannot silently become stock-active again through a re-upload; any such case requires explicit operator review.
 
 This change requires migration application plus automated CI and database-level verification before production acceptance.
+
+## K037 - Fast WhatsApp query source needs production-live acceptance
+
+Source now contains a deterministic read-only fast path for a small set of operational WhatsApp questions.
+
+What is implemented in source:
+
+- today's PDF-bill count
+- pending/review-required bill count
+- latest bill summary
+- exact canonical/operator-approved-alias stock balance
+- no Groq call for these supported intents
+- correction-session priority and outbound reply idempotency are preserved
+
+What is not yet proven live:
+
+- real WhatsApp phrasing through the production deployment
+- observed end-to-end response latency
+- production response behavior for exact stock aliases
+
+Voice transcription and a Groq fallback for unsupported natural-language phrasing are not implemented by this change. They must not be described as available until separately designed, tested, and verified.
+
