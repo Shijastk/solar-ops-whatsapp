@@ -17,7 +17,9 @@ export type FastWhatsAppQuery =
   | { type: "pending_bill_count" }
   | { type: "latest_bill" }
   | { type: "stock_balance"; productQuery: string }
-  | { type: "stock_product_required" };
+  | { type: "stock_product_required" }
+  | { type: "today_trip_summary" }
+  | { type: "latest_trip" };
 
 const BILL_TERMS = [
   "bill",
@@ -67,6 +69,8 @@ const LATEST_TERMS = [
 ];
 
 const STOCK_TERMS = ["stock", "സ്റ്റോക്ക്"];
+const TRIP_TERMS = ["trip", "trips", "ട്രിപ്പ്", "ട്രിപ്പുകൾ"];
+const TRIP_LATEST_TERMS = ["latest", "last", "recent", "അവസാന", "ലാസ്റ്റ്"];
 
 const STOCK_QUESTION_TERMS = [
   "balance",
@@ -144,6 +148,20 @@ export function parseFastWhatsAppQuery(
 
   if (hasBill && includesAny(normalized, LATEST_TERMS)) {
     return { type: "latest_bill" };
+  }
+
+  if (
+    includesAny(normalized, TRIP_TERMS) &&
+    includesAny(normalized, TODAY_TERMS)
+  ) {
+    return { type: "today_trip_summary" };
+  }
+
+  if (
+    includesAny(normalized, TRIP_TERMS) &&
+    includesAny(normalized, TRIP_LATEST_TERMS)
+  ) {
+    return { type: "latest_trip" };
   }
 
   if (
@@ -289,6 +307,7 @@ type StockMatch = {
   product_name: string;
   unit: string;
   current_quantity: number;
+  balance_known: boolean;
 };
 
 export type FuzzyStockCandidate = {
@@ -385,9 +404,11 @@ function formatStockMatches(
     return [
       fuzzy ? "Match ചെയ്തത്: " + item.product_name : item.product_name,
       "കമ്പനി: " + item.company_name,
-      "സ്റ്റോക്ക്: " +
-        String(item.current_quantity) +
-        (item.unit ? " " + item.unit : ""),
+      item.balance_known
+        ? "സ്റ്റോക്ക്: " +
+          String(item.current_quantity) +
+          (item.unit ? " " + item.unit : "")
+        : "സ്റ്റോക്ക്: count ഇനിയും add ചെയ്തിട്ടില്ല.",
     ].join("\n");
   }
 
@@ -402,8 +423,9 @@ function formatStockMatches(
         " — " +
         item.product_name +
         ": " +
-        String(item.current_quantity) +
-        (item.unit ? " " + item.unit : ""),
+        (item.balance_known
+          ? String(item.current_quantity) + (item.unit ? " " + item.unit : "")
+          : "count add ചെയ്തിട്ടില്ല"),
     ),
     fuzzy
       ? "Model/number അല്ലെങ്കിൽ പേരിലെ മറ്റൊരു ഭാഗം കൂടി അയച്ചാൽ ഞാൻ narrow ചെയ്യാം."
@@ -470,7 +492,7 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
   const { data, error } = await supabase
     .from("stock_balances")
     .select(
-      "product_id, company_id, company_name, product_name, unit, current_quantity",
+      "product_id, company_id, company_name, product_name, unit, current_quantity, balance_known",
     )
     .in("product_id", productIds)
     .limit(MAX_STOCK_MATCHES);
@@ -487,6 +509,7 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
       product_name: row.product_name,
       unit: row.unit,
       current_quantity: Number(row.current_quantity),
+      balance_known: Boolean(row.balance_known),
     }))
     .sort(
       (left, right) =>
@@ -494,6 +517,91 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
     ) as StockMatch[];
 
   return formatStockMatches(matches, fuzzy);
+}
+
+type TripSummaryRow = {
+  display_name: string | null;
+  vehicle_number: string | null;
+  driver_id: string | null;
+  finalized_at: string | null;
+};
+
+async function driverNamesById(ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("ops_drivers")
+    .select("id, name")
+    .in("id", Array.from(new Set(ids)));
+
+  if (error) {
+    throw new Error("Failed to load trip drivers: " + error.message);
+  }
+
+  return new Map((data ?? []).map((row) => [row.id, row.name]));
+}
+
+function formatTripSummary(
+  rows: TripSummaryRow[],
+  driverNames: Map<string, string>,
+  heading: string,
+): string {
+  if (rows.length === 0) return heading + "\nCompleted trip ഒന്നുമില്ല.";
+
+  return [
+    heading,
+    ...rows.map((trip, index) => {
+      const parts = [
+        String(index + 1) + ". " + (trip.display_name ?? "Trip"),
+        trip.driver_id ? driverNames.get(trip.driver_id) ?? null : null,
+        trip.vehicle_number ?? null,
+      ].filter((part): part is string => Boolean(part));
+      return parts.join(" · ");
+    }),
+  ].join("\n");
+}
+
+async function todayTripsSummary(now = new Date()): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const bounds = indiaDayBounds(now);
+  const { data, error } = await supabase
+    .from("delivery_trips")
+    .select("display_name, vehicle_number, driver_id, finalized_at")
+    .eq("status", "ready")
+    .gte("finalized_at", bounds.start)
+    .lt("finalized_at", bounds.end)
+    .order("finalized_at", { ascending: false })
+    .limit(8);
+
+  if (error) {
+    throw new Error("Failed to load today's trips: " + error.message);
+  }
+
+  const rows = (data ?? []) as TripSummaryRow[];
+  const names = await driverNamesById(
+    rows.map((row) => row.driver_id).filter((id): id is string => Boolean(id)),
+  );
+  return formatTripSummary(rows, names, "ഇന്നത്തെ completed trips:");
+}
+
+async function latestTripSummary(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("delivery_trips")
+    .select("display_name, vehicle_number, driver_id, finalized_at")
+    .eq("status", "ready")
+    .order("finalized_at", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    throw new Error("Failed to load latest trip: " + error.message);
+  }
+
+  const rows = (data ?? []) as TripSummaryRow[];
+  const names = await driverNamesById(
+    rows.map((row) => row.driver_id).filter((id): id is string => Boolean(id)),
+  );
+  return formatTripSummary(rows, names, "Latest completed trip:");
 }
 
 async function answerFastQuery(
@@ -515,6 +623,14 @@ async function answerFastQuery(
 
   if (query.type === "stock_product_required") {
     return "ഏത് സാധനത്തിന്റെ സ്റ്റോക്കാണെന്ന് product name കൂടി അയക്കൂ.";
+  }
+
+  if (query.type === "today_trip_summary") {
+    return todayTripsSummary();
+  }
+
+  if (query.type === "latest_trip") {
+    return latestTripSummary();
   }
 
   return stockBalanceAnswer(query.productQuery);

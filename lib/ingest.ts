@@ -5,9 +5,16 @@ import {
   runDocumentAutomationForDraft,
 } from "@/lib/document-automation";
 import { processPdfBytesForMessage } from "@/lib/document-processing";
+import { deterministicUuid } from "@/lib/idempotency";
 import { getIngestionEnv } from "@/lib/env";
 import { downloadWhatsAppMedia } from "@/lib/meta";
+import { sendOpsReply } from "@/lib/replies";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+  markTripDocumentProcessed,
+  reserveTripDocument,
+} from "@/lib/trips";
+import { transcribeOperationalVoice } from "@/lib/voice-transcription";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
 const MEDIA_TYPES = new Set([
@@ -120,6 +127,31 @@ export async function ingestWhatsAppMessage(
     );
   }
 
+  const likelyPdfDocument =
+    message.type === "document" &&
+    (
+      !message.media?.mimeType ||
+      message.media.mimeType.toLowerCase().includes("pdf") ||
+      message.media.filename?.toLowerCase().endsWith(".pdf")
+    );
+  let reservedTripId: string | null = null;
+
+  if (likelyPdfDocument) {
+    try {
+      reservedTripId = await reserveTripDocument({
+        senderPhone: message.senderPhone,
+        messageId: persistedMessage.id,
+      });
+    } catch (error) {
+      console.warn("Trip document reservation did not complete", {
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown trip reservation error",
+      });
+    }
+  }
+
   if (!message.media || !MEDIA_TYPES.has(message.type)) {
     try {
       await handleDocumentWorkflowInbound(message, persistedMessage.id);
@@ -187,6 +219,13 @@ export async function ingestWhatsAppMessage(
 
     if (media.mimeType.toLowerCase() === "application/pdf") {
       try {
+        if (!reservedTripId) {
+          reservedTripId = await reserveTripDocument({
+            senderPhone: message.senderPhone,
+            messageId: persistedMessage.id,
+          });
+        }
+
         const parsed = await processPdfBytesForMessage(
           persistedMessage.id,
           media.bytes,
@@ -195,14 +234,17 @@ export async function ingestWhatsAppMessage(
           status: parsed.status,
           itemCount: parsed.itemCount,
           skippedApproved: parsed.skippedApproved,
+          tripCapture: Boolean(reservedTripId),
         });
 
         try {
           const automationResult = await runDocumentAutomationForDraft(
             parsed.draftId,
+            { suppressReply: Boolean(reservedTripId) },
           );
           console.info("WhatsApp document automation summary", {
             result: automationResult,
+            tripCapture: Boolean(reservedTripId),
           });
         } catch (error) {
           console.warn("WhatsApp document automation did not complete", {
@@ -213,10 +255,110 @@ export async function ingestWhatsAppMessage(
                 : "Unknown automation error",
           });
         }
-      } catch {
+
+        if (reservedTripId) {
+          await markTripDocumentProcessed({
+            messageId: persistedMessage.id,
+            draftId: parsed.draftId,
+            replyToMessageId: persistedMessage.id,
+          });
+        }
+      } catch (error) {
         console.warn("WhatsApp PDF parsing did not complete", {
           messageStored: true,
+          reason:
+            error instanceof Error
+              ? error.message.slice(0, 180)
+              : "Unknown PDF error",
         });
+
+        if (reservedTripId) {
+          try {
+            await markTripDocumentProcessed({
+              messageId: persistedMessage.id,
+              failed: true,
+              errorCode: "pdf_processing_failed",
+              replyToMessageId: persistedMessage.id,
+            });
+          } catch (tripError) {
+            console.warn("Trip PDF failure status did not persist", {
+              reason:
+                tripError instanceof Error
+                  ? tripError.message.slice(0, 180)
+                  : "Unknown trip status error",
+            });
+          }
+        }
+      }
+    } else if (message.type === "audio") {
+      try {
+        const transcript = await transcribeOperationalVoice({
+          bytes: media.bytes,
+          mimeType: media.mimeType,
+        });
+
+        if (!transcript) {
+          throw new Error("Voice transcription was empty");
+        }
+
+        const { error: transcriptError } = await supabase
+          .from("whatsapp_messages")
+          .update({ text_body: transcript })
+          .eq("id", persistedMessage.id);
+
+        if (transcriptError) {
+          throw new Error(
+            "Failed to persist voice transcript: " + transcriptError.message,
+          );
+        }
+
+        const voiceAsText: NormalizedWhatsAppMessage = {
+          ...message,
+          type: "text",
+          textBody: transcript,
+          media: undefined,
+        };
+
+        const voiceResult = await handleDocumentWorkflowInbound(
+          voiceAsText,
+          persistedMessage.id,
+        );
+
+        if (voiceResult === "ignored") {
+          await sendOpsReply({
+            requestId: deterministicUuid("voice-unsupported:" + message.messageId),
+            replyToMessageId: persistedMessage.id,
+            body:
+              "🎙️ കേട്ടത്: " +
+              transcript.slice(0, 220) +
+              "\n\nഈ request ഇപ്പോൾ support ചെയ്യുന്ന command/query ആയി മനസ്സിലായില്ല. Hi എന്ന് അയച്ചാൽ options കാണാം.",
+            knownInboundAt: message.timestamp,
+          });
+        }
+
+        console.info("WhatsApp voice transcription completed", {
+          handled: voiceResult === "handled",
+          transcriptChars: transcript.length,
+        });
+      } catch (error) {
+        console.warn("WhatsApp voice transcription did not complete", {
+          reason:
+            error instanceof Error
+              ? error.message.slice(0, 180)
+              : "Unknown voice error",
+        });
+
+        try {
+          await sendOpsReply({
+            requestId: deterministicUuid("voice-failed:" + message.messageId),
+            replyToMessageId: persistedMessage.id,
+            body:
+              "🎙️ Voice message വ്യക്തമായി transcribe ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ചെറിയ voice note ആയി അയക്കൂ, അല്ലെങ്കിൽ text ആയി അയക്കാം.",
+            knownInboundAt: message.timestamp,
+          });
+        } catch {
+          // The inbound media is still stored even when the error reply fails.
+        }
       }
     }
 

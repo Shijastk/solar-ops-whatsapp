@@ -319,6 +319,7 @@ export async function buildMobileBootstrap(now = new Date()) {
         unit: balance.unit,
         hsnSac: balance.hsn_sac,
         currentQuantity: balance.current_quantity,
+        balanceKnown: balance.balance_known,
       })),
       history: stockHistory.map((movement) => ({
         id: movement.id,

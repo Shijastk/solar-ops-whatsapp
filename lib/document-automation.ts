@@ -18,6 +18,7 @@ import {
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 import { handleFastWhatsAppQuery } from "@/lib/whatsapp-queries";
+import { handleTripWorkflowInbound } from "@/lib/trips";
 
 const EDIT_SESSION_MINUTES = 15;
 const SUMMARY_ITEM_LIMIT = 6;
@@ -471,6 +472,7 @@ async function recordVerifiedDraft(
     model: string | null;
     details: Record<string, unknown>;
   },
+  suppressReply = false,
 ): Promise<"recorded"> {
   const now = new Date().toISOString();
   await updateAutomationState(draft.id, {
@@ -500,6 +502,7 @@ async function recordVerifiedDraft(
       draftId: draft.id,
       replyToMessageId: draft.messageId,
       notifySuccess: false,
+      suppressNotifications: suppressReply,
     });
     if (
       stockResult.status === "applied" ||
@@ -528,11 +531,13 @@ async function recordVerifiedDraft(
     stockStatus,
   };
   try {
-    await sendSummary(
-      recorded,
-      draft.messageId,
-      "document-summary:" + draft.id,
-    );
+    if (!suppressReply) {
+      await sendSummary(
+        recorded,
+        draft.messageId,
+        "document-summary:" + draft.id,
+      );
+    }
   } catch (error) {
     console.warn("Verified document summary was not sent", {
       reason:
@@ -623,11 +628,13 @@ function verificationCandidate(draft: DraftContext): VerificationCandidate {
 
 export async function runDocumentAutomationForDraft(
   draftId: string,
+  options: { suppressReply?: boolean } = {},
 ): Promise<
   "disabled" | "recorded" | "review_required" | "cancelled" | "already_recorded"
 > {
   const env = getDocumentAutomationEnv();
   if (!env.enabled) return "disabled";
+  const suppressReply = Boolean(options.suppressReply);
 
   const draft = await loadDraftContext(draftId);
   if (!draft) {
@@ -646,6 +653,7 @@ export async function runDocumentAutomationForDraft(
         draftId: draft.id,
         replyToMessageId: draft.messageId,
         notifySuccess: false,
+        suppressNotifications: suppressReply,
       });
       if (
         stockResult.status === "applied" ||
@@ -665,7 +673,7 @@ export async function runDocumentAutomationForDraft(
       });
     }
 
-    if (!draft.summarySentAt) {
+    if (!suppressReply && !draft.summarySentAt) {
       await sendSummary(
         { ...draft, stockStatus },
         draft.messageId,
@@ -689,7 +697,7 @@ export async function runDocumentAutomationForDraft(
       action: "review_required",
       newValue: { reason: draft.parseStatus },
     });
-    await trySendReviewNotice(draft, "needs_review");
+    if (!suppressReply) await trySendReviewNotice(draft, "needs_review");
     return "review_required";
   }
 
@@ -704,22 +712,26 @@ export async function runDocumentAutomationForDraft(
       action: "review_required",
       newValue: { reason: "parser_not_ready" },
     });
-    await trySendReviewNotice(draft, "needs_review");
+    if (!suppressReply) await trySendReviewNotice(draft, "needs_review");
     return "review_required";
   }
 
   const candidate = verificationCandidate(draft);
   const deterministicDecision = verifyDocumentDeterministically(candidate);
   if (deterministicDecision.verified) {
-    return recordVerifiedDraft(draft, {
-      provider: "local",
-      model: null,
-      details: {
-        verifier: "deterministic-v1",
-        issues: [],
-        matched_item_count: draft.items.length,
+    return recordVerifiedDraft(
+      draft,
+      {
+        provider: "local",
+        model: null,
+        details: {
+          verifier: "deterministic-v1",
+          issues: [],
+          matched_item_count: draft.items.length,
+        },
       },
-    });
+      suppressReply,
+    );
   }
 
   try {
@@ -747,20 +759,24 @@ export async function runDocumentAutomationForDraft(
           mismatches: decision.mismatches,
         },
       });
-      await trySendReviewNotice(draft, "needs_review");
+      if (!suppressReply) await trySendReviewNotice(draft, "needs_review");
       return "review_required";
     }
 
-    return recordVerifiedDraft(draft, {
-      provider: "groq",
-      model: env.model,
-      details: {
-        verifier: "strict-json-v1",
-        deterministic_issues: deterministicDecision.issues,
-        matched_item_count: draft.items.length,
-        mismatches: [],
+    return recordVerifiedDraft(
+      draft,
+      {
+        provider: "groq",
+        model: env.model,
+        details: {
+          verifier: "strict-json-v1",
+          deterministic_issues: deterministicDecision.issues,
+          matched_item_count: draft.items.length,
+          mismatches: [],
+        },
       },
-    });
+      suppressReply,
+    );
   } catch (error) {
     const safeReason =
       error instanceof Error ? error.message.slice(0, 180) : "Unknown error";
@@ -781,7 +797,7 @@ export async function runDocumentAutomationForDraft(
       action: "automation_failed",
       newValue: { error: safeReason },
     });
-    await trySendReviewNotice(draft, "verification_failed");
+    if (!suppressReply) await trySendReviewNotice(draft, "verification_failed");
     return "review_required";
   }
 }
@@ -1247,6 +1263,12 @@ export async function handleDocumentWorkflowInbound(
   message: NormalizedWhatsAppMessage,
   storedMessageId: string,
 ): Promise<"handled" | "ignored"> {
+  if (
+    (await handleTripWorkflowInbound(message, storedMessageId)) === "handled"
+  ) {
+    return "handled";
+  }
+
   if (
     (await handleStockWorkflowInbound(message, storedMessageId)) === "handled"
   ) {

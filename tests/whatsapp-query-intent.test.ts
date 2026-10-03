@@ -35,6 +35,7 @@ describe("WhatsApp AI intent fallback", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     expect(looksLikeOperationalQuery("Hello, എങ്ങനെയുണ്ട്?")).toBe(false);
+    expect(looksLikeOperationalQuery("ഇന്നത്തെ trip details എന്താണ്?")).toBe(true);
     await expect(
       classifyOperationalQueryWithGroq("Hello, എങ്ങനെയുണ്ട്?"),
     ).resolves.toBeNull();

@@ -289,6 +289,7 @@ export async function processStockForDraft(input: {
   draftId: string;
   replyToMessageId: string;
   notifySuccess?: boolean;
+  suppressNotifications?: boolean;
 }): Promise<StockResult> {
   const draft = await loadDraftContext(input.draftId);
   if (!draft) {
@@ -297,6 +298,10 @@ export async function processStockForDraft(input: {
 
   await ensureStockCatalogForDraft(input.draftId);
   const result = await applyStockOutForDraft(input.draftId);
+
+  if (input.suppressNotifications) {
+    return result;
+  }
 
   try {
     if (result.status === "applied" || result.status === "already_applied") {
