@@ -549,3 +549,19 @@ Automated tests cover:
 Production data was inspected separately before implementing the UI contract. At that verification point the database contained real inbound/outbound messages and configured stock, while document drafts/items were empty. The API therefore returns true empty draft/dispatch states rather than synthetic records.
 
 A final post-documentation CI run is required before merge.
+
+## Fast WhatsApp operational query tests
+
+Normal CI covers the deterministic query router without contacting Groq, Meta, or Supabase.
+
+Regression coverage includes:
+
+- Malayalam and English/Manglish today's-bill count phrasing
+- pending-bill and latest-bill intent recognition
+- product phrase extraction from stock questions
+- incomplete stock question -> ask for the product instead of guessing
+- arbitrary chat text, vehicle numbers, and correction-only numeric values are not intercepted
+- India day boundaries are calculated explicitly and do not depend on the server's local timezone
+
+Live acceptance after deployment must separately verify that the narrow database path returns the expected count/balance and that duplicate webhook delivery produces at most one reply.
+
