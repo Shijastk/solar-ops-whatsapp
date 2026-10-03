@@ -289,6 +289,7 @@ type StockMatch = {
   product_name: string;
   unit: string;
   current_quantity: number;
+  balance_known: boolean;
 };
 
 export type FuzzyStockCandidate = {
@@ -385,9 +386,11 @@ function formatStockMatches(
     return [
       fuzzy ? "Match ചെയ്തത്: " + item.product_name : item.product_name,
       "കമ്പനി: " + item.company_name,
-      "സ്റ്റോക്ക്: " +
-        String(item.current_quantity) +
-        (item.unit ? " " + item.unit : ""),
+      item.balance_known
+        ? "സ്റ്റോക്ക്: " +
+          String(item.current_quantity) +
+          (item.unit ? " " + item.unit : "")
+        : "സ്റ്റോക്ക്: count ഇനിയും add ചെയ്തിട്ടില്ല.",
     ].join("\n");
   }
 
@@ -402,8 +405,9 @@ function formatStockMatches(
         " — " +
         item.product_name +
         ": " +
-        String(item.current_quantity) +
-        (item.unit ? " " + item.unit : ""),
+        (item.balance_known
+          ? String(item.current_quantity) + (item.unit ? " " + item.unit : "")
+          : "count add ചെയ്തിട്ടില്ല"),
     ),
     fuzzy
       ? "Model/number അല്ലെങ്കിൽ പേരിലെ മറ്റൊരു ഭാഗം കൂടി അയച്ചാൽ ഞാൻ narrow ചെയ്യാം."
@@ -470,7 +474,7 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
   const { data, error } = await supabase
     .from("stock_balances")
     .select(
-      "product_id, company_id, company_name, product_name, unit, current_quantity",
+      "product_id, company_id, company_name, product_name, unit, current_quantity, balance_known",
     )
     .in("product_id", productIds)
     .limit(MAX_STOCK_MATCHES);
@@ -487,6 +491,7 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
       product_name: row.product_name,
       unit: row.unit,
       current_quantity: Number(row.current_quantity),
+      balance_known: Boolean(row.balance_known),
     }))
     .sort(
       (left, right) =>
