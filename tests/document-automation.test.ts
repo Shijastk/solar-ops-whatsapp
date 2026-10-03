@@ -49,7 +49,7 @@ describe("document automation helpers", () => {
       ],
     });
 
-    expect(applied).toContain("സ്റ്റോക്ക് വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു");
+    expect(applied).toContain("Outgoing stock history-ൽ രേഖപ്പെടുത്തി");
 
     const duplicate = buildDocumentSummary({
       supplierName: "Sun Grid Solutions Limited",
