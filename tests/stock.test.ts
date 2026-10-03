@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canonicalStockCompanyName,
   decideOpeningProductDuplicate,
   normalizeProductIdentityName,
   normalizeStockGstin,
@@ -259,5 +260,14 @@ describe("stock input helpers", () => {
       product_id: "11111111-1111-4111-8111-111111111111",
       product_name: "Emmvee 560 Wp Topcon Dcr Panel",
     });
+  });
+
+  it("removes a trailing financial-year suffix from document company names", () => {
+    expect(
+      canonicalStockCompanyName("SAVITR SOLAR SOLUTIONS LIMITED 24-25"),
+    ).toBe("SAVITR SOLAR SOLUTIONS LIMITED");
+    expect(canonicalStockCompanyName("SAVITR SOLAR SOLUTIONS LIMITED")).toBe(
+      "SAVITR SOLAR SOLUTIONS LIMITED",
+    );
   });
 });
