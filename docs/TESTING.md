@@ -607,3 +607,19 @@ Automated tests must prove:
 
 Database acceptance must verify the company/unit-scoped candidate RPC is service-role-only and returns bounded candidates without changing stock or aliases.
 
+## Ledger-first inventory acceptance
+
+Verify with synthetic data:
+
+- a verified bill with no pre-existing company/product provisions the catalogue
+- its outgoing movement is recorded from a zero balance and the resulting balance is negative
+- adding Stock IN later creates a positive movement and changes the derived balance without rewriting the outgoing row
+- duplicate processing does not create a second outgoing movement
+- a correction adds only the delta and a cancellation adds a reversal
+- stock history returns signed movements with document identity and running balance
+- manual physical adjustment can reconcile a negative derived balance
+
+## Deterministic verification acceptance
+
+Automated tests cover multiline item descriptions and the deterministic verification gate. Production acceptance should confirm a clean known-format PDF records without a Groq verification call, while an unsafe/ambiguous PDF still falls back to Groq or review-required.
+
