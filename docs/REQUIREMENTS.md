@@ -654,3 +654,26 @@ Requirements:
 - raw PDF access must use a short-lived signed Storage URL created only after authenticated mobile authorization
 - Dispatch UI may use only actual parsed document fields such as vehicle/destination/consignee; it must not invent driver assignment or delivered states that do not exist in the current data model
 - responses must be no-store and must not return secret values or full sender phone numbers by default.
+
+### R60 - Fast WhatsApp operational queries use stored structured data
+
+After an inbound bill has been parsed and persisted, routine WhatsApp questions must use the stored operational data rather than re-reading the PDF.
+
+The first bounded query set is:
+
+- today's received PDF bill count
+- pending/review-required bill count
+- latest received bill summary
+- current stock for an exact canonical or operator-approved product alias
+
+Rules:
+
+- exact operational queries use narrow database reads and do not call Groq
+- stock answers derive from the immutable stock ledger/current balance view
+- product identity remains fail-closed; an unknown spelling must not be fuzzy-selected just to answer quickly
+- a pending document Edit session has priority over query interpretation, so correction values cannot be consumed as unrelated questions
+- duplicate inbound delivery must not create duplicate automatic replies
+- query handling must not scan or serialize the full document history into AI context
+- an AI fallback may be added later only for language/intent resolution, with minimal retrieved facts; AI must not become the stock/accounting source of truth
+- raw PDFs must never be sent to the AI query layer
+
