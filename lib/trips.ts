@@ -622,7 +622,13 @@ async function finalizeTripCollection(
     drafts.find(
       (draft) => cleanDestination(draft.destination) === primaryDestination,
     ) ?? drafts[0] ?? null;
-  const primaryPincode = primaryDraft ? extractPincodeFromDraft(primaryDraft) : null;
+  const primaryPincode = primaryDestination
+    ? primaryDraft
+      ? extractPincodeFromDraft(primaryDraft)
+      : null
+    : choosePrimaryDestination(
+        drafts.map((draft) => extractPincodeFromDraft(draft)),
+      );
   const pincodeLocation = primaryDestination
     ? null
     : await resolvePincodeLocation(primaryPincode);
