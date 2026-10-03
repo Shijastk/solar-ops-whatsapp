@@ -14,6 +14,7 @@ type StoredMediaRow = {
   media_id: string | null;
   original_filename: string | null;
   mime_type: string | null;
+  media_sha256: string | null;
   received_at: string;
   storage_path: string | null;
 };
@@ -88,7 +89,7 @@ async function loadStoredMediaRow(messageId: string): Promise<StoredMediaRow> {
   const { data, error } = await supabase
     .from("whatsapp_messages")
     .select(
-      "id, whatsapp_message_id, sender_phone, message_type, media_id, original_filename, mime_type, received_at, storage_path",
+      "id, whatsapp_message_id, sender_phone, message_type, media_id, original_filename, mime_type, media_sha256, received_at, storage_path",
     )
     .eq("id", messageId)
     .maybeSingle();
@@ -216,7 +217,7 @@ async function obtainMediaBytes(row: StoredMediaRow): Promise<{
     bytes: media.bytes,
     storagePath,
     mimeType: media.mimeType,
-    sha256: media.sha256 ?? null,
+    sha256: media.sha256 ?? row.media_sha256 ?? null,
     reusedStoredBytes: false,
   };
 }
