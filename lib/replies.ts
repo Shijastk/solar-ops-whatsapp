@@ -214,12 +214,14 @@ export async function sendOpsReplyButtons(input: {
   replyToMessageId: string;
   body: string;
   buttons: WhatsAppReplyButton[];
+  knownInboundAt?: string | Date;
 }): Promise<SendResult> {
   return sendPersistedReply({
     requestId: input.requestId,
     replyToMessageId: input.replyToMessageId,
     body: input.body,
     messageKind: "interactive",
+    knownInboundAt: input.knownInboundAt,
     send: ({ recipientPhone, whatsappMessageId }) =>
       sendWhatsAppReplyButtons({
         recipientPhone,
@@ -237,12 +239,14 @@ export async function sendOpsList(input: {
   buttonText: string;
   rows: WhatsAppListRow[];
   sectionTitle?: string;
+  knownInboundAt?: string | Date;
 }): Promise<SendResult> {
   return sendPersistedReply({
     requestId: input.requestId,
     replyToMessageId: input.replyToMessageId,
     body: input.body,
     messageKind: "interactive",
+    knownInboundAt: input.knownInboundAt,
     send: ({ recipientPhone, whatsappMessageId }) =>
       sendWhatsAppList({
         recipientPhone,
