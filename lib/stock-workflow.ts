@@ -2,6 +2,7 @@ import { deterministicUuid } from "@/lib/idempotency";
 import { sendOpsList, sendOpsReply, sendOpsReplyButtons } from "@/lib/replies";
 import {
   applyStockOutForDraft,
+  ensureStockCatalogForDraft,
   listCompanySuggestions,
   listProductSuggestions,
   saveCompanyAlias,
@@ -127,7 +128,7 @@ async function sendSuccess(
     body:
       "✅ " +
       documentLabel(draft) +
-      "-ന്റെ സ്റ്റോക്ക് വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു. സ്റ്റോക്ക് ഒരിക്കൽ മാത്രം കുറച്ചിട്ടുണ്ട്.",
+      "-ന്റെ outgoing stock history-ൽ രേഖപ്പെടുത്തി. ഒരിക്കൽ മാത്രം രേഖപ്പെടുത്തിയിട്ടുണ്ട്.",
     buttons: [
       { id: "so:doc:edit:" + draft.id, title: "ബിൽ തിരുത്തുക" },
       { id: "so:doc:delete:" + draft.id, title: "ഒഴിവാക്കുക" },
@@ -294,6 +295,7 @@ export async function processStockForDraft(input: {
     throw new Error("Stock draft was not found");
   }
 
+  await ensureStockCatalogForDraft(input.draftId);
   const result = await applyStockOutForDraft(input.draftId);
 
   try {
