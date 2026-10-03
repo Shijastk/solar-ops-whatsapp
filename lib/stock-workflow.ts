@@ -87,7 +87,9 @@ async function loadDraftContext(
     .maybeSingle();
 
   if (messageError) {
-    throw new Error("Failed to load stock draft sender: " + messageError.message);
+    throw new Error(
+      "Failed to load stock draft sender: " + messageError.message,
+    );
   }
   if (!message) {
     throw new Error("Stock draft sender was not found");
@@ -180,8 +182,7 @@ async function notifyProductMatch(
     await sendOpsReply({
       requestId: deterministicUuid("stock-product-invalid:" + draft.id),
       replyToMessageId,
-      body:
-        "⚠️ സാധനത്തിന്റെ ബന്ധിപ്പിക്കൽ വിവരങ്ങൾ പൂർത്തിയായിട്ടില്ലാത്തതിനാൽ സ്റ്റോക്ക് മാറ്റിയിട്ടില്ല. Solar Ops-ൽ ബിൽ പരിശോധിക്കുക.",
+      body: "⚠️ സാധനത്തിന്റെ ബന്ധിപ്പിക്കൽ വിവരങ്ങൾ പൂർത്തിയായിട്ടില്ലാത്തതിനാൽ സ്റ്റോക്ക് മാറ്റിയിട്ടില്ല. Solar Ops-ൽ ബിൽ പരിശോധിക്കുക.",
     });
     return;
   }
@@ -228,8 +229,10 @@ async function notifyProductMatch(
         ":" +
         product.id,
       title: shortTitle(product.canonical_name),
-      description:
-        shortTitle(product.unit + (product.hsn_sac ? " · HSN " + product.hsn_sac : ""), 72),
+      description: shortTitle(
+        product.unit + (product.hsn_sac ? " · HSN " + product.hsn_sac : ""),
+        72,
+      ),
     })),
   });
 }
@@ -245,10 +248,7 @@ async function notifyInsufficient(
 
   await sendOpsReplyButtons({
     requestId: deterministicUuid(
-      "stock-insufficient:" +
-        draft.id +
-        ":" +
-        (result.product_id ?? "unknown"),
+      "stock-insufficient:" + draft.id + ":" + (result.product_id ?? "unknown"),
     ),
     replyToMessageId,
     body:
@@ -296,8 +296,34 @@ export async function processStockForDraft(input: {
     throw new Error("Stock draft was not found");
   }
 
-  await ensureStockCatalogForDraft(input.draftId);
-  const result = await applyStockOutForDraft(input.draftId);
+  const { data: claim, error: claimError } = await getSupabaseAdmin().rpc(
+    "claim_stock_document",
+    { p_draft_id: input.draftId },
+  );
+  if (claimError)
+    throw new Error("Failed to claim stock document: " + claimError.message);
+  let result: StockResult;
+  if (claim?.status !== "claimed") {
+    result = claim as StockResult;
+  } else {
+    try {
+      await ensureStockCatalogForDraft(input.draftId);
+      result = await applyStockOutForDraft(input.draftId);
+    } catch (error) {
+      const { error: persistError } = await getSupabaseAdmin()
+        .from("document_drafts")
+        .update({
+          stock_error: "stock_processing_failed",
+          stock_updated_at: new Date().toISOString(),
+        })
+        .eq("id", input.draftId);
+      if (persistError)
+        console.error("Failed to persist stock failure", {
+          draftId: input.draftId,
+        });
+      throw error;
+    }
+  }
 
   if (input.suppressNotifications) {
     return result;

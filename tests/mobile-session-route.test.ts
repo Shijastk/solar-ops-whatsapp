@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 describe("mobile session route", () => {
-  it("returns a signed short-lived session for the valid access key", async () => {
+  it("returns a signed 90-day device session for the valid access key", async () => {
     const response = await POST(
       new Request("https://ops.example.test/api/mobile/v1/session", {
         method: "POST",
@@ -35,6 +35,7 @@ describe("mobile session route", () => {
     const body = await response.json();
     expect(typeof body.token).toBe("string");
     expect(typeof body.expiresAt).toBe("string");
+    expect(new Date(body.expiresAt).getTime() - Date.now()).toBeGreaterThan(89 * 24 * 60 * 60 * 1000);
   });
 
   it("does not issue a session for an invalid key", async () => {
@@ -51,3 +52,4 @@ describe("mobile session route", () => {
     expect(body).toEqual({ error: "Invalid access key" });
   });
 });
+

@@ -1,3 +1,4 @@
+import { cleanDestination } from "@/lib/trips";
 import { getHealthConfiguration } from "@/lib/env";
 import {
   buildOpsConversations,
@@ -7,6 +8,7 @@ import {
   type OpsDocumentDraft,
   type OpsMessage,
 } from "@/lib/ops-data";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { verifyOpsSession } from "@/lib/ops-auth";
 import { isWithinCustomerServiceWindow } from "@/lib/replies";
 import {
@@ -77,7 +79,9 @@ function displayDay(value: Date): string {
   }).format(value);
 }
 
-function normalizeCompanyGstin(value: string | null | undefined): string | null {
+function normalizeCompanyGstin(
+  value: string | null | undefined,
+): string | null {
   if (!value) return null;
   const normalized = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
   return normalized.length === 15 ? normalized : null;
@@ -85,15 +89,15 @@ function normalizeCompanyGstin(value: string | null | undefined): string | null 
 
 export function resolveMobileCompany(
   draft:
-    | Pick<OpsDocumentDraft, "stock_company_id" | "supplier_gstin">
-    | undefined,
+    Pick<OpsDocumentDraft, "stock_company_id" | "supplier_gstin"> | undefined,
   companies: StockCompany[],
 ): StockCompany | null {
   if (!draft) return null;
 
   if (draft.stock_company_id) {
     const mapped = companies.find(
-      (company) => company.id === draft.stock_company_id && company.gstin !== null,
+      (company) =>
+        company.id === draft.stock_company_id && company.gstin !== null,
     );
     if (mapped) return mapped;
   }
@@ -117,7 +121,7 @@ function draftNeedsReview(draft: OpsDocumentDraft | undefined): boolean {
   );
 }
 
-function serializeDraft(draft: OpsDocumentDraft | undefined) {
+export function serializeDraft(draft: OpsDocumentDraft | undefined) {
   if (!draft) return null;
 
   return {
@@ -136,7 +140,7 @@ function serializeDraft(draft: OpsDocumentDraft | undefined) {
     buyerName: draft.buyer_name,
     buyerAddress: draft.buyer_address,
     buyerGstin: draft.buyer_gstin,
-    destination: draft.destination,
+    destination: cleanDestination(draft.destination),
     dispatchFromAddress: draft.dispatch_from_address,
     vehicleNumber: draft.vehicle_number,
     approximateDistanceKm: draft.approximate_distance_km,
@@ -169,21 +173,22 @@ function serializeDraft(draft: OpsDocumentDraft | undefined) {
   };
 }
 
-export async function buildMobileBootstrap(now = new Date()) {
-  const [messages, outbound, companies, balances, stockHistory] = await Promise.all([
-    listOpsMessages(150),
-    listOpsOutboundMessages(250),
-    listStockCompanies(),
-    listStockBalances(),
-    listStockHistory(60),
-  ]);
+export async function buildMobileBootstrap(now = new Date(), compact = false) {
+  const [messages, outbound, companies, balances, stockHistory] =
+    await Promise.all([
+      listOpsMessages(compact ? 80 : 150),
+      compact ? Promise.resolve([]) : listOpsOutboundMessages(250),
+      listStockCompanies(),
+      listStockBalances(),
+      compact ? Promise.resolve([]) : listStockHistory(60),
+    ]);
 
   const billMessages = messages.filter(isPdfOpsMessage);
   const drafts = await listOpsDraftsForMessages(
     billMessages.map((message) => message.id),
   );
 
-  const bills = billMessages.map((message) => {
+  let bills = billMessages.map((message) => {
     const draft = drafts.get(message.id);
     const company = resolveMobileCompany(draft, companies);
     return {
@@ -203,6 +208,39 @@ export async function buildMobileBootstrap(now = new Date()) {
     };
   });
 
+  if (compact) {
+    const ids = bills.flatMap((b) => (b.draft ? [b.draft.id] : []));
+    const { data: claims, error: claimError } = ids.length
+      ? await getSupabaseAdmin()
+          .from("stock_document_claims")
+          .select("draft_id")
+          .in("draft_id", ids)
+      : { data: [], error: null };
+    if (claimError) throw new Error("Could not load original bill identities");
+    const owners = new Set((claims ?? []).map((c) => c.draft_id));
+    bills.sort(
+      (a, b) =>
+        Number(owners.has(b.draft?.id ?? "")) -
+          Number(owners.has(a.draft?.id ?? "")) ||
+        Number(b.draft?.workflowStatus === "recorded") -
+          Number(a.draft?.workflowStatus === "recorded") ||
+        a.receivedAt.localeCompare(b.receivedAt),
+    );
+    const seen = new Set<string>();
+    bills = bills.filter((b) => {
+      if (b.draft?.stockStatus === "duplicate_document") return false;
+      const key =
+        b.draft?.supplierGstin && b.draft?.documentNumber
+          ? (b.draft.supplierGstin + ":" + b.draft.documentNumber)
+              .toUpperCase()
+              .replace(/[^A-Z0-9:]/g, "")
+          : b.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    bills.sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
+  }
   const todayKey = dateKey(now);
   const pendingReview = billMessages.filter((message) =>
     draftNeedsReview(drafts.get(message.id)),
@@ -217,8 +255,9 @@ export async function buildMobileBootstrap(now = new Date()) {
     return {
       key,
       label: displayDay(date),
-      count: billMessages.filter((message) => dateKey(message.received_at) === key)
-        .length,
+      count: billMessages.filter(
+        (message) => dateKey(message.received_at) === key,
+      ).length,
     };
   });
 
@@ -228,43 +267,49 @@ export async function buildMobileBootstrap(now = new Date()) {
   );
 
   const health = getHealthConfiguration();
-  const conversations = buildOpsConversations(messages, outbound).map((conversation) => {
-    const latestInbound = conversation.messages[conversation.messages.length - 1] ?? null;
-    const timeline = [
-      ...conversation.messages.map((message) => ({
-        type: "inbound" as const,
-        time: message.received_at,
-        id: message.id,
-        messageType: message.message_type,
-        textBody: message.text_body,
-        fileName: message.original_filename,
-        mimeType: message.mime_type,
-        mediaSizeBytes: message.media_size_bytes,
-        storageAvailable: Boolean(message.storage_path),
-        processingStatus: message.processing_status,
-      })),
-      ...conversation.outbound.map((message) => ({
-        type: "outbound" as const,
-        time: message.sent_at || message.created_at,
-        id: message.id,
-        body: message.body,
-        status: message.status,
-        errorMessage: message.error_message,
-      })),
-    ].sort((left, right) => new Date(left.time).getTime() - new Date(right.time).getTime());
+  const conversations = buildOpsConversations(messages, outbound).map(
+    (conversation) => {
+      const latestInbound =
+        conversation.messages[conversation.messages.length - 1] ?? null;
+      const timeline = [
+        ...conversation.messages.map((message) => ({
+          type: "inbound" as const,
+          time: message.received_at,
+          id: message.id,
+          messageType: message.message_type,
+          textBody: message.text_body,
+          fileName: message.original_filename,
+          mimeType: message.mime_type,
+          mediaSizeBytes: message.media_size_bytes,
+          storageAvailable: Boolean(message.storage_path),
+          processingStatus: message.processing_status,
+        })),
+        ...conversation.outbound.map((message) => ({
+          type: "outbound" as const,
+          time: message.sent_at || message.created_at,
+          id: message.id,
+          body: message.body,
+          status: message.status,
+          errorMessage: message.error_message,
+        })),
+      ].sort(
+        (left, right) =>
+          new Date(left.time).getTime() - new Date(right.time).getTime(),
+      );
 
-    return {
-      key: conversation.key,
-      senderName: conversation.senderName,
-      senderPhoneMasked: maskMobilePhone(conversation.senderPhone),
-      latestReceivedAt: conversation.latestReceivedAt,
-      latestInboundMessageId: latestInbound?.id ?? null,
-      canReply: latestInbound
-        ? isWithinCustomerServiceWindow(latestInbound.received_at, now)
-        : false,
-      timeline,
-    };
-  });
+      return {
+        key: conversation.key,
+        senderName: conversation.senderName,
+        senderPhoneMasked: maskMobilePhone(conversation.senderPhone),
+        latestReceivedAt: conversation.latestReceivedAt,
+        latestInboundMessageId: latestInbound?.id ?? null,
+        canReply: latestInbound
+          ? isWithinCustomerServiceWindow(latestInbound.received_at, now)
+          : false,
+        timeline,
+      };
+    },
+  );
 
   return {
     apiVersion: MOBILE_API_VERSION,
@@ -287,7 +332,7 @@ export async function buildMobileBootstrap(now = new Date()) {
       dailyBills,
     },
     bills,
-    conversations,
+    conversations: compact ? [] : conversations,
     dispatches: bills
       .filter((bill) => bill.draft !== null)
       .map((bill) => ({

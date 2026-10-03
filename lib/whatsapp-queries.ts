@@ -727,7 +727,7 @@ async function latestTripSummary(): Promise<string> {
   const names = await driverNamesById(
     rows.map((row) => row.driver_id).filter((id): id is string => Boolean(id)),
   );
-  return formatTripSummary(rows, names, "Latest completed trip:");
+  return formatTripSummary(rows, names, "Latest saved trip:");
 }
 
 async function operationalPeriodSummary(
@@ -751,7 +751,7 @@ async function operationalPeriodSummary(
     "Bills: " + String(Number(row?.bill_count ?? 0)),
     "Verified: " + String(Number(row?.verified_bill_count ?? 0)),
     "Needs review: " + String(Number(row?.review_bill_count ?? 0)),
-    "Completed trips: " + String(Number(row?.completed_trip_count ?? 0)),
+    "Ready trips: " + String(Number(row?.completed_trip_count ?? 0)),
   ].join("\n");
 }
 
@@ -875,3 +875,4 @@ export async function handleFastWhatsAppQuery(
 
   return "handled";
 }
+

@@ -37,6 +37,7 @@ type TripDraftRow = {
   workflow_status: string;
   verification_status: string;
   parse_status: string;
+  stock_status: string;
   destination: string | null;
   consignee_pincode: string | null;
   buyer_pincode: string | null;
@@ -138,18 +139,22 @@ function displayCase(value: string): string {
   if (compact !== compact.toUpperCase()) return compact;
   return compact
     .toLowerCase()
-    .replace(/(^|\s)(\p{L})/gu, (_, prefix: string, letter: string) =>
-      prefix + letter.toUpperCase(),
+    .replace(
+      /(^|\s)(\p{L})/gu,
+      (_, prefix: string, letter: string) => prefix + letter.toUpperCase(),
     );
 }
 
-function cleanDestination(value: string | null | undefined): string | null {
-  if (!value) return null;
+export function cleanDestination(
+  value: string | null | undefined,
+): string | null {
+  if (!value || /(?:state\s*name|gstin|code\s*:)/i.test(value)) return null;
   const cleaned = value
     .normalize("NFKC")
+    .replace(/\b(?:mobile|phone|tel)\b.*$/i, "")
     .replace(/\b[1-9][0-9]{5}\b/g, " ")
     .replace(/\b(?:kerala|state)\b/gi, " ")
-    .replace(/[|,;]+/g, " ")
+    .replace(/[|,;:-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   return cleaned ? displayCase(cleaned) : null;
@@ -199,9 +204,7 @@ function parseCsvLine(line: string): string[] {
   return cells;
 }
 
-export function parseIndiaPostPincodeCsv(
-  csv: string,
-): PincodeLocation | null {
+export function parseIndiaPostPincodeCsv(csv: string): PincodeLocation | null {
   const lines = csv
     .replace(/^\uFEFF/, "")
     .split(/\r?\n/)
@@ -245,8 +248,7 @@ export function parseIndiaPostPincodeCsv(
   return {
     district: mode(districtIndex),
     state: mode(stateIndex),
-    postOffice:
-      officeIndex >= 0 ? nonEmpty[officeIndex]?.trim() || null : null,
+    postOffice: officeIndex >= 0 ? nonEmpty[officeIndex]?.trim() || null : null,
   };
 }
 
@@ -321,7 +323,10 @@ export function buildTripDisplayName(input: {
   const destination = cleanDestination(input.destination);
   const district = input.district ? displayCase(input.district) : null;
 
-  let base = destination || district || (input.pincode ? "PIN " + input.pincode : "Trip");
+  let base =
+    destination ||
+    district ||
+    (input.pincode ? "PIN " + input.pincode : "Trip");
 
   if (
     destination &&
@@ -333,7 +338,8 @@ export function buildTripDisplayName(input: {
 
   const additionalStops = Math.max(0, input.additionalStops ?? 0);
   if (additionalStops > 0) {
-    base += " + " + additionalStops + " stop" + (additionalStops === 1 ? "" : "s");
+    base +=
+      " + " + additionalStops + " stop" + (additionalStops === 1 ? "" : "s");
   }
 
   return base.slice(0, 160);
@@ -379,7 +385,6 @@ async function loadTripForSender(
   return (data as TripRow | null) ?? null;
 }
 
-
 async function loadTripById(tripId: string): Promise<TripRow | null> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -401,8 +406,7 @@ async function sendHomeMenu(
   await sendOpsList({
     requestId: deterministicUuid("trip-home-menu:" + storedMessageId),
     replyToMessageId: storedMessageId,
-    body:
-      "☀️ Solar Ops\nBills, trips, stock — godown daily work എളുപ്പമായി manage ചെയ്യാം.",
+    body: "☀️ Solar Ops\nBills, trips, stock — godown daily work എളുപ്പമായി manage ചെയ്യാം.",
     buttonText: "Open menu",
     sectionTitle: "Solar Ops",
     knownInboundAt,
@@ -472,8 +476,7 @@ async function startTrip(
   await sendOpsReply({
     requestId: deterministicUuid("trip-opened:" + storedMessageId),
     replyToMessageId: storedMessageId,
-    body:
-      "🚚 New Trip തുറന്നു. ഇനി PDF bills തുടർച്ചയായി അയക്കൂ — ഓരോ bill-നും reply കാത്തിരിക്കേണ്ട. എല്ലാം അയച്ച ശേഷം done / ശരി / complete എന്ന് അയക്കൂ.",
+    body: "🚚 New Trip തുറന്നു. ഇനി PDF bills തുടർച്ചയായി അയക്കൂ — ഓരോ bill-നും reply കാത്തിരിക്കേണ്ട. എല്ലാം അയച്ച ശേഷം done / ശരി / complete എന്ന് അയക്കൂ.",
     knownInboundAt: message.timestamp,
   });
 }
@@ -517,11 +520,12 @@ async function loadTripDrafts(ids: string[]): Promise<TripDraftRow[]> {
   const { data, error } = await supabase
     .from("document_drafts")
     .select(
-      "id, workflow_status, verification_status, parse_status, destination, consignee_pincode, buyer_pincode, vehicle_number, document_number, consignee_name",
+      "id, workflow_status, verification_status, parse_status, stock_status, destination, consignee_pincode, buyer_pincode, vehicle_number, document_number, consignee_name",
     )
     .in("id", ids);
 
-  if (error) throw new Error("Failed to load trip bill drafts: " + error.message);
+  if (error)
+    throw new Error("Failed to load trip bill drafts: " + error.message);
 
   const byId = new Map(
     ((data ?? []) as TripDraftRow[]).map((draft) => [draft.id, draft]),
@@ -535,23 +539,18 @@ export function choosePrimaryDestination(
   values: Array<string | null>,
 ): string | null {
   const counts = new Map<string, number>();
-  let best: string | null = null;
-  let bestCount = 0;
-
   for (const value of values) {
     const compact = value?.trim();
-    if (!compact) continue;
-
-    const count = (counts.get(compact) ?? 0) + 1;
-    counts.set(compact, count);
-
-    // Strictly greater preserves the first-uploaded destination when counts tie.
+    if (compact) counts.set(compact, (counts.get(compact) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [value, count] of counts) {
     if (count > bestCount) {
-      best = compact;
+      best = value;
       bestCount = count;
     }
   }
-
   return best;
 }
 
@@ -597,10 +596,7 @@ async function sendDriverPicker(
   });
 }
 
-async function sendTripReadySummary(
-  trip: TripRow,
-  replyToMessageId: string,
-) {
+async function sendTripReadySummary(trip: TripRow, replyToMessageId: string) {
   const supabase = getSupabaseAdmin();
   const docs = await loadTripDocuments(trip.id);
   const drafts = await loadTripDrafts(
@@ -609,7 +605,8 @@ async function sendTripReadySummary(
   const ready = drafts.filter(
     (draft) =>
       draft.workflow_status === "recorded" &&
-      draft.verification_status === "verified",
+      ["verified", "manual_override"].includes(draft.verification_status) &&
+      ["applied", "duplicate_document"].includes(draft.stock_status),
   ).length;
   const review = drafts.filter(
     (draft) => draft.workflow_status === "review_required",
@@ -632,14 +629,18 @@ async function sendTripReadySummary(
     requestId: deterministicUuid("trip-ready:" + trip.id),
     replyToMessageId,
     body:
-      "✅ Trip ready\n" +
+      (ready === drafts.length &&
+      docs.every((doc) => doc.processing_status === "parsed") &&
+      ready > 0
+        ? "✅ Trip ready\n"
+        : "⚠️ Trip saved — check bills\n") +
       (trip.display_name ?? "Trip") +
       "\nBills: " +
       docs.length +
       (driverName ? "\nDriver: " + driverName : "") +
       (trip.vehicle_number ? "\nVehicle: " + trip.vehicle_number : "") +
       (review > 0 ? "\n⚠️ " + review + " bill needs review" : "") +
-      (ready > 0 ? "\n✅ " + ready + " bill verified" : ""),
+      (ready > 0 ? "\n✅ " + ready + " bill stock updated" : ""),
   });
 }
 
@@ -651,7 +652,9 @@ async function finalizeTripCollection(
   const docs = await loadTripDocuments(tripId);
   if (docs.length === 0) return "empty";
 
-  const pending = docs.filter((doc) => doc.processing_status === "pending").length;
+  const pending = docs.filter(
+    (doc) => doc.processing_status === "pending",
+  ).length;
   if (pending > 0) return "waiting";
 
   const draftIds = docs
@@ -659,12 +662,16 @@ async function finalizeTripCollection(
     .filter((id): id is string => Boolean(id));
   const drafts = await loadTripDrafts(draftIds);
 
-  const destinations = drafts.map((draft) => cleanDestination(draft.destination));
+  const destinations = drafts.map((draft) =>
+    cleanDestination(draft.destination),
+  );
   const primaryDestination = choosePrimaryDestination(destinations);
   const primaryDraft =
     drafts.find(
       (draft) => cleanDestination(draft.destination) === primaryDestination,
-    ) ?? drafts[0] ?? null;
+    ) ??
+    drafts[0] ??
+    null;
   const primaryPincode = primaryDestination
     ? primaryDraft
       ? extractPincodeFromDraft(primaryDraft)
@@ -733,6 +740,30 @@ async function finalizeTripCollection(
   return "finalized";
 }
 
+export async function finishTripAfterDuplicate(
+  tripId: string,
+  replyToMessageId: string,
+) {
+  const current = await loadTripById(tripId);
+  if (
+    !current ||
+    current.status === "collecting" ||
+    current.status === "ready" ||
+    current.status === "cancelled"
+  )
+    return;
+  const docs = await loadTripDocuments(tripId);
+  if (docs.length === 0) {
+    const { error } = await getSupabaseAdmin()
+      .from("delivery_trips")
+      .update({ status: "collecting", updated_at: new Date().toISOString() })
+      .eq("id", tripId)
+      .eq("status", current.status);
+    if (error) throw new Error("Could not reopen empty trip");
+  } else if (current.status === "closing")
+    await finalizeTripCollection(tripId, replyToMessageId);
+}
+
 export async function markTripDocumentProcessed(input: {
   messageId: string;
   draftId?: string | null;
@@ -748,7 +779,9 @@ export async function markTripDocumentProcessed(input: {
     .maybeSingle();
 
   if (readError) {
-    throw new Error("Failed to load trip document reservation: " + readError.message);
+    throw new Error(
+      "Failed to load trip document reservation: " + readError.message,
+    );
   }
   if (!current) return;
 
@@ -762,14 +795,16 @@ export async function markTripDocumentProcessed(input: {
     })
     .eq("message_id", input.messageId);
 
-  if (error) throw new Error("Failed to update trip document: " + error.message);
+  if (error)
+    throw new Error("Failed to update trip document: " + error.message);
 
   const { data: trip, error: tripError } = await supabase
     .from("delivery_trips")
     .select("status")
     .eq("id", current.trip_id)
     .maybeSingle();
-  if (tripError) throw new Error("Failed to inspect closing trip: " + tripError.message);
+  if (tripError)
+    throw new Error("Failed to inspect closing trip: " + tripError.message);
 
   if (trip?.status === "closing") {
     await finalizeTripCollection(current.trip_id, input.replyToMessageId);
@@ -800,7 +835,9 @@ async function closeTripCollection(
 
   if (trip.status === "awaiting_driver_name") {
     await sendOpsReply({
-      requestId: deterministicUuid("trip-driver-name-reminder:" + storedMessageId),
+      requestId: deterministicUuid(
+        "trip-driver-name-reminder:" + storedMessageId,
+      ),
       replyToMessageId: storedMessageId,
       knownInboundAt: message.timestamp,
       body: "പുതിയ driver-ന്റെ പേര് അയക്കൂ.",
@@ -810,7 +847,9 @@ async function closeTripCollection(
 
   if (trip.status === "closing") {
     await sendOpsReply({
-      requestId: deterministicUuid("trip-driver-already-set:" + storedMessageId),
+      requestId: deterministicUuid(
+        "trip-driver-already-set:" + storedMessageId,
+      ),
       replyToMessageId: storedMessageId,
       knownInboundAt: message.timestamp,
       body: "✅ Driver already set. Trip automatically complete ചെയ്യും.",
@@ -844,13 +883,17 @@ async function closeTripCollection(
     )
     .single();
 
-  if (error) throw new Error("Failed to close trip collection: " + error.message);
+  if (error)
+    throw new Error("Failed to close trip collection: " + error.message);
 
   // Ask for the driver immediately. Bill parsing/verification continues in the background.
   await sendDriverPicker(updated as TripRow, storedMessageId, docs.length);
 }
 
-async function cancelTrip(message: NormalizedWhatsAppMessage, storedMessageId: string) {
+async function cancelTrip(
+  message: NormalizedWhatsAppMessage,
+  storedMessageId: string,
+) {
   const trip = await loadActiveTrip(message.senderPhone);
   if (!trip) return;
 
@@ -884,11 +927,14 @@ async function assignDriver(input: {
     .eq("active", true)
     .maybeSingle();
 
-  if (driverError) throw new Error("Failed to load driver: " + driverError.message);
+  if (driverError)
+    throw new Error("Failed to load driver: " + driverError.message);
   if (!driver) throw new Error("Driver was not found");
 
   const docs = await loadTripDocuments(input.trip.id);
-  const pending = docs.filter((doc) => doc.processing_status === "pending").length;
+  const pending = docs.filter(
+    (doc) => doc.processing_status === "pending",
+  ).length;
   const now = new Date().toISOString();
 
   const { error } = await supabase
@@ -922,10 +968,7 @@ async function assignDriver(input: {
   await finalizeTripCollection(input.trip.id, input.replyToMessageId);
 }
 
-async function promptNewDriver(
-  trip: TripRow,
-  replyToMessageId: string,
-) {
+async function promptNewDriver(trip: TripRow, replyToMessageId: string) {
   const supabase = getSupabaseAdmin();
   const { error } = await supabase
     .from("delivery_trips")
@@ -936,7 +979,8 @@ async function promptNewDriver(
     .eq("id", trip.id)
     .eq("status", "awaiting_driver");
 
-  if (error) throw new Error("Failed to request new driver name: " + error.message);
+  if (error)
+    throw new Error("Failed to request new driver name: " + error.message);
 
   await sendOpsReply({
     requestId: deterministicUuid("trip-new-driver:" + trip.id),
@@ -969,7 +1013,9 @@ async function createAndAssignDriver(
     .maybeSingle();
 
   if (existingError) {
-    throw new Error("Failed to check driver identity: " + existingError.message);
+    throw new Error(
+      "Failed to check driver identity: " + existingError.message,
+    );
   }
 
   let driver = existing;
@@ -1000,8 +1046,7 @@ async function handleMenuAction(
       requestId: deterministicUuid("menu-stock:" + storedMessageId),
       replyToMessageId: storedMessageId,
       knownInboundAt,
-      body:
-        "📦 Stock\nProduct name + stock എന്ന് ചോദിക്കാം. ഉദാ: Emmvee 560 panel stock ethra. Stock add ചെയ്യുന്നത് Solar Ops mobile app-ൽ.",
+      body: "📦 Stock\nProduct name + stock എന്ന് ചോദിക്കാം. ഉദാ: Emmvee 560 panel stock ethra. Stock add ചെയ്യുന്നത് Solar Ops mobile app-ൽ.",
     });
     return true;
   }
@@ -1010,8 +1055,7 @@ async function handleMenuAction(
       requestId: deterministicUuid("menu-bills:" + storedMessageId),
       replyToMessageId: storedMessageId,
       knownInboundAt,
-      body:
-        "📄 Bills\nPDF bill നേരിട്ട് അയക്കാം. Open trip ഉണ്ടെങ്കിൽ അതിലേക്ക് attach ചെയ്യും; ഇല്ലെങ്കിൽ standalone bill ആയി process ചെയ്യും.",
+      body: "📄 Bills\nPDF bill നേരിട്ട് അയക്കാം. Open trip ഉണ്ടെങ്കിൽ അതിലേക്ക് attach ചെയ്യും; ഇല്ലെങ്കിൽ standalone bill ആയി process ചെയ്യും.",
     });
     return true;
   }
@@ -1020,8 +1064,7 @@ async function handleMenuAction(
       requestId: deterministicUuid("menu-more:" + storedMessageId),
       replyToMessageId: storedMessageId,
       knownInboundAt,
-      body:
-        "Quick commands:\ntrip — പുതിയ trip\ndone / ശരി — trip bills complete\nHi — menu\nStock questions നേരിട്ട് type ചെയ്യാം.\nഈ ആഴ്ച / മാസം / വർഷം summary എന്നും ചോദിക്കാം.",
+      body: "Quick commands:\ntrip — പുതിയ trip\ndone / ശരി — trip bills complete\nHi — menu\nStock questions നേരിട്ട് type ചെയ്യാം.\nഈ ആഴ്ച / മാസം / വർഷം summary എന്നും ചോദിക്കാം.",
     });
     return true;
   }

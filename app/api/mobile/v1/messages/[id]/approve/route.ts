@@ -27,7 +27,7 @@ export async function POST(
     const stock = await processStockForDraft({
       draftId,
       replyToMessageId: id,
-      notifySuccess: true,
+      suppressNotifications: true,
     });
 
     return Response.json(
@@ -45,3 +45,4 @@ export async function POST(
     );
   }
 }
+
