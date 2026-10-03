@@ -28,6 +28,13 @@ const strictResponseSchema = {
   additionalProperties: false,
 } as const;
 
+export function fixedOperationalFallback(): string {
+  return [
+    "ഈ request-ന് live operational data safely resolve ചെയ്യാൻ കഴിഞ്ഞില്ല.",
+    "Try: ഇന്നത്തെ bills · pending bills · latest bill · <product> stock · ഇന്നത്തെ trip · latest trip.",
+  ].join("\n");
+}
+
 export function fixedUniversalFallback(text: string): string {
   const normalized = text.normalize("NFKC").trim().toLowerCase();
 
