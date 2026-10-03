@@ -236,6 +236,7 @@ export async function sendOpsList(input: {
   body: string;
   buttonText: string;
   rows: WhatsAppListRow[];
+  sectionTitle?: string;
 }): Promise<SendResult> {
   return sendPersistedReply({
     requestId: input.requestId,
@@ -249,6 +250,7 @@ export async function sendOpsList(input: {
         body: input.body,
         buttonText: input.buttonText,
         rows: input.rows,
+        sectionTitle: input.sectionTitle,
       }),
   });
 }
