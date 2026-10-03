@@ -177,6 +177,7 @@ export async function sendWhatsAppList(input: {
   body: string;
   buttonText: string;
   rows: WhatsAppListRow[];
+  sectionTitle?: string;
 }): Promise<string> {
   if (input.rows.length < 1 || input.rows.length > 10) {
     throw new Error("WhatsApp list messages require between 1 and 10 rows");
@@ -197,7 +198,7 @@ export async function sendWhatsAppList(input: {
         button: input.buttonText,
         sections: [
           {
-            title: "Edit field",
+            title: input.sectionTitle?.trim() || "Options",
             rows: input.rows.map((row) => ({
               id: row.id,
               title: row.title,
