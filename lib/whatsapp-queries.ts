@@ -5,6 +5,10 @@ import {
   type AiOperationalQueryClassification,
 } from "@/lib/whatsapp-query-intent";
 import { sendOpsReply } from "@/lib/replies";
+import {
+  fixedUniversalFallback,
+  generateUniversalWhatsAppReply,
+} from "@/lib/whatsapp-fallback";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
@@ -647,18 +651,46 @@ export async function handleFastWhatsAppQuery(
   let query = parseFastWhatsAppQuery(message.textBody);
 
   if (!query) {
-    const classification = await classifyOperationalQueryWithGroq(
-      message.textBody,
-    );
-    if (!classification) return "ignored";
-
-    query = mapAiClassificationToFastQuery(classification);
-    if (!query) return "ignored";
-    resolver = "ai_intent";
+    try {
+      const classification = await classifyOperationalQueryWithGroq(
+        message.textBody,
+      );
+      if (classification) {
+        query = mapAiClassificationToFastQuery(classification);
+        if (query) resolver = "ai_intent";
+      }
+    } catch (error) {
+      console.warn("WhatsApp operational intent classification failed", {
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown classification error",
+      });
+    }
   }
 
   const lookupStartedAt = performance.now();
-  const body = await answerFastQuery(query);
+  let body: string;
+
+  if (query) {
+    body = await answerFastQuery(query);
+  } else {
+    resolver = "ai_intent";
+    try {
+      body =
+        (await generateUniversalWhatsAppReply(message.textBody)) ??
+        fixedUniversalFallback(message.textBody);
+    } catch (error) {
+      console.warn("Universal WhatsApp fallback reply failed", {
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown fallback error",
+      });
+      body = fixedUniversalFallback(message.textBody);
+    }
+  }
+
   const lookupDurationMs = Math.round(performance.now() - lookupStartedAt);
 
   const sendStartedAt = performance.now();
@@ -671,7 +703,7 @@ export async function handleFastWhatsAppQuery(
   const sendDurationMs = Math.round(performance.now() - sendStartedAt);
 
   console.info("Fast WhatsApp operational query completed", {
-    intent: query.type,
+    intent: query?.type ?? "universal_fallback",
     resolver,
     lookupDurationMs,
     sendDurationMs,
