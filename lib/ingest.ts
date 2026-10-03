@@ -162,6 +162,7 @@ export async function ingestWhatsAppMessage(
       message.media.filename?.toLowerCase().endsWith(".pdf")
     );
   let reservedTripId: string | null = null;
+  let tripReceiptReply: Promise<void> | null = null;
 
   if (likelyPdfDocument) {
     try {
@@ -169,6 +170,26 @@ export async function ingestWhatsAppMessage(
         senderPhone: message.senderPhone,
         messageId: persistedMessage.id,
       });
+
+      if (reservedTripId) {
+        tripReceiptReply = sendOpsReply({
+          requestId: deterministicUuid(
+            "trip-bill-received:" + message.messageId,
+          ),
+          replyToMessageId: persistedMessage.id,
+          knownInboundAt: message.timestamp,
+          body: "✅ Bill received. Next bill അയക്കാം.",
+        })
+          .then(() => undefined)
+          .catch((error) => {
+            console.warn("Trip bill acknowledgement failed", {
+              reason:
+                error instanceof Error
+                  ? error.message.slice(0, 180)
+                  : "Unknown acknowledgement error",
+            });
+          });
+      }
     } catch (error) {
       console.warn("Trip document reservation did not complete", {
         reason:
@@ -447,8 +468,15 @@ export async function ingestWhatsAppMessage(
       }
     }
 
+    if (tripReceiptReply) {
+      await tripReceiptReply;
+    }
     return "stored";
   } catch (error) {
+    if (tripReceiptReply) {
+      await tripReceiptReply;
+    }
+
     const messageText =
       error instanceof Error ? error.message.slice(0, 1000) : "Unknown error";
 
