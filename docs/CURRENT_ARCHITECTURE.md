@@ -578,3 +578,9 @@ The RPC uses pg_trgm GiST indexes to retrieve only a bounded nearest-candidate s
 
 Fuzzy lookup never writes an alias and never participates in Stock OUT identity resolution. If more than one plausible stock entry remains, each is returned separately instead of being silently merged or selected.
 
+### Fast-query reply latency
+
+Direct operational query replies reuse the signed inbound message timestamp for the WhatsApp 24-hour service-window check instead of performing a second latest-message lookup. Reply idempotency lookup and reply-target lookup run in parallel. Other/manual reply paths keep the existing latest-inbound service-window check.
+
+Fast-query logs record lookup, outbound-send, and total durations separately so future optimization is based on measured latency rather than guesswork.
+
