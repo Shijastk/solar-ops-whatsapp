@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  decideOpeningProductDuplicate,
+  normalizeProductIdentityName,
   normalizeStockGstin,
   normalizeStockName,
   normalizeStockUnit,
@@ -166,5 +168,96 @@ describe("stock input helpers", () => {
         targetQuantity: "10",
       }),
     ).toThrow();
+  });
+
+  it("treats safe singular/plural product wording as the same deterministic identity", () => {
+    expect(
+      normalizeProductIdentityName("Emmvee 560 Wp Topcon Dcr Panels"),
+    ).toBe(
+      normalizeProductIdentityName("Emmvee 560 Wp Topcon Dcr Panel"),
+    );
+
+    expect(normalizeProductIdentityName("Electrical Fittings")).toBe(
+      normalizeProductIdentityName("Electrical Fitting"),
+    );
+  });
+
+  it("keeps model-number and meaningful-token differences distinct", () => {
+    expect(
+      normalizeProductIdentityName("Emmvee 580 Wp Topcon Dcr Panel"),
+    ).not.toBe(
+      normalizeProductIdentityName("Emmvee 560 Wp Topcon Dcr Panel"),
+    );
+
+    expect(
+      normalizeProductIdentityName("Emmvee 560 Wp Topcon Non Dcr Panel"),
+    ).not.toBe(
+      normalizeProductIdentityName("Emmvee 560 Wp Topcon Dcr Panel"),
+    );
+  });
+
+  it("blocks a hard-equivalent duplicate even when similar-product override is enabled", () => {
+    expect(
+      decideOpeningProductDuplicate({
+        productName: "Emmvee 560 Wp Topcon Dcr Panels",
+        allowSimilarProduct: true,
+        candidates: [
+          {
+            product_id: "11111111-1111-4111-8111-111111111111",
+            company_id: "22222222-2222-4222-8222-222222222222",
+            canonical_name: "Emmvee 560 Wp Topcon Dcr Panel",
+            unit: "NOS",
+            hsn_sac: null,
+            similarity_score: 0.96,
+          },
+        ],
+      }),
+    ).toEqual({
+      status: "opening_exists",
+      product_id: "11111111-1111-4111-8111-111111111111",
+      product_name: "Emmvee 560 Wp Topcon Dcr Panel",
+    });
+  });
+
+  it("still allows an explicit override for merely similar but genuinely distinct products", () => {
+    expect(
+      decideOpeningProductDuplicate({
+        productName: "Emmvee 560 Wp Topcon Non Dcr Panel",
+        allowSimilarProduct: true,
+        candidates: [
+          {
+            product_id: "11111111-1111-4111-8111-111111111111",
+            company_id: "22222222-2222-4222-8222-222222222222",
+            canonical_name: "Emmvee 560 Wp Topcon Dcr Panel",
+            unit: "NOS",
+            hsn_sac: null,
+            similarity_score: 0.9,
+          },
+        ],
+      }),
+    ).toBeNull();
+  });
+
+  it("keeps local typo similarity as a warning when no override is given", () => {
+    expect(
+      decideOpeningProductDuplicate({
+        productName: "Emvee 560 Wp Topcon Dcr Panel",
+        allowSimilarProduct: false,
+        candidates: [
+          {
+            product_id: "11111111-1111-4111-8111-111111111111",
+            company_id: "22222222-2222-4222-8222-222222222222",
+            canonical_name: "Emmvee 560 Wp Topcon Dcr Panel",
+            unit: "NOS",
+            hsn_sac: null,
+            similarity_score: 0.94,
+          },
+        ],
+      }),
+    ).toEqual({
+      status: "potential_product_duplicate",
+      product_id: "11111111-1111-4111-8111-111111111111",
+      product_name: "Emmvee 560 Wp Topcon Dcr Panel",
+    });
   });
 });
