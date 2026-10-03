@@ -550,3 +550,23 @@ Unknown product spelling is not fuzzy-selected for a stock answer. The current f
 
 The outbound response reuses lib/replies.ts, including the active customer-service-window check and deterministic request-id idempotency.
 
+### Bounded AI intent fallback
+
+When the deterministic fast-query parser does not recognize a text question, lib/whatsapp-query-intent.ts can perform a second-stage Groq classification only if the message contains a Solar Ops domain hint.
+
+The classifier is deliberately context-light:
+
+- current user message only
+- NFKC-normalized and capped at 500 characters
+- no raw PDF
+- no extracted bill body
+- no database rows or ledger
+- no previous chat history
+- strict JSON Schema output
+- maximum 120 completion tokens
+- low reasoning effort
+
+Supported classifier outputs map only to the existing targeted reads for today's bill count, pending bill count, latest bill, or exact stock balance. Unsupported meaning is ignored rather than guessed.
+
+The query answer itself is still built from Postgres. Groq does not return the stock quantity, bill count, document total, or any other source-of-truth fact.
+
