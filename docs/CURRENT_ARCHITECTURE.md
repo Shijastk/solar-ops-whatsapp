@@ -584,3 +584,13 @@ Direct operational query replies reuse the signed inbound message timestamp for 
 
 Fast-query logs record lookup, outbound-send, and total durations separately so future optimization is based on measured latency rather than guesswork.
 
+### Deterministic opening-stock product identity
+
+Before a new opening-stock product can be created, the backend performs a bounded service-role-only candidate lookup scoped to the resolved company and normalized unit.
+
+The application then applies deterministic identity normalization. It normalizes casing/punctuation, ignores token order, and canonicalizes a conservative list of common singular/plural inventory nouns (for example `panel/panels`). Model numbers remain part of the identity.
+
+A hard-equivalent existing product returns `opening_exists` even if a client sends `allowSimilarProduct=true`. Soft typo similarity still returns `potential_product_duplicate` unless an operator explicitly confirms that the product is genuinely different.
+
+No AI model participates in opening-stock product identity.
+

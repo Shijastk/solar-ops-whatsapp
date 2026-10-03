@@ -62,6 +62,25 @@ const productSchema = z.object({
   hsn_sac: z.string().nullable(),
 });
 
+const openingProductCandidateSchema = z.object({
+  product_id: z.string().uuid(),
+  company_id: z.string().uuid(),
+  canonical_name: z.string(),
+  unit: z.string(),
+  hsn_sac: z.string().nullable(),
+  similarity_score: z.coerce.number(),
+});
+
+type OpeningProductCandidate = z.infer<typeof openingProductCandidateSchema>;
+
+export type OpeningProductDuplicateDecision =
+  | {
+      status: "opening_exists" | "potential_product_duplicate";
+      product_id: string;
+      product_name: string;
+    }
+  | null;
+
 const balanceSchema = z.object({
   product_id: z.string().uuid(),
   company_id: z.string().uuid(),
@@ -110,6 +129,28 @@ export function normalizeStockUnit(value: string): string {
     .replace(/[^A-Z0-9]/g, "");
 }
 
+const PRODUCT_IDENTITY_TOKEN_ALIASES: Record<string, string> = {
+  batteries: "battery",
+  cables: "cable",
+  connectors: "connector",
+  fittings: "fitting",
+  inverters: "inverter",
+  modules: "module",
+  panels: "panel",
+  pieces: "piece",
+  sets: "set",
+  wires: "wire",
+};
+
+export function normalizeProductIdentityName(value: string): string {
+  return normalizeProductDescription(value)
+    .split(" ")
+    .filter(Boolean)
+    .map((token) => PRODUCT_IDENTITY_TOKEN_ALIASES[token] ?? token)
+    .sort()
+    .join(" ");
+}
+
 const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
 const GSTIN_TOKEN_PATTERN =
   /[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]/g;
@@ -126,6 +167,85 @@ export function normalizeStockGstin(value: string): string {
   const uniqueCandidates = [...new Set(candidates)];
 
   return uniqueCandidates.length === 1 ? uniqueCandidates[0] : compact;
+}
+
+export function decideOpeningProductDuplicate(input: {
+  productName: string;
+  hsnSac?: string | null;
+  allowSimilarProduct?: boolean;
+  candidates: OpeningProductCandidate[];
+}): OpeningProductDuplicateDecision {
+  const targetIdentity = normalizeProductIdentityName(input.productName);
+  const targetTokens = tokenSet(input.productName);
+  const targetNumbers = numericTokens(targetTokens);
+
+  const hardEquivalent = input.candidates.find((candidate) => {
+    if (
+      normalizeProductIdentityName(candidate.canonical_name) !== targetIdentity
+    ) {
+      return false;
+    }
+
+    if (
+      input.hsnSac &&
+      candidate.hsn_sac &&
+      normalizeIdentifier(input.hsnSac) !== normalizeIdentifier(candidate.hsn_sac)
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+  if (hardEquivalent) {
+    return {
+      status: "opening_exists",
+      product_id: hardEquivalent.product_id,
+      product_name: hardEquivalent.canonical_name,
+    };
+  }
+
+  if (input.allowSimilarProduct) return null;
+
+  const potential = input.candidates
+    .map((candidate) => {
+      const productTokens = tokenSet(candidate.canonical_name);
+      const sameNumbers = equalStringArrays(
+        targetNumbers,
+        numericTokens(productTokens),
+      );
+      const sameHsn =
+        Boolean(input.hsnSac) &&
+        Boolean(candidate.hsn_sac) &&
+        normalizeIdentifier(input.hsnSac ?? "") ===
+          normalizeIdentifier(candidate.hsn_sac ?? "");
+
+      return {
+        candidate,
+        score: similarityScore(targetTokens, productTokens),
+        sameNumbers,
+        sameHsn,
+      };
+    })
+    .filter(
+      (entry) =>
+        entry.sameHsn ||
+        (entry.sameNumbers && entry.score >= 0.72) ||
+        entry.score >= 0.88,
+    )
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.candidate.similarity_score - left.candidate.similarity_score,
+    )[0];
+
+  if (!potential) return null;
+
+  return {
+    status: "potential_product_duplicate",
+    product_id: potential.candidate.product_id,
+    product_name: potential.candidate.canonical_name,
+  };
 }
 
 export function validateOpeningStockInput(input: {
@@ -301,64 +421,40 @@ export async function createOpeningStock(input: {
     }
   }
 
-  if (resolvedCompanyId && !parsed.allowSimilarProduct) {
-    const normalizedUnit = parsed.unitNormalized;
-    const { data: existingData, error: existingError } = await supabase
-      .from("stock_products")
-      .select("id, company_id, canonical_name, unit, hsn_sac")
-      .eq("company_id", resolvedCompanyId)
-      .eq("normalized_unit", normalizedUnit)
-      .eq("active", true)
-      .limit(100);
+  if (resolvedCompanyId) {
+    const { data: candidateData, error: candidateError } = await supabase.rpc(
+      "search_opening_stock_product_candidates",
+      {
+        p_query: parsed.productNormalized,
+        p_company_id: resolvedCompanyId,
+        p_unit: parsed.unitNormalized,
+        p_limit: 12,
+      },
+    );
 
-    if (existingError) {
+    if (candidateError) {
       throw new Error(
         "Failed to validate opening stock product identity: " +
-          existingError.message,
+          candidateError.message,
       );
     }
 
-    const existingProducts = z.array(productSchema).parse(existingData ?? []);
-    const targetTokens = tokenSet(parsed.productName);
-    const targetNumbers = numericTokens(targetTokens);
+    const candidates = z
+      .array(openingProductCandidateSchema)
+      .parse(candidateData ?? []);
+    const duplicateDecision = decideOpeningProductDuplicate({
+      productName: parsed.productName,
+      hsnSac: parsed.hsnSac,
+      allowSimilarProduct: parsed.allowSimilarProduct,
+      candidates,
+    });
 
-    const potential = existingProducts
-      .filter(
-        (product) =>
-          normalizeProductDescription(product.canonical_name) !==
-          parsed.productNormalized,
-      )
-      .map((product) => {
-        const productTokens = tokenSet(product.canonical_name);
-        const sameNumbers =
-          equalStringArrays(targetNumbers, numericTokens(productTokens));
-        const sameHsn =
-          Boolean(parsed.hsnSac) &&
-          Boolean(product.hsn_sac) &&
-          normalizeIdentifier(parsed.hsnSac ?? "") ===
-            normalizeIdentifier(product.hsn_sac ?? "");
-
-        return {
-          product,
-          score: similarityScore(targetTokens, productTokens),
-          sameNumbers,
-          sameHsn,
-        };
-      })
-      .filter(
-        (entry) =>
-          entry.sameHsn ||
-          (entry.sameNumbers && entry.score >= 0.72) ||
-          entry.score >= 0.88,
-      )
-      .sort((left, right) => right.score - left.score)[0];
-
-    if (potential) {
+    if (duplicateDecision) {
       return stockResultSchema.parse({
-        status: "potential_product_duplicate",
+        status: duplicateDecision.status,
         company_id: resolvedCompanyId,
-        product_id: potential.product.id,
-        product_name: potential.product.canonical_name,
+        product_id: duplicateDecision.product_id,
+        product_name: duplicateDecision.product_name,
       });
     }
   }

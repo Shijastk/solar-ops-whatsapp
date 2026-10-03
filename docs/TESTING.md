@@ -594,3 +594,16 @@ Database acceptance must verify the search_stock_product_candidates RPC is servi
 
 Fast-query production acceptance should compare lookupDurationMs, sendDurationMs, and total durationMs from redacted runtime logs. The goal is to distinguish database/query cost from Meta outbound-delivery API cost before adding caching or more infrastructure.
 
+## Deterministic product identity regression tests
+
+Automated tests must prove:
+
+- `Panel` and `Panels` normalize to the same product identity
+- model-number changes such as 560 vs 580 remain distinct
+- meaningful terms such as DCR vs Non DCR remain distinct
+- hard-equivalent products return `opening_exists` even when the similar-product override is enabled
+- local typo similarity still produces a duplicate warning when no override is given
+- genuinely distinct but similar products can still use the explicit soft-warning override
+
+Database acceptance must verify the company/unit-scoped candidate RPC is service-role-only and returns bounded candidates without changing stock or aliases.
+
