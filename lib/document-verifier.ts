@@ -116,6 +116,64 @@ export type DocumentVerificationDecision = {
   extraction: GroqDocumentExtraction;
 };
 
+export type DeterministicVerificationDecision = {
+  verified: boolean;
+  issues: string[];
+};
+
+export function verifyDocumentDeterministically(
+  candidate: VerificationCandidate,
+): DeterministicVerificationDecision {
+  const issues: string[] = [];
+
+  if (!candidate.documentType) issues.push("document_type");
+  if (!candidate.supplierName) issues.push("supplier_name");
+  if (
+    !candidate.supplierGstin ||
+    normalizeIdentifier(candidate.supplierGstin).length !== 15
+  ) {
+    issues.push("supplier_gstin");
+  }
+  if (!candidate.documentNumber) issues.push("document_number");
+  if (!candidate.documentDate) issues.push("document_date");
+  if (!candidate.consigneeName) issues.push("consignee_name");
+  if (candidate.items.length === 0) issues.push("items");
+
+  candidate.items.forEach((item, index) => {
+    if (!item.description.trim()) {
+      issues.push("item_description_" + String(index + 1));
+    }
+    if (item.quantity === null || item.quantity <= 0) {
+      issues.push("item_quantity_" + String(index + 1));
+    }
+    if (!item.unit?.trim()) {
+      issues.push("item_unit_" + String(index + 1));
+    }
+  });
+
+  issues.push(...arithmeticMismatches(candidate));
+
+  if (
+    candidate.taxableAmount !== null &&
+    candidate.cgstAmount !== null &&
+    candidate.sgstAmount !== null &&
+    candidate.totalAmount !== null &&
+    Math.abs(
+      candidate.taxableAmount +
+        candidate.cgstAmount +
+        candidate.sgstAmount -
+        candidate.totalAmount,
+    ) > MONEY_TOLERANCE
+  ) {
+    issues.push("total_amount_arithmetic");
+  }
+
+  return {
+    verified: issues.length === 0,
+    issues: Array.from(new Set(issues)),
+  };
+}
+
 const nullableStringJson = { type: ["string", "null"] } as const;
 const nullableNumberJson = { type: ["number", "null"] } as const;
 
