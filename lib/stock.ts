@@ -33,6 +33,8 @@ const stockResultSchema = z.object({
     "company_alias_conflict",
     "opening_created",
     "opening_exists",
+    "stock_in_applied",
+    "stock_in_already_applied",
     "potential_company_duplicate",
     "potential_product_duplicate",
   ]),
@@ -46,6 +48,7 @@ const stockResultSchema = z.object({
   available: z.coerce.number().optional(),
   required: z.coerce.number().optional(),
   reason: z.string().optional(),
+  current_quantity: z.coerce.number().optional(),
 });
 
 const companySchema = z.object({
@@ -92,10 +95,36 @@ const balanceSchema = z.object({
   current_quantity: z.coerce.number(),
 });
 
+const stockMovementSchema = z.object({
+  id: z.string().uuid(),
+  product_id: z.string().uuid(),
+  company_id: z.string().uuid(),
+  company_name: z.string(),
+  company_gstin: z.string().nullable(),
+  product_name: z.string(),
+  unit: z.string(),
+  hsn_sac: z.string().nullable(),
+  movement_type: z.enum([
+    "opening",
+    "stock_in",
+    "stock_out",
+    "correction",
+    "reversal",
+    "adjustment",
+  ]),
+  quantity_delta: z.coerce.number(),
+  created_at: z.string(),
+  draft_id: z.string().uuid().nullable(),
+  document_number: z.string().nullable(),
+  document_date: z.string().nullable(),
+  balance_after: z.coerce.number(),
+});
+
 export type StockResult = z.infer<typeof stockResultSchema>;
 export type StockCompany = z.infer<typeof companySchema>;
 export type StockProduct = z.infer<typeof productSchema>;
 export type StockBalance = z.infer<typeof balanceSchema>;
+export type StockMovement = z.infer<typeof stockMovementSchema>;
 
 const stockAdjustmentResultSchema = z.object({
   status: z.enum([
@@ -154,6 +183,14 @@ export function normalizeProductIdentityName(value: string): string {
 const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
 const GSTIN_TOKEN_PATTERN =
   /[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]/g;
+
+export function canonicalStockCompanyName(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/\s+\d{2}-\d{2}\s*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 export function normalizeStockGstin(value: string): string {
   const normalizedText = value.normalize("NFKC").toUpperCase();
@@ -345,6 +382,318 @@ export async function adjustStockBalance(input: {
   return stockAdjustmentResultSchema.parse(data);
 }
 
+async function insertStockCompanyAlias(input: {
+  companyId: string;
+  aliasText: string;
+  source: "canonical" | "operator" | "document";
+}) {
+  const normalized = normalizeStockName(input.aliasText);
+  if (!normalized) return;
+
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.from("stock_company_aliases").insert({
+    company_id: input.companyId,
+    alias_text: input.aliasText.trim(),
+    normalized_alias: normalized,
+    source: input.source,
+  });
+
+  if (error && error.code !== "23505") {
+    throw new Error("Failed to save stock company alias: " + error.message);
+  }
+}
+
+async function insertStockProductAlias(input: {
+  companyId: string;
+  productId: string;
+  aliasText: string;
+  unit: string;
+  source: "canonical" | "operator" | "document";
+}) {
+  const normalizedAlias = normalizeProductDescription(input.aliasText);
+  const normalizedUnit = normalizeStockUnit(input.unit);
+  if (!normalizedAlias || !normalizedUnit) return;
+
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.from("stock_product_aliases").insert({
+    company_id: input.companyId,
+    product_id: input.productId,
+    alias_text: input.aliasText.trim(),
+    normalized_alias: normalizedAlias,
+    normalized_unit: normalizedUnit,
+    source: input.source,
+  });
+
+  if (error && error.code !== "23505") {
+    throw new Error("Failed to save stock product alias: " + error.message);
+  }
+}
+
+export async function ensureStockCatalogForDraft(
+  draftId: string,
+): Promise<{ companyId: string; productIds: string[] }> {
+  const supabase = getSupabaseAdmin();
+  const { data: draft, error: draftError } = await supabase
+    .from("document_drafts")
+    .select(
+      "id, parse_status, workflow_status, supplier_name, supplier_gstin, stock_company_id",
+    )
+    .eq("id", draftId)
+    .maybeSingle();
+
+  if (draftError) {
+    throw new Error("Failed to load draft stock identity: " + draftError.message);
+  }
+  if (
+    !draft ||
+    draft.parse_status !== "approved" ||
+    draft.workflow_status !== "recorded"
+  ) {
+    throw new Error("Draft is not ready for stock catalog provisioning");
+  }
+
+  const supplierName = draft.supplier_name?.trim() || "";
+  const supplierGstin = draft.supplier_gstin
+    ? normalizeStockGstin(draft.supplier_gstin)
+    : null;
+  let companyId = draft.stock_company_id as string | null;
+
+  if (!companyId && supplierGstin) {
+    const { data, error } = await supabase
+      .from("stock_companies")
+      .select("id")
+      .eq("gstin", supplierGstin)
+      .eq("active", true)
+      .maybeSingle();
+    if (error) {
+      throw new Error("Failed to resolve stock company GSTIN: " + error.message);
+    }
+    companyId = data?.id ?? null;
+  }
+
+  const canonicalCompanyName = canonicalStockCompanyName(supplierName);
+  const companyNormalized = normalizeStockName(canonicalCompanyName);
+
+  if (!companyId && companyNormalized) {
+    const { data, error } = await supabase
+      .from("stock_companies")
+      .select("id")
+      .eq("normalized_name", companyNormalized)
+      .eq("active", true)
+      .maybeSingle();
+    if (error) {
+      throw new Error("Failed to resolve stock company name: " + error.message);
+    }
+    companyId = data?.id ?? null;
+  }
+
+  if (!companyId) {
+    if (!canonicalCompanyName || !supplierGstin) {
+      throw new Error("Verified bill is missing a safe company identity");
+    }
+
+    const { data, error } = await supabase
+      .from("stock_companies")
+      .insert({
+        canonical_name: canonicalCompanyName,
+        normalized_name: companyNormalized,
+        gstin: supplierGstin,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      if (error.code !== "23505") {
+        throw new Error("Failed to create stock company: " + error.message);
+      }
+
+      const { data: existing, error: existingError } = await supabase
+        .from("stock_companies")
+        .select("id")
+        .eq("gstin", supplierGstin)
+        .maybeSingle();
+      if (existingError || !existing) {
+        throw new Error(
+          "Failed to reload stock company after duplicate creation",
+        );
+      }
+      companyId = existing.id;
+    } else {
+      companyId = data.id;
+    }
+
+    await insertStockCompanyAlias({
+      companyId,
+      aliasText: canonicalCompanyName,
+      source: "canonical",
+    });
+  }
+
+  if (supplierName && normalizeStockName(supplierName) !== companyNormalized) {
+    await insertStockCompanyAlias({
+      companyId,
+      aliasText: supplierName,
+      source: "document",
+    });
+  }
+
+  await supabase
+    .from("document_drafts")
+    .update({ stock_company_id: companyId })
+    .eq("id", draftId);
+
+  const { data: itemData, error: itemError } = await supabase
+    .from("document_items")
+    .select("id, description, normalized_description, hsn_sac, quantity, unit")
+    .eq("draft_id", draftId)
+    .order("line_index", { ascending: true });
+
+  if (itemError) {
+    throw new Error("Failed to load draft stock items: " + itemError.message);
+  }
+
+  const productIds: string[] = [];
+
+  for (const item of itemData ?? []) {
+    if (
+      !item.description ||
+      !item.normalized_description ||
+      !item.unit ||
+      Number(item.quantity) <= 0
+    ) {
+      throw new Error("Verified bill contains an invalid stock item");
+    }
+
+    const normalizedUnit = normalizeStockUnit(item.unit);
+    const { data: alias, error: aliasError } = await supabase
+      .from("stock_product_aliases")
+      .select("product_id")
+      .eq("company_id", companyId)
+      .eq("normalized_alias", item.normalized_description)
+      .eq("normalized_unit", normalizedUnit)
+      .maybeSingle();
+
+    if (aliasError) {
+      throw new Error("Failed to resolve stock product alias: " + aliasError.message);
+    }
+
+    let productId = alias?.product_id ?? null;
+
+    if (!productId) {
+      const { data: candidateData, error: candidateError } = await supabase.rpc(
+        "search_opening_stock_product_candidates",
+        {
+          p_query: item.normalized_description,
+          p_company_id: companyId,
+          p_unit: normalizedUnit,
+          p_limit: 12,
+        },
+      );
+
+      if (candidateError) {
+        throw new Error(
+          "Failed to search stock product identity: " + candidateError.message,
+        );
+      }
+
+      const candidates = z
+        .array(openingProductCandidateSchema)
+        .parse(candidateData ?? []);
+      const hardEquivalent = decideOpeningProductDuplicate({
+        productName: item.description,
+        hsnSac: item.hsn_sac,
+        allowSimilarProduct: true,
+        candidates,
+      });
+
+      if (hardEquivalent?.status === "opening_exists") {
+        productId = hardEquivalent.product_id;
+      }
+    }
+
+    if (!productId) {
+      const { data: created, error: createError } = await supabase
+        .from("stock_products")
+        .insert({
+          company_id: companyId,
+          canonical_name: item.description.trim(),
+          normalized_name: item.normalized_description,
+          unit: item.unit.trim().toUpperCase(),
+          normalized_unit: normalizedUnit,
+          hsn_sac: item.hsn_sac,
+        })
+        .select("id")
+        .single();
+
+      if (createError) {
+        if (createError.code !== "23505") {
+          throw new Error("Failed to create stock product: " + createError.message);
+        }
+
+        const { data: existing, error: existingError } = await supabase
+          .from("stock_products")
+          .select("id")
+          .eq("company_id", companyId)
+          .eq("normalized_name", item.normalized_description)
+          .eq("normalized_unit", normalizedUnit)
+          .maybeSingle();
+
+        if (existingError || !existing) {
+          throw new Error(
+            "Failed to reload stock product after duplicate creation",
+          );
+        }
+        productId = existing.id;
+      } else {
+        productId = created.id;
+      }
+
+      await insertStockProductAlias({
+        companyId,
+        productId,
+        aliasText: item.description,
+        unit: item.unit,
+        source: "canonical",
+      });
+    } else {
+      await insertStockProductAlias({
+        companyId,
+        productId,
+        aliasText: item.description,
+        unit: item.unit,
+        source: "document",
+      });
+    }
+
+    productIds.push(productId);
+  }
+
+  return { companyId, productIds };
+}
+
+export async function recordStockIn(input: {
+  productId: string;
+  quantity: number | string;
+  actionKey: string;
+}): Promise<StockResult> {
+  const productId = z.string().uuid().parse(input.productId);
+  const quantity = quantitySchema.parse(input.quantity);
+  const actionKey = z.string().uuid().parse(input.actionKey);
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase.rpc("record_stock_in", {
+    p_product_id: productId,
+    p_quantity: quantity,
+    p_idempotency_key: actionKey,
+  });
+
+  if (error) {
+    throw new Error("Failed to record stock in: " + error.message);
+  }
+
+  return stockResultSchema.parse(data);
+}
+
 export async function createOpeningStock(input: {
   companyId?: string | null;
   companyName?: string | null;
@@ -355,6 +704,7 @@ export async function createOpeningStock(input: {
   quantity: number | string;
   allowSimilarCompany?: boolean;
   allowSimilarProduct?: boolean;
+  actionKey?: string;
 }): Promise<StockResult> {
   const parsed = validateOpeningStockInput(input);
   const supabase = getSupabaseAdmin();
@@ -449,6 +799,14 @@ export async function createOpeningStock(input: {
       candidates,
     });
 
+    if (duplicateDecision?.status === "opening_exists") {
+      return recordStockIn({
+        productId: duplicateDecision.product_id,
+        quantity: parsed.quantity,
+        actionKey: input.actionKey ?? crypto.randomUUID(),
+      });
+    }
+
     if (duplicateDecision) {
       return stockResultSchema.parse({
         status: duplicateDecision.status,
@@ -517,6 +875,25 @@ export async function listStockBalances(): Promise<StockBalance[]> {
   }
 
   return z.array(balanceSchema).parse(data ?? []);
+}
+
+export async function listStockHistory(limit = 60): Promise<StockMovement[]> {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 200);
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("stock_history")
+    .select(
+      "id, product_id, company_id, company_name, company_gstin, product_name, unit, hsn_sac, movement_type, quantity_delta, created_at, draft_id, document_number, document_date, balance_after",
+    )
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(safeLimit);
+
+  if (error) {
+    throw new Error("Failed to load stock history: " + error.message);
+  }
+
+  return z.array(stockMovementSchema).parse(data ?? []);
 }
 
 export async function applyStockOutForDraft(
