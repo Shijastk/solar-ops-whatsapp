@@ -379,7 +379,10 @@ async function loadTripForSender(
   return (data as TripRow | null) ?? null;
 }
 
-async function sendHomeMenu(storedMessageId: string) {
+async function sendHomeMenu(
+  storedMessageId: string,
+  knownInboundAt?: string | Date,
+) {
   await sendOpsList({
     requestId: deterministicUuid("trip-home-menu:" + storedMessageId),
     replyToMessageId: storedMessageId,
@@ -387,6 +390,7 @@ async function sendHomeMenu(storedMessageId: string) {
       "☀️ Solar Ops\nBills, trips, stock — godown daily work എളുപ്പമായി manage ചെയ്യാം.",
     buttonText: "Open menu",
     sectionTitle: "Solar Ops",
+    knownInboundAt,
     rows: [
       {
         id: "so:menu:new_trip",
@@ -430,12 +434,14 @@ async function startTrip(
     await sendOpsReply({
       requestId: deterministicUuid("trip-already-open:" + storedMessageId),
       replyToMessageId: storedMessageId,
+      knownInboundAt,
       body:
         "🚚 ഒരു trip ഇതിനകം open ആണ്. " +
         stateText +
         (existing.status === "collecting"
           ? " PDF bills തുടർച്ചയായി അയക്കൂ; കഴിഞ്ഞാൽ done എന്ന് അയക്കൂ."
           : ""),
+      knownInboundAt: message.timestamp,
     });
     return;
   }
@@ -454,6 +460,7 @@ async function startTrip(
     replyToMessageId: storedMessageId,
     body:
       "🚚 New Trip തുറന്നു. ഇനി PDF bills തുടർച്ചയായി അയക്കൂ — ഓരോ bill-നും reply കാത്തിരിക്കേണ്ട. എല്ലാം അയച്ച ശേഷം done / ശരി / complete എന്ന് അയക്കൂ.",
+    knownInboundAt: message.timestamp,
   });
 }
 
@@ -705,6 +712,7 @@ async function closeTripCollection(
     await sendOpsReply({
       requestId: deterministicUuid("trip-done-no-active:" + storedMessageId),
       replyToMessageId: storedMessageId,
+      knownInboundAt,
       body: "Open trip ഒന്നുമില്ല. പുതിയ trip തുടങ്ങാൻ trip എന്ന് അയക്കൂ.",
     });
     return;
@@ -765,6 +773,7 @@ async function closeTripCollection(
     await sendOpsReply({
       requestId: deterministicUuid("trip-processing:" + trip.id),
       replyToMessageId: storedMessageId,
+      knownInboundAt,
       body:
         "⏳ " +
         pending +
@@ -792,6 +801,7 @@ async function cancelTrip(message: NormalizedWhatsAppMessage, storedMessageId: s
     requestId: deterministicUuid("trip-cancelled:" + storedMessageId),
     replyToMessageId: storedMessageId,
     body: "Trip cancelled. Bills/stock history delete ചെയ്തിട്ടില്ല.",
+    knownInboundAt: message.timestamp,
   });
 }
 
@@ -929,11 +939,16 @@ async function createAndAssignDriver(
   });
 }
 
-async function handleMenuAction(id: string, storedMessageId: string) {
+async function handleMenuAction(
+  id: string,
+  storedMessageId: string,
+  knownInboundAt?: string | Date,
+) {
   if (id === "so:menu:stock") {
     await sendOpsReply({
       requestId: deterministicUuid("menu-stock:" + storedMessageId),
       replyToMessageId: storedMessageId,
+      knownInboundAt,
       body:
         "📦 Stock\nProduct name + stock എന്ന് ചോദിക്കാം. ഉദാ: Emmvee 560 panel stock ethra. Stock add ചെയ്യുന്നത് Solar Ops mobile app-ൽ.",
     });
@@ -943,6 +958,7 @@ async function handleMenuAction(id: string, storedMessageId: string) {
     await sendOpsReply({
       requestId: deterministicUuid("menu-bills:" + storedMessageId),
       replyToMessageId: storedMessageId,
+      knownInboundAt,
       body:
         "📄 Bills\nPDF bill നേരിട്ട് അയക്കാം. Open trip ഉണ്ടെങ്കിൽ അതിലേക്ക് attach ചെയ്യും; ഇല്ലെങ്കിൽ standalone bill ആയി process ചെയ്യും.",
     });
@@ -952,6 +968,7 @@ async function handleMenuAction(id: string, storedMessageId: string) {
     await sendOpsReply({
       requestId: deterministicUuid("menu-more:" + storedMessageId),
       replyToMessageId: storedMessageId,
+      knownInboundAt,
       body:
         "Quick commands:\ntrip — പുതിയ trip\ndone / ശരി — trip bills complete\nHi — menu\nStock questions നേരിട്ട് type ചെയ്യാം.",
     });
@@ -1007,7 +1024,7 @@ export async function handleTripWorkflowInbound(
   }
 
   if (command === "menu") {
-    await sendHomeMenu(storedMessageId);
+    await sendHomeMenu(storedMessageId, message.timestamp);
     return "handled";
   }
   if (command === "start") {
