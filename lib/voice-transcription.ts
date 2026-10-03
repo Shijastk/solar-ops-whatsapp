@@ -25,10 +25,13 @@ export async function transcribeOperationalVoice(input: {
   }
 
   const mimeType = input.mimeType.toLowerCase().split(";")[0].trim();
+  const audioBuffer = new ArrayBuffer(input.bytes.byteLength);
+  new Uint8Array(audioBuffer).set(input.bytes);
+
   const form = new FormData();
   form.set(
     "file",
-    new Blob([input.bytes], { type: mimeType || "audio/ogg" }),
+    new Blob([audioBuffer], { type: mimeType || "audio/ogg" }),
     "voice" + extensionForAudioMime(mimeType),
   );
   form.set("model", "whisper-large-v3-turbo");
