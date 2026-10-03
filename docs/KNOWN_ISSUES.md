@@ -472,3 +472,9 @@ Production data currently contains at least one pair of very similar canonical s
 
 The typo-tolerant read-only search must therefore return both when a query cannot distinguish them. It must not merge, delete, or aggregate those identities automatically. Any catalogue cleanup requires an explicit stock-history reconciliation decision.
 
+## K040 - Existing duplicate product history requires manual reconciliation
+
+The deterministic identity fix prevents new hard-equivalent products from being created, but it intentionally does not rewrite existing ledger history.
+
+The current `Emmvee 560 Wp Topcon Dcr Panel` / `Panels` pair therefore remains two historical product IDs until the opening quantities and ledger history are explicitly reconciled. Automatic summing, deleting, or reassigning these balances is unsafe without confirming which opening quantity represents the intended physical stock.
+
