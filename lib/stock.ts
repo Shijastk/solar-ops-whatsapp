@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { normalizeProductDescription } from "@/lib/document-parser";
 import { deterministicUuid } from "@/lib/idempotency";
@@ -529,6 +530,10 @@ export async function ensureStockCatalogForDraft(
     });
   }
 
+  if (!companyId) {
+    throw new Error("Failed to resolve stock company");
+  }
+
   if (supplierName && normalizeStockName(supplierName) !== companyNormalized) {
     await insertStockCompanyAlias({
       companyId,
@@ -803,7 +808,7 @@ export async function createOpeningStock(input: {
       return recordStockIn({
         productId: duplicateDecision.product_id,
         quantity: parsed.quantity,
-        actionKey: input.actionKey ?? crypto.randomUUID(),
+        actionKey: input.actionKey ?? randomUUID(),
       });
     }
 
