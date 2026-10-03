@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTripDisplayName,
+  choosePrimaryDestination,
   classifyTripTextCommand,
   normalizeDriverName,
   parseIndiaPostPincodeCsv,
@@ -16,6 +17,16 @@ describe("WhatsApp trip capture helpers", () => {
     expect(classifyTripTextCommand("complete")).toBe("done");
     expect(classifyTripTextCommand("cancel trip")).toBe("cancel");
     expect(classifyTripTextCommand("Emmvee 560 panel")).toBeNull();
+  });
+
+  it("keeps the first uploaded destination when destination counts tie", () => {
+    expect(
+      choosePrimaryDestination(["Tirur", "Kottakkal", "Tirur", "Kottakkal"]),
+    ).toBe("Tirur");
+
+    expect(
+      choosePrimaryDestination(["Kottakkal", "Tirur"]),
+    ).toBe("Kottakkal");
   });
 
   it("uses destination as the human trip name instead of an opaque id", () => {
