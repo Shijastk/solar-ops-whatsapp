@@ -623,3 +623,8 @@ Verify with synthetic data:
 
 Automated tests cover multiline item descriptions and the deterministic verification gate. Production acceptance should confirm a clean known-format PDF records without a Groq verification call, while an unsafe/ambiguous PDF still falls back to Groq or review-required.
 
+
+
+
+### Mobile simplification verification
+Run `npm run verify`. New tests cover duplicate PDF reuse, protected mobile-action authorization, destination sanitization and the final-count tie rule. `tests/sql/duplicate-stock-rollback.sql` exercises real database stock posting/retry, a duplicate with missing e-way number, company isolation, missing identity, document aliases, atomic quantity/cancel audit, driver requirements and closed-trip attachment. It uses only synthetic fixtures and rolls back; it sends no messages. Production hardware biometrics and a signed-in phone/network upload still require device verification and must not be described as tested by CI.

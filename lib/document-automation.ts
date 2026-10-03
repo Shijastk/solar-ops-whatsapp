@@ -98,7 +98,9 @@ function trimForWhatsApp(value: string, max: number): string {
 
 function formatQuantity(value: number | null): string {
   if (value === null) return "—";
-  return Number.isInteger(value) ? String(value) : String(value).replace(/0+$/, "").replace(/\.$/, "");
+  return Number.isInteger(value)
+    ? String(value)
+    : String(value).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function formatMoney(value: number | null): string | null {
@@ -150,9 +152,7 @@ export function buildDocumentSummary(
 
     if (input.items.length > SUMMARY_ITEM_LIMIT) {
       lines.push(
-        "+ " +
-          String(input.items.length - SUMMARY_ITEM_LIMIT) +
-          " സാധനം കൂടി",
+        "+ " + String(input.items.length - SUMMARY_ITEM_LIMIT) + " സാധനം കൂടി",
       );
     }
   }
@@ -164,7 +164,10 @@ export function buildDocumentSummary(
   if (stockStatus === "applied") {
     lines.push("", "✅ Outgoing stock history-ൽ രേഖപ്പെടുത്തി.");
   } else if (stockStatus === "duplicate_document") {
-    lines.push("", "ℹ️ ഈ ബിൽ നേരത്തെ സ്റ്റോക്കിൽ രേഖപ്പെടുത്തിയതാണ്. അതിനാൽ സ്റ്റോക്ക് വീണ്ടും കുറച്ചിട്ടില്ല.");
+    lines.push(
+      "",
+      "ℹ️ ഈ ബിൽ നേരത്തെ സ്റ്റോക്കിൽ രേഖപ്പെടുത്തിയതാണ്. അതിനാൽ സ്റ്റോക്ക് വീണ്ടും കുറച്ചിട്ടില്ല.",
+    );
   } else if (stockStatus === "reversed") {
     lines.push("", "↩️ സ്റ്റോക്കിൽ നിന്ന് കുറച്ചത് തിരികെ ചേർത്തു.");
   } else {
@@ -258,23 +261,27 @@ async function loadDraftContext(draftId: string): Promise<DraftContext | null> {
     .maybeSingle();
 
   if (draftError) {
-    throw new Error("Failed to load document automation draft: " + draftError.message);
+    throw new Error(
+      "Failed to load document automation draft: " + draftError.message,
+    );
   }
   if (!draft) return null;
 
-  const [{ data: message, error: messageError }, { data: items, error: itemError }] =
-    await Promise.all([
-      supabase
-        .from("whatsapp_messages")
-        .select("sender_phone")
-        .eq("id", draft.message_id)
-        .maybeSingle(),
-      supabase
-        .from("document_items")
-        .select("id, description, hsn_sac, quantity, unit, rate, amount")
-        .eq("draft_id", draft.id)
-        .order("line_index", { ascending: true }),
-    ]);
+  const [
+    { data: message, error: messageError },
+    { data: items, error: itemError },
+  ] = await Promise.all([
+    supabase
+      .from("whatsapp_messages")
+      .select("sender_phone")
+      .eq("id", draft.message_id)
+      .maybeSingle(),
+    supabase
+      .from("document_items")
+      .select("id, description, hsn_sac, quantity, unit, rate, amount")
+      .eq("draft_id", draft.id)
+      .order("line_index", { ascending: true }),
+  ]);
 
   if (messageError) {
     throw new Error("Failed to load document sender: " + messageError.message);
@@ -403,7 +410,9 @@ async function updateAutomationState(
     .eq("id", draftId);
 
   if (error) {
-    throw new Error("Failed to update document automation state: " + error.message);
+    throw new Error(
+      "Failed to update document automation state: " + error.message,
+    );
   }
 }
 
@@ -435,6 +444,16 @@ async function sendSummary(
   requestSeed: string,
   heading?: string,
 ) {
+  if (draft.stockStatus === "duplicate_document") {
+    return sendOpsReply({
+      requestId: deterministicUuid(requestSeed),
+      replyToMessageId,
+      body:
+        "ℹ️ ബിൽ " +
+        (draft.documentNumber ?? "") +
+        " നേരത്തെ upload ചെയ്തിട്ടുണ്ട്. Already uploaded.",
+    });
+  }
   const companyName = await canonicalSupplierName(draft.supplierGstin);
   const body = buildDocumentSummary(
     { ...draft, supplierName: companyName ?? draft.supplierName },
@@ -560,9 +579,7 @@ async function sendReviewNotice(
       : "⚠️ ബിൽ ലഭിച്ചു. ഇപ്പോൾ സ്വയമേവ പരിശോധിക്കാൻ കഴിഞ്ഞില്ല. ഒന്നും സ്വയമേവ രേഖപ്പെടുത്തിയിട്ടില്ല. Solar Ops-ൽ പരിശോധിക്കുക.";
 
   await sendOpsReply({
-    requestId: deterministicUuid(
-      "document-review:" + draft.id + ":" + reason,
-    ),
+    requestId: deterministicUuid("document-review:" + draft.id + ":" + reason),
     replyToMessageId: draft.messageId,
     body,
   });
@@ -660,8 +677,7 @@ export async function runDocumentAutomationForDraft(
         stockResult.status === "already_applied"
       ) {
         stockStatus = "applied";
-      }
-      else if (stockResult.status === "duplicate_document") {
+      } else if (stockResult.status === "duplicate_document") {
         stockStatus = "duplicate_document";
       }
     } catch (error) {
@@ -807,7 +823,10 @@ function editRows(draft: DraftContext) {
     {
       id: "so:doc:field:document_number:" + draft.id,
       title: "ബിൽ നമ്പർ",
-      description: trimForWhatsApp(draft.documentNumber ?? "കണ്ടെത്തിയില്ല", 60),
+      description: trimForWhatsApp(
+        draft.documentNumber ?? "കണ്ടെത്തിയില്ല",
+        60,
+      ),
     },
     {
       id: "so:doc:field:vehicle_number:" + draft.id,
@@ -816,9 +835,7 @@ function editRows(draft: DraftContext) {
     },
   ];
 
-  for (const [index, item] of draft.items
-    .slice(0, EDIT_ITEM_LIMIT)
-    .entries()) {
+  for (const [index, item] of draft.items.slice(0, EDIT_ITEM_LIMIT).entries()) {
     rows.push({
       id: "so:doc:qty:" + draft.id + ":" + item.id,
       title: "അളവ് സാധനം " + String(index + 1),
@@ -926,7 +943,9 @@ async function applyPendingTextEdit(
     .maybeSingle();
 
   if (sessionError) {
-    throw new Error("Failed to inspect document edit session: " + sessionError.message);
+    throw new Error(
+      "Failed to inspect document edit session: " + sessionError.message,
+    );
   }
   if (!session) return false;
 
@@ -935,7 +954,9 @@ async function applyPendingTextEdit(
   if (new Date(session.expires_at).getTime() < Date.now()) {
     await cancelEditSession(message.senderPhone, draft.id);
     await sendOpsReply({
-      requestId: deterministicUuid("document-edit-expired:" + message.messageId),
+      requestId: deterministicUuid(
+        "document-edit-expired:" + message.messageId,
+      ),
       replyToMessageId: storedMessageId,
       body: "തിരുത്താനുള്ള സമയം കഴിഞ്ഞു. ബിൽ സംഗ്രഹത്തിലെ തിരുത്തുക അമർത്തി വീണ്ടും ശ്രമിക്കുക.",
     });
@@ -943,17 +964,16 @@ async function applyPendingTextEdit(
   }
 
   const targetKind = session.target_kind as
-    | "document_number"
-    | "vehicle_number"
-    | "item_quantity";
+    "document_number" | "vehicle_number" | "item_quantity";
   const corrected = normalizeCorrectionValue(targetKind, message.textBody);
 
   if (corrected === null) {
     await sendOpsReplyButtons({
-      requestId: deterministicUuid("document-edit-invalid:" + message.messageId),
+      requestId: deterministicUuid(
+        "document-edit-invalid:" + message.messageId,
+      ),
       replyToMessageId: storedMessageId,
-      body:
-        "ഈ വിവരത്തിന് നൽകിയ വില ശരിയല്ല. ശരിയായ വില മാത്രം അയക്കുക, അല്ലെങ്കിൽ തിരുത്തൽ റദ്ദാക്കുക.",
+      body: "ഈ വിവരത്തിന് നൽകിയ വില ശരിയല്ല. ശരിയായ വില മാത്രം അയക്കുക, അല്ലെങ്കിൽ തിരുത്തൽ റദ്ദാക്കുക.",
       buttons: [
         {
           id: "so:doc:edit_cancel:" + draft.id,
@@ -1029,8 +1049,7 @@ async function applyPendingTextEdit(
         stockCorrection.status !== "already_corrected"
       ) {
         throw new Error(
-          "Stock correction was not applied safely: " +
-            stockCorrection.status,
+          "Stock correction was not applied safely: " + stockCorrection.status,
         );
       }
     } else {
@@ -1060,7 +1079,9 @@ async function applyPendingTextEdit(
       .eq("id", draft.id);
 
     if (draftUpdateError) {
-      throw new Error("Failed to update document field: " + draftUpdateError.message);
+      throw new Error(
+        "Failed to update document field: " + draftUpdateError.message,
+      );
     }
   }
 
@@ -1132,7 +1153,9 @@ async function handleInteractiveAction(
   if (action.type === "edit") {
     if (draft.workflowStatus === "cancelled") {
       await sendOpsReply({
-        requestId: deterministicUuid("document-edit-cancelled:" + message.messageId),
+        requestId: deterministicUuid(
+          "document-edit-cancelled:" + message.messageId,
+        ),
         replyToMessageId: storedMessageId,
         body: "ഈ ബിൽ നിലവിലെ പ്രവർത്തന പട്ടികയിൽ നിന്ന് ഇതിനകം ഒഴിവാക്കിയിട്ടുണ്ട്.",
       });
@@ -1151,10 +1174,11 @@ async function handleInteractiveAction(
 
   if (action.type === "delete") {
     await sendOpsReplyButtons({
-      requestId: deterministicUuid("document-delete-confirm:" + message.messageId),
+      requestId: deterministicUuid(
+        "document-delete-confirm:" + message.messageId,
+      ),
       replyToMessageId: storedMessageId,
-      body:
-        "ഈ ബിൽ നിലവിലെ പ്രവർത്തന പട്ടികയിൽ നിന്ന് ഒഴിവാക്കണോ? സ്റ്റോക്ക് കുറച്ചിട്ടുണ്ടെങ്കിൽ അത് തിരികെ ചേർക്കും. പഴയ രേഖകൾ സുരക്ഷിതമായി നിലനിർത്തും.",
+      body: "ഈ ബിൽ നിലവിലെ പ്രവർത്തന പട്ടികയിൽ നിന്ന് ഒഴിവാക്കണോ? സ്റ്റോക്ക് കുറച്ചിട്ടുണ്ടെങ്കിൽ അത് തിരികെ ചേർക്കും. പഴയ രേഖകൾ സുരക്ഷിതമായി നിലനിർത്തും.",
       buttons: [
         {
           id: "so:doc:delete_confirm:" + draft.id,
@@ -1183,8 +1207,7 @@ async function handleInteractiveAction(
             "document-delete-stock-blocked:" + message.messageId,
           ),
           replyToMessageId: storedMessageId,
-          body:
-            "⚠️ സ്റ്റോക്ക് സുരക്ഷിതമായി തിരികെ ചേർക്കാൻ കഴിഞ്ഞില്ല. അതിനാൽ ബിൽ ഒഴിവാക്കിയിട്ടില്ല; വിവരങ്ങളിൽ മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല.",
+          body: "⚠️ സ്റ്റോക്ക് സുരക്ഷിതമായി തിരികെ ചേർക്കാൻ കഴിഞ്ഞില്ല. അതിനാൽ ബിൽ ഒഴിവാക്കിയിട്ടില്ല; വിവരങ്ങളിൽ മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല.",
         });
         return true;
       }
@@ -1283,9 +1306,7 @@ export async function handleDocumentWorkflowInbound(
     return "handled";
   }
 
-  if (
-    (await handleFastWhatsAppQuery(message, storedMessageId)) === "handled"
-  ) {
+  if ((await handleFastWhatsAppQuery(message, storedMessageId)) === "handled") {
     return "handled";
   }
 

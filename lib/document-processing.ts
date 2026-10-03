@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto";
-import { DOCUMENT_PARSER_VERSION, parseOperationalDocumentText } from "@/lib/document-parser";
+import {
+  DOCUMENT_PARSER_VERSION,
+  parseOperationalDocumentText,
+} from "@/lib/document-parser";
 import { getIngestionEnv } from "@/lib/env";
 import { extractPdfText } from "@/lib/pdf-extract";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 type ProcessResult = {
+  duplicate?: boolean;
   draftId: string;
   status: string;
   itemCount: number;
@@ -17,11 +21,7 @@ function errorText(error: unknown): string {
     : "Unknown document parsing error";
 }
 
-function draftRow(
-  messageId: string,
-  extractedText: string,
-  pageCount: number,
-) {
+function draftRow(messageId: string, extractedText: string, pageCount: number) {
   const parsed = parseOperationalDocumentText(extractedText);
 
   return {
@@ -59,7 +59,9 @@ function draftRow(
     total_amount: parsed.totalAmount,
     page_count: pageCount,
     extracted_text: extractedText,
-    text_sha256: createHash("sha256").update(extractedText, "utf8").digest("hex"),
+    text_sha256: createHash("sha256")
+      .update(extractedText, "utf8")
+      .digest("hex"),
     text_length: extractedText.length,
     missing_fields: parsed.missingFields,
     extra_fields: {},
@@ -112,6 +114,30 @@ export async function processPdfBytesForMessage(
   try {
     const extracted = await extractPdfText(bytes);
     const row = draftRow(messageId, extracted.text, extracted.pageCount);
+    // Exact extracted text from a previously approved active bill is already known.
+    // Keep the new inbound message for audit, but do not create another business draft.
+    const { data: originals, error: duplicateError } = await supabase
+      .from("document_drafts")
+      .select("id")
+      .eq("text_sha256", row.text_sha256)
+      .eq("parse_status", "approved")
+      .eq("workflow_status", "recorded")
+      .neq("stock_status", "duplicate_document")
+      .neq("message_id", messageId)
+      .order("created_at", { ascending: true })
+      .limit(1);
+    if (duplicateError)
+      throw new Error(
+        "Failed to check repeated bill: " + duplicateError.message,
+      );
+    if (originals?.[0])
+      return {
+        draftId: originals[0].id,
+        status: "already_uploaded",
+        itemCount: 0,
+        skippedApproved: true,
+        duplicate: true,
+      };
     const items = row.items;
     const persistedRow = { ...row };
     delete (persistedRow as Partial<typeof row>).items;
@@ -135,36 +161,40 @@ export async function processPdfBytesForMessage(
       .eq("draft_id", savedDraft.id);
 
     if (deleteError) {
-      throw new Error("Failed to replace document items: " + deleteError.message);
+      throw new Error(
+        "Failed to replace document items: " + deleteError.message,
+      );
     }
 
     if (items.length > 0) {
-      const { error: itemError } = await supabase
-        .from("document_items")
-        .insert(
-          items.map((item, index) => ({
-            draft_id: savedDraft.id,
-            line_index: index,
-            source_line_number: item.sourceLineNumber,
-            description: item.description,
-            normalized_description: item.normalizedDescription,
-            hsn_sac: item.hsnSac,
-            quantity: item.quantity,
-            unit: item.unit,
-            rate: item.rate,
-            amount: item.amount,
-          })),
-        );
+      const { error: itemError } = await supabase.from("document_items").insert(
+        items.map((item, index) => ({
+          draft_id: savedDraft.id,
+          line_index: index,
+          source_line_number: item.sourceLineNumber,
+          description: item.description,
+          normalized_description: item.normalizedDescription,
+          hsn_sac: item.hsnSac,
+          quantity: item.quantity,
+          unit: item.unit,
+          rate: item.rate,
+          amount: item.amount,
+        })),
+      );
 
       if (itemError) {
         await supabase
           .from("document_drafts")
           .update({
             parse_status: "failed",
-            parse_error: ("Item persistence failed: " + itemError.message).slice(0, 1000),
+            parse_error: (
+              "Item persistence failed: " + itemError.message
+            ).slice(0, 1000),
           })
           .eq("id", savedDraft.id);
-        throw new Error("Failed to persist document items: " + itemError.message);
+        throw new Error(
+          "Failed to persist document items: " + itemError.message,
+        );
       }
     }
 
@@ -247,9 +277,7 @@ export async function processStoredPdfMessage(
   );
 }
 
-export async function approveDocumentDraft(
-  messageId: string,
-): Promise<string> {
+export async function approveDocumentDraft(messageId: string): Promise<string> {
   const supabase = getSupabaseAdmin();
 
   const { data: draft, error: readError } = await supabase

@@ -12,18 +12,13 @@ import { sendOpsReply } from "@/lib/replies";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   markTripDocumentProcessed,
+  finishTripAfterDuplicate,
   reserveTripDocument,
 } from "@/lib/trips";
 import { transcribeOperationalVoice } from "@/lib/voice-transcription";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
-const MEDIA_TYPES = new Set([
-  "document",
-  "image",
-  "audio",
-  "video",
-  "sticker",
-]);
+const MEDIA_TYPES = new Set(["document", "image", "audio", "video", "sticker"]);
 
 function cleanFilename(value: string): string {
   const base = value
@@ -87,9 +82,7 @@ async function sendUnsupportedMessageAck(
 
   const label = labels[message.type] ?? "Message";
   await sendOpsReply({
-    requestId: deterministicUuid(
-      "unsupported-message:" + message.messageId,
-    ),
+    requestId: deterministicUuid("unsupported-message:" + message.messageId),
     replyToMessageId: storedMessageId,
     knownInboundAt: message.timestamp,
     body:
@@ -156,11 +149,9 @@ export async function ingestWhatsAppMessage(
 
   const likelyPdfDocument =
     message.type === "document" &&
-    (
-      !message.media?.mimeType ||
+    (!message.media?.mimeType ||
       message.media.mimeType.toLowerCase().includes("pdf") ||
-      message.media.filename?.toLowerCase().endsWith(".pdf")
-    );
+      message.media.filename?.toLowerCase().endsWith(".pdf"));
   let reservedTripId: string | null = null;
   let tripReceiptReply: Promise<void> | null = null;
 
@@ -303,10 +294,36 @@ export async function ingestWhatsAppMessage(
         });
 
         try {
-          const automationResult = await runDocumentAutomationForDraft(
-            parsed.draftId,
-            { suppressReply: Boolean(reservedTripId) },
-          );
+          let automationResult: string;
+          if (parsed.duplicate) {
+            if (reservedTripId) {
+              const { error: unlinkError } = await supabase
+                .from("trip_documents")
+                .delete()
+                .eq("message_id", persistedMessage.id);
+              if (unlinkError)
+                throw new Error("Could not remove duplicate trip receipt");
+            }
+            await sendOpsReply({
+              requestId: deterministicUuid(
+                "duplicate-bill:" + message.messageId,
+              ),
+              replyToMessageId: persistedMessage.id,
+              knownInboundAt: message.timestamp,
+              body: "ℹ️ ഈ ബിൽ നേരത്തെ upload ചെയ്തിട്ടുണ്ട്. Already uploaded.",
+            });
+            if (reservedTripId)
+              await finishTripAfterDuplicate(
+                reservedTripId,
+                persistedMessage.id,
+              );
+            automationResult = "already_uploaded";
+          } else {
+            automationResult = await runDocumentAutomationForDraft(
+              parsed.draftId,
+              { suppressReply: Boolean(reservedTripId) },
+            );
+          }
           console.info("WhatsApp document automation summary", {
             result: automationResult,
             tripCapture: Boolean(reservedTripId),
@@ -328,8 +345,7 @@ export async function ingestWhatsAppMessage(
                 ),
                 replyToMessageId: persistedMessage.id,
                 knownInboundAt: message.timestamp,
-                body:
-                  "📄 PDF ലഭിച്ചു. പക്ഷേ bill safely process ചെയ്യാൻ കഴിഞ്ഞില്ല. Stock auto-update ചെയ്തിട്ടില്ല.",
+                body: "📄 PDF ലഭിച്ചു. പക്ഷേ bill safely process ചെയ്യാൻ കഴിഞ്ഞില്ല. Stock auto-update ചെയ്തിട്ടില്ല.",
               });
             } catch {
               // Message remains stored even if the fallback reply cannot be sent.
@@ -377,8 +393,7 @@ export async function ingestWhatsAppMessage(
               ),
               replyToMessageId: persistedMessage.id,
               knownInboundAt: message.timestamp,
-              body:
-                "📄 PDF ലഭിച്ചു. പക്ഷേ bill details read/process ചെയ്യാൻ കഴിഞ്ഞില്ല. Stock auto-update ചെയ്തിട്ടില്ല.",
+              body: "📄 PDF ലഭിച്ചു. പക്ഷേ bill details read/process ചെയ്യാൻ കഴിഞ്ഞില്ല. Stock auto-update ചെയ്തിട്ടില്ല.",
             });
           } catch {
             // The inbound PDF is still stored even if the fallback reply fails.
@@ -421,7 +436,9 @@ export async function ingestWhatsAppMessage(
 
         if (voiceResult === "ignored") {
           await sendOpsReply({
-            requestId: deterministicUuid("voice-unsupported:" + message.messageId),
+            requestId: deterministicUuid(
+              "voice-unsupported:" + message.messageId,
+            ),
             replyToMessageId: persistedMessage.id,
             body:
               "🎙️ കേട്ടത്: " +
@@ -447,8 +464,7 @@ export async function ingestWhatsAppMessage(
           await sendOpsReply({
             requestId: deterministicUuid("voice-failed:" + message.messageId),
             replyToMessageId: persistedMessage.id,
-            body:
-              "🎙️ Voice message വ്യക്തമായി transcribe ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ചെറിയ voice note ആയി അയക്കൂ, അല്ലെങ്കിൽ text ആയി അയക്കാം.",
+            body: "🎙️ Voice message വ്യക്തമായി transcribe ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ചെറിയ voice note ആയി അയക്കൂ, അല്ലെങ്കിൽ text ആയി അയക്കാം.",
             knownInboundAt: message.timestamp,
           });
         } catch {

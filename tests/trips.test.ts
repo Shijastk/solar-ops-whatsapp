@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTripDisplayName,
+  cleanDestination,
   choosePrimaryDestination,
   classifyTripTextCommand,
   normalizeDriverName,
@@ -24,11 +25,20 @@ describe("WhatsApp trip capture helpers", () => {
       choosePrimaryDestination(["Tirur", "Kottakkal", "Tirur", "Kottakkal"]),
     ).toBe("Tirur");
 
-    expect(
-      choosePrimaryDestination(["Kottakkal", "Tirur"]),
-    ).toBe("Kottakkal");
+    expect(choosePrimaryDestination(["Kottakkal", "Tirur"])).toBe("Kottakkal");
   });
 
+  it("resolves final ties by upload order even after a temporary leader", () => {
+    expect(
+      choosePrimaryDestination(["Tirur", "Palakkad", "Palakkad", "Tirur"]),
+    ).toBe("Tirur");
+  });
+  it("rejects address labels and strips phone numbers from routes", () => {
+    expect(cleanDestination("State Name : Kerala, Code : 32")).toBeNull();
+    expect(cleanDestination("Palakkad - 678633 Mobile No :- 0000000000")).toBe(
+      "Palakkad",
+    );
+  });
   it("uses destination as the human trip name instead of an opaque id", () => {
     expect(
       buildTripDisplayName({

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const token = createOpsSession();
+  const token = createOpsSession(Date.now(), 90 * 24 * 60 * 60 * 1000);
   const expiresAt = getOpsSessionExpiresAt(token);
 
   return Response.json(
@@ -43,3 +43,4 @@ export async function POST(request: Request) {
     { headers: { "Cache-Control": "no-store" } },
   );
 }
+

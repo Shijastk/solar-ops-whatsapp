@@ -626,3 +626,19 @@ When done/ശരി/complete is received, the trip stops accepting new bills and
 
 Trip destination is chosen across all processed trip bills: the most frequent destination wins; ties preserve the first-uploaded bill. If no destination text exists, the same majority/first rule is applied to PIN codes and the PIN lookup is used as a fallback location source.
 
+
+
+
+## 2026-10-03 mobile simplification and duplicate repair
+
+The mobile client uses three primary sections: Trips, Stock and History. Company switching filters each section by canonical company ID or exact GSTIN; it is an operations view switch within the shared operator account. Drivers and WhatsApp conversations live in a small menu. Direct PDF upload (maximum 4 MiB), grouping uploaded or existing bills into trips, driver creation/assignment, stock counting, bill review, quantity/vehicle/number correction and cancellation remain available. Older bills are searchable and retrievable on demand rather than included in every launch.
+
+`/api/mobile/v1/home` is the compact launch API; the existing bootstrap API remains compatible with older clients and loads WhatsApp history only when requested. New write APIs require the same signed bearer authentication. Bill corrections/cancellation and their audit entries commit in one Postgres transaction. Trip attachment and closing serialize on the same trip row; closing requires a driver, parsed approved stock-posted bills and consistent vehicle identity. Ready means ready to dispatch, not delivered.
+
+Mobile setup issues a 90-day signed session, stored with the compact cache in encrypted device storage. Cached data renders before network refresh and displays its sync timestamp. Offline data is never treated as confirmation of a server write. A 401 clears token and cache. Device authentication is optional (off by default), using fingerprint or the existing OS PIN/pattern; server authentication is retained. Shared HMAC sessions have no per-device revocation; secret rotation invalidates them.
+
+Exact repeated PDF text reuses the existing approved active business draft while retaining the new inbound message. Different PDFs for the same normalized GSTIN+bill number or e-way number are blocked by transaction-level identity locks before catalog creation, inferred receipts or stock-out. Historical unposted copies are classified as duplicates without deleting records or replaying real stock. Identity claims survive cancellation; reuploading a cancelled bill does not silently undo it. Invoice numbers reused across financial years require review; this release keeps the existing conservative GSTIN+number identity rule.
+
+Company aliases now accept `document`, matching the verified ingestion code and product-alias constraint. Catalog failures persist a stock error. Duplicate replies are short Already uploaded notices. Raw-file cleanup runs hourly after the 24-hour threshold using the Storage API; message metadata, extracted text, structured items, trip links and the immutable ledger remain. GitHub schedule delays mean deletion is approximate.
+
+Migration ordering note: earlier repository migrations have timestamps later than their observed application time. The repair file is ordered after them so a fresh replay cannot overwrite the restored guard. Production was applied through the Supabase migration connector.

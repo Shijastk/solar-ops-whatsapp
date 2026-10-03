@@ -1,3 +1,5 @@
+import { runDocumentAutomationForDraft } from "@/lib/document-automation";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { processStoredPdfMessage } from "@/lib/document-processing";
 import {
   isUuid,
@@ -22,7 +24,19 @@ export async function POST(
   }
 
   try {
-    const result = await processStoredPdfMessage(id);
+    const { data: existing, error: readError } = await getSupabaseAdmin()
+      .from("document_drafts")
+      .select("id,parse_status,workflow_status")
+      .eq("message_id", id)
+      .maybeSingle();
+    if (readError) throw new Error("Could not load bill");
+    const result =
+      existing?.parse_status === "approved"
+        ? { draftId: existing.id, status: existing.parse_status }
+        : await processStoredPdfMessage(id);
+    await runDocumentAutomationForDraft(result.draftId, {
+      suppressReply: true,
+    });
     return Response.json(
       { status: result.status },
       { headers: { "Cache-Control": "no-store" } },
