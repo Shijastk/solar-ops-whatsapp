@@ -379,6 +379,21 @@ async function loadTripForSender(
   return (data as TripRow | null) ?? null;
 }
 
+
+async function loadTripById(tripId: string): Promise<TripRow | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("delivery_trips")
+    .select(
+      "id, sender_phone, status, display_name, primary_destination, destination_pincode, destination_district, destination_state, vehicle_number, driver_id",
+    )
+    .eq("id", tripId)
+    .maybeSingle();
+
+  if (error) throw new Error("Failed to load trip: " + error.message);
+  return (data as TripRow | null) ?? null;
+}
+
 async function sendHomeMenu(
   storedMessageId: string,
   knownInboundAt?: string | Date,
@@ -678,14 +693,7 @@ async function finalizeTripCollection(
   );
   const vehicleNumber = vehicleNumbers.length === 1 ? vehicleNumbers[0] : null;
 
-  const current = await loadTripForSender(
-    tripId,
-    (await supabase
-      .from("delivery_trips")
-      .select("sender_phone")
-      .eq("id", tripId)
-      .single()).data?.sender_phone ?? "",
-  );
+  const current = await loadTripById(tripId);
   if (!current) {
     throw new Error("Trip disappeared while finalizing");
   }
