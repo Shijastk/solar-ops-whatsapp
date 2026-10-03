@@ -565,3 +565,20 @@ Regression coverage includes:
 
 Live acceptance after deployment must separately verify that the narrow database path returns the expected count/balance and that duplicate webhook delivery produces at most one reply.
 
+## Bounded WhatsApp AI intent fallback tests
+
+Normal CI covers the AI fallback with mocked network responses.
+
+Regression coverage includes:
+
+- ordinary chat without an operational domain hint causes zero Groq requests
+- unresolved operational phrasing can be classified into a supported intent
+- Groq API key remains only in the Authorization header
+- only the current user text is sent as user content
+- text forwarded to the classifier is capped at 500 characters
+- strict JSON Schema is requested
+- generated output is capped at 120 completion tokens with low reasoning effort
+- disabling document automation/Groq leaves the fallback inactive while deterministic query parsing remains independent
+
+Provider-live language acceptance remains separate from mocked CI.
+
