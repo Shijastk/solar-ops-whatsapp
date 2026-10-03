@@ -570,3 +570,17 @@ Supported classifier outputs map only to the existing targeted reads for today's
 
 The query answer itself is still built from Postgres. Groq does not return the stock quantity, bill count, document total, or any other source-of-truth fact.
 
+### Indexed fuzzy stock lookup
+
+Read-only WhatsApp stock questions now keep exact canonical/alias lookup as the fastest path. On an exact miss, the backend calls the service-role-only search_stock_product_candidates RPC.
+
+The RPC uses pg_trgm GiST indexes to retrieve only a bounded nearest-candidate set from canonical product names and approved aliases. Application code then rejects weak candidates and rejects candidates whose numeric/model tokens conflict with numbers explicitly present in the operator's query.
+
+Fuzzy lookup never writes an alias and never participates in Stock OUT identity resolution. If more than one plausible stock entry remains, each is returned separately instead of being silently merged or selected.
+
+### Fast-query reply latency
+
+Direct operational query replies reuse the signed inbound message timestamp for the WhatsApp 24-hour service-window check instead of performing a second latest-message lookup. Reply idempotency lookup and reply-target lookup run in parallel. Other/manual reply paths keep the existing latest-inbound service-window check.
+
+Fast-query logs record lookup, outbound-send, and total durations separately so future optimization is based on measured latency rather than guesswork.
+

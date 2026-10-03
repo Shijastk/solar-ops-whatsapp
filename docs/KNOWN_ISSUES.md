@@ -466,3 +466,9 @@ Still requiring live evidence after deployment:
 
 Voice transcription remains outside this change.
 
+## K039 - Near-duplicate stock products remain separate identities
+
+Production data currently contains at least one pair of very similar canonical stock names that are separate product IDs and have separate balances.
+
+The typo-tolerant read-only search must therefore return both when a query cannot distinguish them. It must not merge, delete, or aggregate those identities automatically. Any catalogue cleanup requires an explicit stock-history reconciliation decision.
+

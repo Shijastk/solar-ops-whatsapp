@@ -693,3 +693,17 @@ Rules:
 - unsupported intents must not be coerced into a nearby supported answer
 - if AI configuration is disabled or unavailable, deterministic queries continue to work independently
 
+### R62 - Typo-tolerant read-only stock lookup
+
+WhatsApp stock questions must not require the operator to type the exact canonical product spelling.
+
+Rules:
+
+- exact canonical/approved-alias lookup remains the first path
+- when exact lookup misses, use an indexed bounded fuzzy search over canonical product names and approved aliases
+- fuzzy lookup is read-only; it must never create an alias or mutate stock identity
+- numeric/model tokens supplied by the operator must match the candidate, so a request containing 580 must not silently resolve to a 560 product
+- weak matches must fail closed
+- multiple plausible matches must be shown as separate stock entries rather than silently selecting one
+- the lookup must return only a small bounded candidate set and must not load the full product catalogue into application memory
+

@@ -10,6 +10,7 @@ import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 const MAX_STOCK_MATCHES = 8;
+const MIN_FUZZY_STOCK_SCORE = 0.25;
 
 export type FastWhatsAppQuery =
   | { type: "today_bill_count" }
@@ -290,6 +291,128 @@ type StockMatch = {
   current_quantity: number;
 };
 
+export type FuzzyStockCandidate = {
+  product_id: string;
+  matched_name: string;
+  similarity_score: number;
+};
+
+function numericTokens(value: string): string[] {
+  return normalizeProductDescription(value)
+    .split(" ")
+    .filter((token) => /^\d+(?:\.\d+)?$/.test(token))
+    .sort();
+}
+
+export function filterSafeFuzzyStockCandidates(
+  productQuery: string,
+  candidates: FuzzyStockCandidate[],
+): FuzzyStockCandidate[] {
+  const queryNumbers = numericTokens(productQuery);
+
+  return candidates
+    .filter((candidate) => {
+      if (
+        !Number.isFinite(candidate.similarity_score) ||
+        candidate.similarity_score < MIN_FUZZY_STOCK_SCORE
+      ) {
+        return false;
+      }
+
+      if (queryNumbers.length === 0) return true;
+
+      const candidateNumbers = numericTokens(candidate.matched_name);
+      return queryNumbers.every((token) => candidateNumbers.includes(token));
+    })
+    .sort(
+      (left, right) =>
+        right.similarity_score - left.similarity_score ||
+        left.matched_name.localeCompare(right.matched_name),
+    )
+    .slice(0, MAX_STOCK_MATCHES);
+}
+
+async function fuzzyStockProductIds(
+  productQuery: string,
+): Promise<string[]> {
+  const normalized = normalizeProductDescription(productQuery);
+  if (!normalized) return [];
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.rpc(
+    "search_stock_product_candidates",
+    {
+      p_query: normalized,
+      p_limit: MAX_STOCK_MATCHES,
+    },
+  );
+
+  if (error) {
+    throw new Error("Failed to search stock products: " + error.message);
+  }
+
+  const candidates = (data ?? []).map(
+    (row: {
+      product_id: unknown;
+      matched_name: unknown;
+      similarity_score: unknown;
+    }) => ({
+      product_id: String(row.product_id),
+      matched_name: String(row.matched_name ?? ""),
+      similarity_score: Number(row.similarity_score),
+    }),
+  ) as FuzzyStockCandidate[];
+
+  return Array.from(
+    new Set(
+      filterSafeFuzzyStockCandidates(productQuery, candidates).map(
+        (candidate) => candidate.product_id,
+      ),
+    ),
+  ).slice(0, MAX_STOCK_MATCHES);
+}
+
+function formatStockMatches(
+  matches: StockMatch[],
+  fuzzy: boolean,
+): string {
+  if (matches.length === 0) {
+    return "ഈ സാധനം കണ്ടെത്തി, പക്ഷേ നിലവിലെ stock balance ലഭിച്ചില്ല.";
+  }
+
+  if (matches.length === 1) {
+    const item = matches[0];
+    return [
+      fuzzy ? "Match ചെയ്തത്: " + item.product_name : item.product_name,
+      "കമ്പനി: " + item.company_name,
+      "സ്റ്റോക്ക്: " +
+        String(item.current_quantity) +
+        (item.unit ? " " + item.unit : ""),
+    ].join("\n");
+  }
+
+  return [
+    fuzzy
+      ? "നിങ്ങൾ എഴുതിയത് ഒന്നിലധികം stock entries-നോട് match ചെയ്യുന്നു:"
+      : "ഒരേ പേരിലുള്ള stock ഒന്നിലധികം കമ്പനികളിലുണ്ട്:",
+    ...matches.map(
+      (item) =>
+        "• " +
+        item.company_name +
+        " — " +
+        item.product_name +
+        ": " +
+        String(item.current_quantity) +
+        (item.unit ? " " + item.unit : ""),
+    ),
+    fuzzy
+      ? "Model/number അല്ലെങ്കിൽ പേരിലെ മറ്റൊരു ഭാഗം കൂടി അയച്ചാൽ ഞാൻ narrow ചെയ്യാം."
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 async function stockBalanceAnswer(productQuery: string): Promise<string> {
   const normalized = normalizeProductDescription(productQuery);
   if (!normalized) {
@@ -322,19 +445,25 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
     );
   }
 
-  const productIds = Array.from(
+  let productIds = Array.from(
     new Set([
       ...(canonicalResult.data ?? []).map((row) => row.id),
       ...(aliasResult.data ?? []).map((row) => row.product_id),
     ]),
   ).slice(0, MAX_STOCK_MATCHES);
+  let fuzzy = false;
+
+  if (productIds.length === 0) {
+    productIds = await fuzzyStockProductIds(productQuery);
+    fuzzy = productIds.length > 0;
+  }
 
   if (productIds.length === 0) {
     return (
       "“" +
       productQuery.trim().slice(0, 80) +
-      "” എന്ന പേരിൽ കൃത്യമായി match ചെയ്യുന്ന stock item കണ്ടെത്തിയില്ല. " +
-      "തെറ്റായി മറ്റൊരു item തിരഞ്ഞെടുക്കാതിരിക്കാൻ ഞാൻ guess ചെയ്തിട്ടില്ല."
+      "” എന്നതുമായി സുരക്ഷിതമായി match ചെയ്യുന്ന stock item കണ്ടെത്തിയില്ല. " +
+      "Model/number അല്ലെങ്കിൽ പേരിലെ മറ്റൊരു ഭാഗം കൂടി അയക്കൂ."
     );
   }
 
@@ -350,43 +479,21 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
     throw new Error("Failed to load stock balance: " + error.message);
   }
 
-  const matches = (data ?? []).map((row) => ({
-    product_id: row.product_id,
-    company_id: row.company_id,
-    company_name: row.company_name,
-    product_name: row.product_name,
-    unit: row.unit,
-    current_quantity: Number(row.current_quantity),
-  })) as StockMatch[];
+  const matches = (data ?? [])
+    .map((row) => ({
+      product_id: row.product_id,
+      company_id: row.company_id,
+      company_name: row.company_name,
+      product_name: row.product_name,
+      unit: row.unit,
+      current_quantity: Number(row.current_quantity),
+    }))
+    .sort(
+      (left, right) =>
+        productIds.indexOf(left.product_id) - productIds.indexOf(right.product_id),
+    ) as StockMatch[];
 
-  if (matches.length === 0) {
-    return "ഈ സാധനം കണ്ടെത്തി, പക്ഷേ നിലവിലെ stock balance ലഭിച്ചില്ല.";
-  }
-
-  if (matches.length === 1) {
-    const item = matches[0];
-    return [
-      item.product_name,
-      "കമ്പനി: " + item.company_name,
-      "സ്റ്റോക്ക്: " +
-        String(item.current_quantity) +
-        (item.unit ? " " + item.unit : ""),
-    ].join("\n");
-  }
-
-  return [
-    "ഒരേ പേരിലുള്ള stock ഒന്നിലധികം കമ്പനികളിലുണ്ട്:",
-    ...matches.map(
-      (item) =>
-        "• " +
-        item.company_name +
-        " — " +
-        item.product_name +
-        ": " +
-        String(item.current_quantity) +
-        (item.unit ? " " + item.unit : ""),
-    ),
-  ].join("\n");
+  return formatStockMatches(matches, fuzzy);
 }
 
 async function answerFastQuery(
@@ -434,17 +541,24 @@ export async function handleFastWhatsAppQuery(
     resolver = "ai_intent";
   }
 
+  const lookupStartedAt = performance.now();
   const body = await answerFastQuery(query);
+  const lookupDurationMs = Math.round(performance.now() - lookupStartedAt);
 
+  const sendStartedAt = performance.now();
   await sendOpsReply({
     requestId: deterministicUuid("fast-query:" + message.messageId),
     replyToMessageId: storedMessageId,
     body,
+    knownInboundAt: message.timestamp,
   });
+  const sendDurationMs = Math.round(performance.now() - sendStartedAt);
 
   console.info("Fast WhatsApp operational query completed", {
     intent: query.type,
     resolver,
+    lookupDurationMs,
+    sendDurationMs,
     durationMs: Math.round(performance.now() - startedAt),
   });
 
