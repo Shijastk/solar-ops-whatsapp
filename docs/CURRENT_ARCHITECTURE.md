@@ -570,3 +570,19 @@ Supported classifier outputs map only to the existing targeted reads for today's
 
 The query answer itself is still built from Postgres. Groq does not return the stock quantity, bill count, document total, or any other source-of-truth fact.
 
+## Stored media processing worker boundary
+
+Inbound media processing is now isolated in lib/media-processing.ts.
+
+The webhook ingestion path still persists the normalized WhatsApp message first. For media messages, ingest then passes only the persisted message UUID to processStoredWhatsAppMedia(). The worker reloads the minimum media metadata it needs from Postgres and owns media download, private Storage persistence, PDF parsing, and document automation.
+
+This is intentionally still synchronous in this change. The refactor creates a durable hand-off boundary before a queue is introduced; it does not claim faster webhook acknowledgement yet.
+
+Retry behavior is improved without changing the source of truth:
+
+- storage paths remain deterministic from sender, received timestamp, WhatsApp message id, and filename
+- webhook media SHA-256 is persisted immediately when present
+- when a retry finds an existing private storage object, the worker reuses those bytes instead of requiring another Meta media download
+- if the private object cannot be read and a Meta media id is still available, the worker can recover by downloading and upserting the same deterministic path
+- PDF parser and document automation still use their existing idempotent draft/stock safeguards
+

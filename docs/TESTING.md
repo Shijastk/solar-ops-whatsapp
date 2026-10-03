@@ -582,3 +582,16 @@ Regression coverage includes:
 
 Provider-live language acceptance remains separate from mocked CI.
 
+## Stored media worker refactor tests
+
+CI covers deterministic worker helpers for:
+
+- stable private Storage paths across retries
+- filename sanitization and known MIME extensions
+- PDF recognition from resolved media metadata
+- avoiding raw WhatsApp message ids in Storage path components
+
+The normal full suite remains responsible for document parser, verifier, stock idempotency, webhook signature, and outbound reply regressions.
+
+This refactor does not count as queue acceptance. A later queue change must separately prove fast webhook acknowledgement, consumer retries, duplicate delivery safety, and recovery from a failed processing attempt.
+

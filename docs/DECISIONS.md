@@ -404,3 +404,13 @@ Reason: Malayalam/Manglish wording can vary enough that exact phrase rules alone
 
 Database retrieval remains authoritative. AI decides only which bounded read to attempt; it does not calculate balances, select fuzzy product identities, mutate stock, or generate the factual result.
 
+## D046 - Extract media processing behind a persisted-message worker before queueing
+
+Decision: move media download, private storage persistence, PDF parsing, and document automation behind processStoredWhatsAppMedia(messageId) before changing webhook acknowledgement semantics.
+
+The worker receives a persisted internal message id rather than the full webhook payload and reloads only the media fields it needs.
+
+Reason: introducing a managed queue and simultaneously rewriting media processing would make failures difficult to isolate. A stable worker boundary lets synchronous behavior be verified first, then allows the producer to be replaced by a durable queue in a separate change.
+
+Existing stored bytes are preferred on retries. This reduces dependence on Meta media availability and makes at-least-once delivery safer when a queue is introduced later.
+

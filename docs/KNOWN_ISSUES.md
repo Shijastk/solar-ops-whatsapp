@@ -466,3 +466,11 @@ Still requiring live evidence after deployment:
 
 Voice transcription remains outside this change.
 
+## K039 - Media worker exists but webhook processing is still synchronous
+
+The media pipeline has been extracted behind processStoredWhatsAppMedia(messageId), and retries can reuse an already-persisted private media object.
+
+The webhook still awaits this worker in the current source. Therefore Meta acknowledgement latency can still include media download, PDF parsing, Groq verification, and stock workflow time.
+
+Do not describe asynchronous or durable queue processing as implemented until the webhook producer and private queue consumer are separately deployed and verified.
+
