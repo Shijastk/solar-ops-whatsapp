@@ -988,7 +988,10 @@ export async function handleTripWorkflowInbound(
     await startTrip(message, storedMessageId);
     return "handled";
   }
-  if (interactiveId && (await handleMenuAction(interactiveId, storedMessageId))) {
+  if (
+    interactiveId &&
+    (await handleMenuAction(interactiveId, storedMessageId, message.timestamp))
+  ) {
     return "handled";
   }
 
