@@ -594,3 +594,17 @@ A hard-equivalent existing product returns `opening_exists` even if a client sen
 
 No AI model participates in opening-stock product identity.
 
+### Ledger-first outgoing flow
+
+After a document is approved and recorded, the stock workflow provisions a canonical company from the verified supplier GSTIN/name when needed, provisions or resolves products using deterministic product identity, stores bill wording as a document alias, then writes one idempotent `stock_out` movement per document item.
+
+The stock-out RPC no longer rejects an outgoing movement because current quantity is insufficient. The `stock_balances` view remains a sum of immutable movements, so a balance can be negative until Stock IN/opening data is supplied.
+
+The `stock_history` view joins ledger movements to company/product/document identity and calculates a per-product running balance. The mobile bootstrap exposes only the newest bounded history rows.
+
+### Document verification fast path
+
+After local PDF parsing, the backend first checks stock-critical identity fields and arithmetic locally. If that deterministic gate passes, the document is recorded with `verification_provider=local` and no Groq request is made.
+
+If the local gate fails, the existing strict Groq extraction/comparison remains the fallback. WhatsApp response bodies are still deterministic templates selected by workflow status; the model does not author the user-facing reply.
+

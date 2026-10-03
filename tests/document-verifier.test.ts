@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   compareDocumentVerification,
   extractDocumentWithGroq,
+  verifyDocumentDeterministically,
   type GroqDocumentExtraction,
   type VerificationCandidate,
 } from "../lib/document-verifier";
@@ -126,6 +127,56 @@ afterEach(() => {
   restore("GROQ_API_KEY", originalEnv.key);
   restore("GROQ_MODEL", originalEnv.model);
   restore("GROQ_TIMEOUT_MS", originalEnv.timeout);
+});
+
+describe("verifyDocumentDeterministically", () => {
+  it("accepts a complete document with internally consistent stock-critical fields", () => {
+    expect(verifyDocumentDeterministically(candidate)).toEqual({
+      verified: true,
+      issues: [],
+    });
+  });
+
+  it("does not require address, phone, destination, or vehicle fields to auto-record", () => {
+    expect(
+      verifyDocumentDeterministically({
+        ...candidate,
+        supplierAddress: null,
+        consigneeAddress: null,
+        consigneePhone: null,
+        buyerAddress: null,
+        buyerPhone: null,
+        destination: null,
+        vehicleNumber: null,
+      }),
+    ).toEqual({
+      verified: true,
+      issues: [],
+    });
+  });
+
+  it("fails deterministic verification when stock-critical item data is unsafe", () => {
+    const result = verifyDocumentDeterministically({
+      ...candidate,
+      items: [{ ...candidate.items[0], quantity: null }],
+    });
+
+    expect(result.verified).toBe(false);
+    expect(result.issues).toContain("item_quantity_1");
+  });
+
+  it("fails deterministic verification when totals are arithmetically inconsistent", () => {
+    const result = verifyDocumentDeterministically({
+      ...candidate,
+      taxableAmount: 138000,
+      cgstAmount: 100,
+      sgstAmount: 100,
+      totalAmount: 140000,
+    });
+
+    expect(result.verified).toBe(false);
+    expect(result.issues).toContain("total_amount_arithmetic");
+  });
 });
 
 describe("compareDocumentVerification", () => {

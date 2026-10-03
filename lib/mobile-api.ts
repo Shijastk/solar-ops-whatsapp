@@ -12,6 +12,7 @@ import { isWithinCustomerServiceWindow } from "@/lib/replies";
 import {
   listStockBalances,
   listStockCompanies,
+  listStockHistory,
   type StockCompany,
 } from "@/lib/stock";
 
@@ -169,11 +170,12 @@ function serializeDraft(draft: OpsDocumentDraft | undefined) {
 }
 
 export async function buildMobileBootstrap(now = new Date()) {
-  const [messages, outbound, companies, balances] = await Promise.all([
+  const [messages, outbound, companies, balances, stockHistory] = await Promise.all([
     listOpsMessages(150),
     listOpsOutboundMessages(250),
     listStockCompanies(),
     listStockBalances(),
+    listStockHistory(60),
   ]);
 
   const billMessages = messages.filter(isPdfOpsMessage);
@@ -317,6 +319,23 @@ export async function buildMobileBootstrap(now = new Date()) {
         unit: balance.unit,
         hsnSac: balance.hsn_sac,
         currentQuantity: balance.current_quantity,
+      })),
+      history: stockHistory.map((movement) => ({
+        id: movement.id,
+        productId: movement.product_id,
+        companyId: movement.company_id,
+        companyName: movement.company_name,
+        companyGstin: movement.company_gstin,
+        productName: movement.product_name,
+        unit: movement.unit,
+        hsnSac: movement.hsn_sac,
+        movementType: movement.movement_type,
+        quantityDelta: movement.quantity_delta,
+        createdAt: movement.created_at,
+        draftId: movement.draft_id,
+        documentNumber: movement.document_number,
+        documentDate: movement.document_date,
+        balanceAfter: movement.balance_after,
       })),
     },
   };

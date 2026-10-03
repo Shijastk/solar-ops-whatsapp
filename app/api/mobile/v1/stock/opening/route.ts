@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
   mobileUnauthorizedResponse,
@@ -38,7 +39,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await createOpeningStock(parsed.data);
+    const result = await createOpeningStock({
+      ...parsed.data,
+      actionKey: randomUUID(),
+    });
     return Response.json(result, {
       headers: { "Cache-Control": "no-store" },
     });
