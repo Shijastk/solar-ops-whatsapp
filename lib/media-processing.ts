@@ -70,7 +70,7 @@ export function buildInboundStoragePath(input: {
     String(year),
     month,
     safeMessageId,
-    input.filename,
+    cleanInboundFilename(input.filename),
   ].join("/");
 }
 
