@@ -527,3 +527,19 @@ language sql stable set search_path=public as $$
 $$;
 revoke all on function public.get_ops_period_summary(timestamptz,timestamptz) from public,anon,authenticated;
 grant execute on function public.get_ops_period_summary(timestamptz,timestamptz) to service_role;
+create or replace function public.get_mobile_today_totals()
+returns table(company_id uuid,bill_count bigint,total_amount numeric)
+language sql stable set search_path=public as $$
+ with bounds as(select date_trunc('day',now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata' as start),
+ bills as(
+  select distinct on (upper(regexp_replace(coalesce(d.supplier_gstin,'')||':'||coalesce(d.document_number,d.id::text),'[^A-Za-z0-9:]','','g')))
+   coalesce(d.stock_company_id,c.id) as company_id,d.total_amount
+  from public.document_drafts d join public.whatsapp_messages m on m.id=d.message_id
+  left join public.stock_companies c on c.gstin=upper(regexp_replace(d.supplier_gstin,'[^A-Za-z0-9]','','g')) cross join bounds b
+  where m.received_at>=b.start and m.received_at<b.start+interval '1 day' and d.workflow_status='recorded' and d.stock_status<>'duplicate_document'
+  and not exists(select 1 from public.stock_document_claims claims where claims.identity_key='doc:'||upper(regexp_replace(d.supplier_gstin,'[^A-Za-z0-9]','','g'))||':'||upper(regexp_replace(d.document_number,'[^A-Za-z0-9]','','g')) and claims.draft_id<>d.id)
+  order by upper(regexp_replace(coalesce(d.supplier_gstin,'')||':'||coalesce(d.document_number,d.id::text),'[^A-Za-z0-9:]','','g')),d.created_at
+ ) select company_id,count(*)::bigint,coalesce(sum(total_amount),0) from bills group by company_id;
+$$;
+revoke all on function public.get_mobile_today_totals() from public,anon,authenticated;
+grant execute on function public.get_mobile_today_totals() to service_role;
