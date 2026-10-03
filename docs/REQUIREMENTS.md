@@ -677,3 +677,19 @@ Rules:
 - an AI fallback may be added later only for language/intent resolution, with minimal retrieved facts; AI must not become the stock/accounting source of truth
 - raw PDFs must never be sent to the AI query layer
 
+### R61 - AI is a bounded intent fallback, not an operational data source
+
+When a text question is not resolved by the deterministic fast-query parser, the system may call Groq only when the text contains a bounded Solar Ops operational hint.
+
+Rules:
+
+- ordinary chat without an operational hint must not spend an AI request
+- the query classifier receives only the current normalized user text, capped at 500 characters
+- do not send raw PDFs, extracted bill text, database rows, stock ledgers, prior chat history, or broad search results to the query classifier
+- classifier output is limited to a small strict schema: supported intent plus an optional product phrase
+- generated output is bounded; the classifier does not compose the business answer
+- the final count, bill summary, or stock quantity still comes from the same targeted database path used by deterministic intents
+- an unknown or ambiguous product identity remains fail-closed
+- unsupported intents must not be coerced into a nearby supported answer
+- if AI configuration is disabled or unavailable, deterministic queries continue to work independently
+
