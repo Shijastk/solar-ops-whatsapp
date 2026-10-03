@@ -776,3 +776,5 @@ Exact repeated PDF text reuses the existing approved active business draft while
 Company aliases now accept `document`, matching the verified ingestion code and product-alias constraint. Catalog failures persist a stock error. Duplicate replies are short Already uploaded notices. Raw-file cleanup runs hourly after the 24-hour threshold using the Storage API; message metadata, extracted text, structured items, trip links and the immutable ledger remain. GitHub schedule delays mean deletion is approximate.
 
 Migration ordering note: earlier repository migrations have timestamps later than their observed application time. The repair file is ordered after them so a fresh replay cannot overwrite the restored guard. Production was applied through the Supabase migration connector.
+
+Today bill counts/value are computed in Postgres over the whole current IST day, with canonical identity filtering and exact company mapping. They do not depend on the recent launch/history page size.

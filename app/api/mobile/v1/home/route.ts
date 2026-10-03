@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   buildMobileBootstrap,
   mobileUnauthorizedResponse,
@@ -9,13 +10,26 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   if (!verifyMobileRequest(request)) return mobileUnauthorizedResponse();
   try {
-    const [data, trips, drivers] = await Promise.all([
+    const [data, trips, drivers, totals] = await Promise.all([
       buildMobileBootstrap(new Date(), true),
       listMobileTrips(),
       listMobileDrivers(),
+      getSupabaseAdmin().rpc("get_mobile_today_totals"),
     ]);
+    if (totals.error) throw new Error("Could not load daily bill totals");
+    const todayTotals = (totals.data ?? []).map(
+      (r: {
+        company_id: string | null;
+        bill_count: number;
+        total_amount: number;
+      }) => ({
+        companyId: r.company_id,
+        billCount: Number(r.bill_count),
+        totalAmount: Number(r.total_amount),
+      }),
+    );
     return Response.json(
-      { ...data, trips, drivers },
+      { ...data, trips, drivers, todayTotals },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {

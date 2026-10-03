@@ -12,8 +12,8 @@ begin
  for n in 1..3 loop
   m:=gen_random_uuid(); d:=gen_random_uuid(); ds:=array_append(ds,d);
   insert into whatsapp_messages(id,whatsapp_message_id,sender_phone,message_type,processing_status,received_at) values(m,'synthetic:'||m::text,'synthetic-audit','document','stored',now());
-  insert into document_drafts(id,message_id,parser_version,parse_status,workflow_status,verification_status,supplier_gstin,document_number,stock_company_id,eway_bill_number)
-  values(d,m,'synthetic-test','approved','recorded','manual_override',case when n=3 then '33ZZZZZ9999Z1Z9' else '32ZZZZZ9999Z1Z9' end,key,case when n=3 then c2 else c end,case when n=1 then 'fixture-'||key else null end);
+  insert into document_drafts(id,message_id,parser_version,parse_status,workflow_status,verification_status,supplier_gstin,document_number,stock_company_id,eway_bill_number,total_amount)
+  values(d,m,'synthetic-test','approved','recorded','manual_override',case when n=3 then '33ZZZZZ9999Z1Z9' else '32ZZZZZ9999Z1Z9' end,key,case when n=3 then c2 else c end,case when n=1 then 'fixture-'||key else null end,100);
   insert into document_items(draft_id,line_index,description,normalized_description,quantity,unit) values(d,0,'Synthetic panel','synthetic panel',7,'NOS');
  end loop;
  r:=apply_stock_out_for_draft(ds[1]);
@@ -24,6 +24,7 @@ begin
  if r->>'status'<>'duplicate_document' then raise exception 'cross-draft duplicate escaped: %',r; end if;
  if exists(select 1 from stock_ledger where draft_id=ds[2]) then raise exception 'duplicate mutated ledger'; end if;
  if (select count(*) from stock_ledger where draft_id=ds[1])<>2 then raise exception 'unexpected inferred/out ledger count'; end if;
+ if (select bill_count from get_mobile_today_totals() where company_id=c)<>1 or (select total_amount from get_mobile_today_totals() where company_id=c)<>100 then raise exception 'daily total duplicated'; end if;
  insert into ops_drivers(id,name,normalized_name) values(driver,'Synthetic driver',key);
  insert into delivery_trips(id,sender_phone,company_id) values(trip,'synthetic:'||trip::text,c);
  select message_id into m from document_drafts where id=ds[1];
