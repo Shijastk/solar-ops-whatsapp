@@ -198,7 +198,7 @@ export async function sendWhatsAppList(input: {
         button: input.buttonText,
         sections: [
           {
-            title: input.sectionTitle?.trim() || "Options",
+            title: input.sectionTitle?.trim() || "Edit field",
             rows: input.rows.map((row) => ({
               id: row.id,
               title: row.title,
