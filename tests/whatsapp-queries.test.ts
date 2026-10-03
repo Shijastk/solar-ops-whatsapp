@@ -19,6 +19,12 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(parseFastWhatsAppQuery("latest bill")).toEqual({
       type: "latest_bill",
     });
+    expect(parseFastWhatsAppQuery("ഇന്നത്തെ trip ഏതാണ്?")).toEqual({
+      type: "today_trip_summary",
+    });
+    expect(parseFastWhatsAppQuery("latest trip")).toEqual({
+      type: "latest_trip",
+    });
   });
 
   it("extracts the product phrase from Malayalam and Manglish stock questions", () => {
