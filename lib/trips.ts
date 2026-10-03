@@ -601,7 +601,9 @@ async function finalizeTripCollection(
       (draft) => cleanDestination(draft.destination) === primaryDestination,
     ) ?? drafts[0] ?? null;
   const primaryPincode = primaryDraft ? extractPincodeFromDraft(primaryDraft) : null;
-  const pincodeLocation = await resolvePincodeLocation(primaryPincode);
+  const pincodeLocation = primaryDestination
+    ? null
+    : await resolvePincodeLocation(primaryPincode);
 
   const uniqueDestinations = new Set(destinations.filter(Boolean));
   const displayName = buildTripDisplayName({
