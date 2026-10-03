@@ -420,3 +420,17 @@ Hard-equivalent wording variants such as singular/plural inventory nouns cannot 
 
 Reason: inventory identity is an accounting boundary. Local deterministic rules are faster, cheaper, reproducible, testable, and safer than model inference for this job.
 
+## D048 - Inventory uses an event ledger, not an availability gate
+
+Decision: verified outgoing bills write immutable negative stock movements even when the current balance is zero or negative. Stock availability no longer blocks the historical fact that goods went out.
+
+Products and companies may be provisioned from verified structured bill data using deterministic identity rules. Manual incoming stock is represented by positive ledger movements. Current balance is the sum of movements and may temporarily be negative when incoming/opening data has not been entered yet.
+
+Reason: the application must preserve what physically happened first and allow stock data to be completed later, while retaining an auditable bank-style history.
+
+## D049 - AI does not write WhatsApp operational prose and is not the default PDF verifier
+
+Decision: operational WhatsApp responses are fixed backend templates. Clean documents use deterministic local verification first; Groq is called only when deterministic safety checks do not establish a safe result.
+
+Reason: deterministic paths are faster, cheaper, reproducible, and easier to audit. AI remains useful for genuinely ambiguous extraction/verification, not routine status text or every clean bill.
+
