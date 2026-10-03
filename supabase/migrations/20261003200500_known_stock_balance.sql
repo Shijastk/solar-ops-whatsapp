@@ -67,7 +67,7 @@ select
   d.document_date,
   case
     when count(*) filter (
-      where l2.movement_type in ('opening', 'stock_in', 'adjustment')
+      where l.movement_type in ('opening', 'stock_in', 'adjustment')
     ) over (
       partition by l.product_id
       order by l.created_at, l.id
@@ -83,8 +83,7 @@ select
 from public.stock_ledger l
 join public.stock_products p on p.id = l.product_id
 join public.stock_companies c on c.id = p.company_id
-left join public.document_drafts d on d.id = l.draft_id
-left join public.stock_ledger l2 on l2.id = l.id;
+left join public.document_drafts d on d.id = l.draft_id;
 
 revoke all on table public.stock_history
   from public, anon, authenticated, service_role;
