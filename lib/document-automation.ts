@@ -653,6 +653,7 @@ export async function runDocumentAutomationForDraft(
         draftId: draft.id,
         replyToMessageId: draft.messageId,
         notifySuccess: false,
+        suppressNotifications: suppressReply,
       });
       if (
         stockResult.status === "applied" ||
