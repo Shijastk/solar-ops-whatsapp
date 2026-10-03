@@ -452,3 +452,17 @@ What is not yet proven live:
 
 Voice transcription and a Groq fallback for unsupported natural-language phrasing are not implemented by this change. They must not be described as available until separately designed, tested, and verified.
 
+## K038 - AI query fallback still needs provider-live phrasing evidence
+
+Source now includes a token-bounded Groq intent fallback for unresolved operational text.
+
+The fallback does not send PDFs, extracted bill text, database rows, ledger history, or chat history to Groq and it does not generate source-of-truth business values.
+
+Still requiring live evidence after deployment:
+
+- one real Malayalam/Manglish operational question that misses deterministic routing but maps correctly through Groq
+- observed end-to-end latency for that fallback
+- confirmation that unsupported conversational text does not trigger an incorrect business answer
+
+Voice transcription remains outside this change.
+

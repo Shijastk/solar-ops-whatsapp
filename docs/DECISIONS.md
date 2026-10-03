@@ -394,3 +394,13 @@ Safety boundaries:
 - this decision extends D026 only for direct replies to bounded operator questions; it does not authorize marketing, unsolicited messaging, or arbitrary AI-generated automation
 - future AI intent fallback may interpret language, but the final facts must come from targeted database retrieval
 
+## D045 - Use Groq only to resolve bounded query intent after deterministic routing
+
+Decision: Groq may be used as a second-stage language classifier only after the deterministic WhatsApp query parser fails and only for text that contains an operational domain hint.
+
+The classifier receives at most 500 characters from the current message and returns only a strict supported-intent schema plus an optional product phrase. It never receives raw PDFs, stored document text, database history, or stock-ledger data for this task.
+
+Reason: Malayalam/Manglish wording can vary enough that exact phrase rules alone would create unnecessary operator friction, but sending every message or the full operational context to an LLM would add cost, latency, privacy exposure, and new failure modes.
+
+Database retrieval remains authoritative. AI decides only which bounded read to attempt; it does not calculate balances, select fuzzy product identities, mutate stock, or generate the factual result.
+
