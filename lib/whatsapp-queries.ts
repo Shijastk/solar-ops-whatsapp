@@ -351,11 +351,17 @@ async function fuzzyStockProductIds(
     throw new Error("Failed to search stock products: " + error.message);
   }
 
-  const candidates = (data ?? []).map((row) => ({
-    product_id: String(row.product_id),
-    matched_name: String(row.matched_name ?? ""),
-    similarity_score: Number(row.similarity_score),
-  })) as FuzzyStockCandidate[];
+  const candidates = (data ?? []).map(
+    (row: {
+      product_id: unknown;
+      matched_name: unknown;
+      similarity_score: unknown;
+    }) => ({
+      product_id: String(row.product_id),
+      matched_name: String(row.matched_name ?? ""),
+      similarity_score: Number(row.similarity_score),
+    }),
+  ) as FuzzyStockCandidate[];
 
   return Array.from(
     new Set(
