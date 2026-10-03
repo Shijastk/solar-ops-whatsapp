@@ -16,6 +16,7 @@ import {
 } from "@/lib/stock-workflow";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
+import { handleFastWhatsAppQuery } from "@/lib/whatsapp-queries";
 
 const EDIT_SESSION_MINUTES = 15;
 const SUMMARY_ITEM_LIMIT = 6;
@@ -1224,6 +1225,12 @@ export async function handleDocumentWorkflowInbound(
   }
 
   if (await applyPendingTextEdit(message, storedMessageId)) {
+    return "handled";
+  }
+
+  if (
+    (await handleFastWhatsAppQuery(message, storedMessageId)) === "handled"
+  ) {
     return "handled";
   }
 
