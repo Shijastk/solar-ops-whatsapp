@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   filterSafeFuzzyStockCandidates,
   indiaDayBounds,
+  opsPeriodBounds,
   parseFastWhatsAppQuery,
 } from "../lib/whatsapp-queries";
 
@@ -24,6 +25,14 @@ describe("fast WhatsApp operational query parsing", () => {
     });
     expect(parseFastWhatsAppQuery("latest trip")).toEqual({
       type: "latest_trip",
+    });
+    expect(parseFastWhatsAppQuery("ഈ മാസം summary")).toEqual({
+      type: "ops_period_summary",
+      period: "this_month",
+    });
+    expect(parseFastWhatsAppQuery("last year summary")).toEqual({
+      type: "ops_period_summary",
+      period: "last_year",
     });
   });
 
@@ -59,6 +68,22 @@ describe("fast WhatsApp operational query parsing", () => {
     ).toEqual({
       start: "2026-10-02T18:30:00.000Z",
       end: "2026-10-03T18:30:00.000Z",
+    });
+  });
+
+  it("calculates exact IST period bounds for structured summaries", () => {
+    const now = new Date("2026-10-03T10:16:00.000Z");
+
+    expect(opsPeriodBounds("this_month", now)).toEqual({
+      start: "2026-09-30T18:30:00.000Z",
+      end: "2026-10-03T10:16:00.000Z",
+      label: "ഈ മാസം",
+    });
+
+    expect(opsPeriodBounds("last_month", now)).toEqual({
+      start: "2026-08-31T18:30:00.000Z",
+      end: "2026-09-30T18:30:00.000Z",
+      label: "കഴിഞ്ഞ മാസം",
     });
   });
 

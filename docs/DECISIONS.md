@@ -434,3 +434,19 @@ Decision: operational WhatsApp responses are fixed backend templates. Clean docu
 
 Reason: deterministic paths are faster, cheaper, reproducible, and easier to audit. AI remains useful for genuinely ambiguous extraction/verification, not routine status text or every clean bill.
 
+## D050 - Exact operational Q&A uses structured retrieval, not vector RAG
+
+Decision: stock, bill, trip, driver, date-range counts, and other transactional facts are answered from whitelisted database queries/RPCs. Natural-language AI may classify intent, period, or entity, but it never supplies the factual value itself.
+
+Vector RAG is intentionally not used for exact operational balances/counts because approximate semantic retrieval can omit rows, return stale text, and add latency. RAG may be added later only for genuinely unstructured content such as notes or long free-text documents.
+
+## D051 - Every allowed inbound WhatsApp message receives a response
+
+Decision: text uses deterministic commands/queries first, then a bounded conversational fallback. Voice is transcribed and passed through the same text engine. Unsupported media receives a short acknowledgement. PDFs inside an open trip receive an immediate lightweight receipt while heavy parsing/verification continues independently.
+
+## D052 - Driver selection must not wait for bill verification
+
+Decision: after the operator sends done/ശരി/complete, bill collection closes and the driver picker is returned immediately. Pending bill parsing/verification may continue while the operator selects a driver. If processing is still pending after driver selection, the trip auto-finalizes when the last reserved bill finishes.
+
+Reason: WhatsApp round-trip latency should not create an avoidable extra waiting step.
+

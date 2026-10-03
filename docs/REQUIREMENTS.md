@@ -748,3 +748,15 @@ For document verification:
 - address/phone/display formatting is not sufficient by itself to require AI on an otherwise safe document
 - stock-critical fields remain fail-closed
 
+### R66 - Universal WhatsApp response
+
+For every allowed inbound WhatsApp message, Solar Ops must produce a useful response or acknowledgement. Known commands and exact operational queries must use deterministic fast paths. Casual/general text may use one bounded AI fallback call. Operational facts must never be invented by the fallback.
+
+### R67 - Immediate driver step
+
+Closing a trip's bill collection must immediately present the driver picker. The user must not wait for PDF parsing, AI verification, or stock processing before choosing a driver. The trip may remain internally pending until all reserved bills finish.
+
+### R68 - Exact period summaries
+
+Natural-language questions for this/last week, month, or year must resolve to exact India-time date bounds and a bounded database RPC. The initial summary includes PDF bill count, verified bill count, review-required bill count, and completed trip count.
+

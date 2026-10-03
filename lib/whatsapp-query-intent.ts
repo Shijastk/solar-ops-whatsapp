@@ -11,12 +11,25 @@ const supportedIntentSchema = z.enum([
   "stock_balance",
   "today_trip_summary",
   "latest_trip",
+  "ops_period_summary",
   "unsupported",
 ]);
+
+const periodSchema = z
+  .enum([
+    "this_week",
+    "this_month",
+    "this_year",
+    "last_week",
+    "last_month",
+    "last_year",
+  ])
+  .nullable();
 
 const classificationSchema = z.object({
   intent: supportedIntentSchema,
   product_query: z.string().nullable(),
+  period: periodSchema,
 });
 
 const groqResponseSchema = z.object({
@@ -43,14 +56,27 @@ const strictResponseSchema = {
         "stock_balance",
         "today_trip_summary",
         "latest_trip",
+        "ops_period_summary",
         "unsupported",
       ],
     },
     product_query: {
       type: ["string", "null"],
     },
+    period: {
+      type: ["string", "null"],
+      enum: [
+        "this_week",
+        "this_month",
+        "this_year",
+        "last_week",
+        "last_month",
+        "last_year",
+        null
+      ],
+    },
   },
-  required: ["intent", "product_query"],
+  required: ["intent", "product_query", "period"],
   additionalProperties: false,
 } as const;
 
@@ -81,6 +107,15 @@ const DOMAIN_HINTS = [
   "ട്രിപ്പുകൾ",
   "റൂട്ട്",
   "ഡ്രൈവർ",
+  "summary",
+  "week",
+  "month",
+  "year",
+  "ആഴ്ച",
+  "വാരം",
+  "മാസം",
+  "വർഷം",
+  "സമ്മറി",
 ];
 
 export type AiOperationalQueryClassification = z.infer<
@@ -167,7 +202,7 @@ export async function classifyOperationalQueryWithGroq(
           {
             role: "system",
             content:
-              "Classify a Solar Ops operator question. Do not answer the question and do not invent business facts. Supported intents only: today_bill_count = asks how many PDF bills were received today; pending_bill_count = asks how many bills need review/are pending; latest_bill = asks for the most recently received bill; stock_balance = asks the current stock quantity for one named product; today_trip_summary = asks which trips were completed today; latest_trip = asks for the latest completed trip. For stock_balance, copy only the product phrase from the user into product_query; use null when the product is not named. For every other request, including customer history, routes, trips, totals other than these counts, edits, commands, greetings, explanations, or ambiguous meaning, return unsupported. Understand Malayalam, Manglish and English.",
+              "Classify a Solar Ops operator question. Do not answer the question and do not invent business facts. Supported intents only: today_bill_count = asks how many PDF bills were received today; pending_bill_count = asks how many bills need review/are pending; latest_bill = asks for the most recently received bill; stock_balance = asks the current stock quantity for one named product; today_trip_summary = asks which trips were completed today; latest_trip = asks for the latest completed trip; ops_period_summary = asks for an operational summary for this week/month/year or last week/month/year. For stock_balance, copy only the product phrase from the user into product_query; use null when not named. For ops_period_summary set period to one of this_week, this_month, this_year, last_week, last_month, last_year. For every other intent set period to null. For every other request including arbitrary SQL-like questions, edits, commands, greetings, explanations, or ambiguous meaning, return unsupported. Understand Malayalam, Manglish and English.",
           },
           {
             role: "user",
@@ -222,5 +257,6 @@ export async function classifyOperationalQueryWithGroq(
   return {
     intent: parsed.data.intent,
     product_query: productQuery,
+    period: parsed.data.period,
   };
 }

@@ -71,6 +71,33 @@ function buildStoragePath(
   ].join("/");
 }
 
+async function sendUnsupportedMessageAck(
+  message: NormalizedWhatsAppMessage,
+  storedMessageId: string,
+) {
+  const labels: Record<string, string> = {
+    image: "Image",
+    video: "Video",
+    sticker: "Sticker",
+    document: "Document",
+    location: "Location",
+    contacts: "Contact",
+    reaction: "Reaction",
+  };
+
+  const label = labels[message.type] ?? "Message";
+  await sendOpsReply({
+    requestId: deterministicUuid(
+      "unsupported-message:" + message.messageId,
+    ),
+    replyToMessageId: storedMessageId,
+    knownInboundAt: message.timestamp,
+    body:
+      label +
+      " ലഭിച്ചു. PDF bill, text, അല്ലെങ്കിൽ voice message അയച്ചാൽ Solar Ops അത് process ചെയ്ത് മറുപടി നൽകും.",
+  });
+}
+
 export async function ingestWhatsAppMessage(
   message: NormalizedWhatsAppMessage,
 ): Promise<"stored" | "ignored"> {
@@ -135,6 +162,7 @@ export async function ingestWhatsAppMessage(
       message.media.filename?.toLowerCase().endsWith(".pdf")
     );
   let reservedTripId: string | null = null;
+  let tripReceiptReply: Promise<void> | null = null;
 
   if (likelyPdfDocument) {
     try {
@@ -142,6 +170,26 @@ export async function ingestWhatsAppMessage(
         senderPhone: message.senderPhone,
         messageId: persistedMessage.id,
       });
+
+      if (reservedTripId) {
+        tripReceiptReply = sendOpsReply({
+          requestId: deterministicUuid(
+            "trip-bill-received:" + message.messageId,
+          ),
+          replyToMessageId: persistedMessage.id,
+          knownInboundAt: message.timestamp,
+          body: "✅ Bill received. Next bill അയക്കാം.",
+        })
+          .then(() => undefined)
+          .catch((error) => {
+            console.warn("Trip bill acknowledgement failed", {
+              reason:
+                error instanceof Error
+                  ? error.message.slice(0, 180)
+                  : "Unknown acknowledgement error",
+            });
+          });
+      }
     } catch (error) {
       console.warn("Trip document reservation did not complete", {
         reason:
@@ -153,8 +201,12 @@ export async function ingestWhatsAppMessage(
   }
 
   if (!message.media || !MEDIA_TYPES.has(message.type)) {
+    let workflowResult: "handled" | "ignored" = "ignored";
     try {
-      await handleDocumentWorkflowInbound(message, persistedMessage.id);
+      workflowResult = await handleDocumentWorkflowInbound(
+        message,
+        persistedMessage.id,
+      );
     } catch (error) {
       console.warn("WhatsApp document workflow interaction did not complete", {
         messageStored: true,
@@ -163,6 +215,19 @@ export async function ingestWhatsAppMessage(
             ? error.message.slice(0, 180)
             : "Unknown workflow error",
       });
+    }
+
+    if (workflowResult === "ignored") {
+      try {
+        await sendUnsupportedMessageAck(message, persistedMessage.id);
+      } catch (error) {
+        console.warn("WhatsApp unsupported-message acknowledgement failed", {
+          reason:
+            error instanceof Error
+              ? error.message.slice(0, 180)
+              : "Unknown acknowledgement error",
+        });
+      }
     }
 
     return "stored";
@@ -254,6 +319,22 @@ export async function ingestWhatsAppMessage(
                 ? error.message.slice(0, 180)
                 : "Unknown automation error",
           });
+
+          if (!reservedTripId) {
+            try {
+              await sendOpsReply({
+                requestId: deterministicUuid(
+                  "pdf-automation-failed:" + message.messageId,
+                ),
+                replyToMessageId: persistedMessage.id,
+                knownInboundAt: message.timestamp,
+                body:
+                  "📄 PDF ലഭിച്ചു. പക്ഷേ bill safely process ചെയ്യാൻ കഴിഞ്ഞില്ല. Stock auto-update ചെയ്തിട്ടില്ല.",
+              });
+            } catch {
+              // Message remains stored even if the fallback reply cannot be sent.
+            }
+          }
         }
 
         if (reservedTripId) {
@@ -287,6 +368,20 @@ export async function ingestWhatsAppMessage(
                   ? tripError.message.slice(0, 180)
                   : "Unknown trip status error",
             });
+          }
+        } else {
+          try {
+            await sendOpsReply({
+              requestId: deterministicUuid(
+                "pdf-processing-failed:" + message.messageId,
+              ),
+              replyToMessageId: persistedMessage.id,
+              knownInboundAt: message.timestamp,
+              body:
+                "📄 PDF ലഭിച്ചു. പക്ഷേ bill details read/process ചെയ്യാൻ കഴിഞ്ഞില്ല. Stock auto-update ചെയ്തിട്ടില്ല.",
+            });
+          } catch {
+            // The inbound PDF is still stored even if the fallback reply fails.
           }
         }
       }
@@ -360,10 +455,28 @@ export async function ingestWhatsAppMessage(
           // The inbound media is still stored even when the error reply fails.
         }
       }
+    } else {
+      try {
+        await sendUnsupportedMessageAck(message, persistedMessage.id);
+      } catch (error) {
+        console.warn("WhatsApp stored-media acknowledgement failed", {
+          reason:
+            error instanceof Error
+              ? error.message.slice(0, 180)
+              : "Unknown acknowledgement error",
+        });
+      }
     }
 
+    if (tripReceiptReply) {
+      await tripReceiptReply;
+    }
     return "stored";
   } catch (error) {
+    if (tripReceiptReply) {
+      await tripReceiptReply;
+    }
+
     const messageText =
       error instanceof Error ? error.message.slice(0, 1000) : "Unknown error";
 

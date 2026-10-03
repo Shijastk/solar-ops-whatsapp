@@ -36,6 +36,7 @@ describe("WhatsApp AI intent fallback", () => {
 
     expect(looksLikeOperationalQuery("Hello, എങ്ങനെയുണ്ട്?")).toBe(false);
     expect(looksLikeOperationalQuery("ഇന്നത്തെ trip details എന്താണ്?")).toBe(true);
+    expect(looksLikeOperationalQuery("ഈ മാസം summary")).toBe(true);
     await expect(
       classifyOperationalQueryWithGroq("Hello, എങ്ങനെയുണ്ട്?"),
     ).resolves.toBeNull();
@@ -57,6 +58,7 @@ describe("WhatsApp AI intent fallback", () => {
                 content: JSON.stringify({
                   intent: "stock_balance",
                   product_query: "Emmvee 560 Wp Topcon Dcr Panel",
+                  period: null,
                 }),
               },
             },
@@ -74,6 +76,7 @@ describe("WhatsApp AI intent fallback", () => {
     expect(result).toEqual({
       intent: "stock_balance",
       product_query: "Emmvee 560 Wp Topcon Dcr Panel",
+      period: null,
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -106,6 +109,7 @@ describe("WhatsApp AI intent fallback", () => {
                 content: JSON.stringify({
                   intent: "unsupported",
                   product_query: null,
+                  period: null,
                 }),
               },
             },

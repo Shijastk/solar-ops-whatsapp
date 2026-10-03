@@ -608,3 +608,21 @@ After local PDF parsing, the backend first checks stock-critical identity fields
 
 If the local gate fails, the existing strict Groq extraction/comparison remains the fallback. WhatsApp response bodies are still deterministic templates selected by workflow status; the model does not author the user-facing reply.
 
+### WhatsApp query routing
+
+Inbound text follows a latency-first hierarchy:
+
+1. deterministic trip/menu commands;
+2. deterministic bill/trip/stock/date-range queries;
+3. at most one bounded AI intent classification for operational wording not caught locally;
+4. a bounded conversational AI fallback for non-operational text;
+5. a fixed local fallback if the provider is unavailable.
+
+Exact operational values always come from PostgreSQL. The AI classifier returns only intent/entity/period metadata.
+
+### Trip closing concurrency
+
+When done/ശരി/complete is received, the trip stops accepting new bills and moves directly to driver selection. Reserved PDFs continue processing. Selecting a driver never depends on the parser finishing. When all reserved documents have reached parsed/failed status, the backend derives destination/vehicle information and finalizes the trip automatically.
+
+Trip destination is chosen across all processed trip bills: the most frequent destination wins; ties preserve the first-uploaded bill. If no destination text exists, the same majority/first rule is applied to PIN codes and the PIN lookup is used as a fallback location source.
+

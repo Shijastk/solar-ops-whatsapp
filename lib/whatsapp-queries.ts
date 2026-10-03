@@ -2,15 +2,29 @@ import { normalizeProductDescription } from "@/lib/document-parser";
 import { deterministicUuid } from "@/lib/idempotency";
 import {
   classifyOperationalQueryWithGroq,
+  looksLikeOperationalQuery,
   type AiOperationalQueryClassification,
 } from "@/lib/whatsapp-query-intent";
 import { sendOpsReply } from "@/lib/replies";
+import {
+  fixedOperationalFallback,
+  fixedUniversalFallback,
+  generateUniversalWhatsAppReply,
+} from "@/lib/whatsapp-fallback";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 const MAX_STOCK_MATCHES = 8;
 const MIN_FUZZY_STOCK_SCORE = 0.25;
+
+export type OpsPeriod =
+  | "this_week"
+  | "this_month"
+  | "this_year"
+  | "last_week"
+  | "last_month"
+  | "last_year";
 
 export type FastWhatsAppQuery =
   | { type: "today_bill_count" }
@@ -19,7 +33,8 @@ export type FastWhatsAppQuery =
   | { type: "stock_balance"; productQuery: string }
   | { type: "stock_product_required" }
   | { type: "today_trip_summary" }
-  | { type: "latest_trip" };
+  | { type: "latest_trip" }
+  | { type: "ops_period_summary"; period: OpsPeriod };
 
 const BILL_TERMS = [
   "bill",
@@ -71,6 +86,33 @@ const LATEST_TERMS = [
 const STOCK_TERMS = ["stock", "സ്റ്റോക്ക്"];
 const TRIP_TERMS = ["trip", "trips", "ട്രിപ്പ്", "ട്രിപ്പുകൾ"];
 const TRIP_LATEST_TERMS = ["latest", "last", "recent", "അവസാന", "ലാസ്റ്റ്"];
+
+const PERIOD_TERMS: Array<{ period: OpsPeriod; terms: string[] }> = [
+  {
+    period: "last_week",
+    terms: ["last week", "previous week", "kazhinja week", "കഴിഞ്ഞ ആഴ്ച"],
+  },
+  {
+    period: "last_month",
+    terms: ["last month", "previous month", "kazhinja month", "കഴിഞ്ഞ മാസം"],
+  },
+  {
+    period: "last_year",
+    terms: ["last year", "previous year", "kazhinja year", "കഴിഞ്ഞ വർഷം"],
+  },
+  {
+    period: "this_week",
+    terms: ["this week", "ee week", "ഈ ആഴ്ച", "ഈ വാരം"],
+  },
+  {
+    period: "this_month",
+    terms: ["this month", "ee month", "ഈ മാസം"],
+  },
+  {
+    period: "this_year",
+    terms: ["this year", "ee year", "ഈ വർഷം"],
+  },
+];
 
 const STOCK_QUESTION_TERMS = [
   "balance",
@@ -164,6 +206,13 @@ export function parseFastWhatsAppQuery(
     return { type: "latest_trip" };
   }
 
+  const periodMatch = PERIOD_TERMS.find((entry) =>
+    includesAny(normalized, entry.terms),
+  );
+  if (periodMatch) {
+    return { type: "ops_period_summary", period: periodMatch.period };
+  }
+
   if (
     includesAny(normalized, STOCK_TERMS) &&
     includesAny(normalized, STOCK_QUESTION_TERMS)
@@ -188,7 +237,84 @@ export function mapAiClassificationToFastQuery(
       : { type: "stock_product_required" };
   }
 
+  if (classification.intent === "ops_period_summary") {
+    return classification.period
+      ? { type: "ops_period_summary", period: classification.period }
+      : null;
+  }
+
   return { type: classification.intent };
+}
+
+function istShift(date: Date): Date {
+  return new Date(date.getTime() + IST_OFFSET_MS);
+}
+
+function fromShiftedUtc(ms: number): string {
+  return new Date(ms - IST_OFFSET_MS).toISOString();
+}
+
+export function opsPeriodBounds(
+  period: OpsPeriod,
+  now = new Date(),
+): { start: string; end: string; label: string } {
+  const shifted = istShift(now);
+  const year = shifted.getUTCFullYear();
+  const month = shifted.getUTCMonth();
+  const day = shifted.getUTCDate();
+  const weekday = shifted.getUTCDay();
+  const todayStart = Date.UTC(year, month, day);
+  const mondayOffset = (weekday + 6) % 7;
+  const thisWeekStart = todayStart - mondayOffset * 24 * 60 * 60 * 1000;
+
+  if (period === "this_week") {
+    return {
+      start: fromShiftedUtc(thisWeekStart),
+      end: now.toISOString(),
+      label: "ഈ ആഴ്ച",
+    };
+  }
+
+  if (period === "last_week") {
+    return {
+      start: fromShiftedUtc(thisWeekStart - 7 * 24 * 60 * 60 * 1000),
+      end: fromShiftedUtc(thisWeekStart),
+      label: "കഴിഞ്ഞ ആഴ്ച",
+    };
+  }
+
+  const thisMonthStart = Date.UTC(year, month, 1);
+  if (period === "this_month") {
+    return {
+      start: fromShiftedUtc(thisMonthStart),
+      end: now.toISOString(),
+      label: "ഈ മാസം",
+    };
+  }
+
+  if (period === "last_month") {
+    const lastMonthStart = Date.UTC(year, month - 1, 1);
+    return {
+      start: fromShiftedUtc(lastMonthStart),
+      end: fromShiftedUtc(thisMonthStart),
+      label: "കഴിഞ്ഞ മാസം",
+    };
+  }
+
+  const thisYearStart = Date.UTC(year, 0, 1);
+  if (period === "this_year") {
+    return {
+      start: fromShiftedUtc(thisYearStart),
+      end: now.toISOString(),
+      label: "ഈ വർഷം",
+    };
+  }
+
+  return {
+    start: fromShiftedUtc(Date.UTC(year - 1, 0, 1)),
+    end: fromShiftedUtc(thisYearStart),
+    label: "കഴിഞ്ഞ വർഷം",
+  };
 }
 
 export function indiaDayBounds(now = new Date()): {
@@ -604,6 +730,31 @@ async function latestTripSummary(): Promise<string> {
   return formatTripSummary(rows, names, "Latest completed trip:");
 }
 
+async function operationalPeriodSummary(
+  period: OpsPeriod,
+): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const bounds = opsPeriodBounds(period);
+
+  const { data, error } = await supabase.rpc("get_ops_period_summary", {
+    p_start: bounds.start,
+    p_end: bounds.end,
+  });
+
+  if (error) {
+    throw new Error("Failed to load operational period summary: " + error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return [
+    bounds.label + " summary:",
+    "Bills: " + String(Number(row?.bill_count ?? 0)),
+    "Verified: " + String(Number(row?.verified_bill_count ?? 0)),
+    "Needs review: " + String(Number(row?.review_bill_count ?? 0)),
+    "Completed trips: " + String(Number(row?.completed_trip_count ?? 0)),
+  ].join("\n");
+}
+
 async function answerFastQuery(
   query: FastWhatsAppQuery,
 ): Promise<string> {
@@ -633,6 +784,10 @@ async function answerFastQuery(
     return latestTripSummary();
   }
 
+  if (query.type === "ops_period_summary") {
+    return operationalPeriodSummary(query.period);
+  }
+
   return stockBalanceAnswer(query.productQuery);
 }
 
@@ -643,22 +798,62 @@ export async function handleFastWhatsAppQuery(
   if (message.type !== "text" || !message.textBody) return "ignored";
 
   const startedAt = performance.now();
-  let resolver: "deterministic" | "ai_intent" = "deterministic";
+  let resolver: "deterministic" | "ai_intent" | "ai_fallback" | "fixed_fallback" =
+    "deterministic";
   let query = parseFastWhatsAppQuery(message.textBody);
+  const likelyOperational = !query && looksLikeOperationalQuery(message.textBody);
+  let operationalClassifierFailed = false;
 
-  if (!query) {
-    const classification = await classifyOperationalQueryWithGroq(
-      message.textBody,
-    );
-    if (!classification) return "ignored";
-
-    query = mapAiClassificationToFastQuery(classification);
-    if (!query) return "ignored";
-    resolver = "ai_intent";
+  if (!query && likelyOperational) {
+    try {
+      const classification = await classifyOperationalQueryWithGroq(
+        message.textBody,
+      );
+      if (classification) {
+        query = mapAiClassificationToFastQuery(classification);
+        if (query) resolver = "ai_intent";
+      }
+    } catch (error) {
+      operationalClassifierFailed = true;
+      console.warn("WhatsApp operational intent classification failed", {
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown classification error",
+      });
+    }
   }
 
   const lookupStartedAt = performance.now();
-  const body = await answerFastQuery(query);
+  let body: string;
+
+  if (query) {
+    body = await answerFastQuery(query);
+  } else if (likelyOperational) {
+    resolver = "fixed_fallback";
+    body = fixedOperationalFallback();
+
+    if (operationalClassifierFailed) {
+      console.info("Operational fallback used after classifier failure");
+    }
+  } else {
+    resolver = "ai_fallback";
+    try {
+      body =
+        (await generateUniversalWhatsAppReply(message.textBody)) ??
+        fixedUniversalFallback(message.textBody);
+    } catch (error) {
+      resolver = "fixed_fallback";
+      console.warn("Universal WhatsApp fallback reply failed", {
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown fallback error",
+      });
+      body = fixedUniversalFallback(message.textBody);
+    }
+  }
+
   const lookupDurationMs = Math.round(performance.now() - lookupStartedAt);
 
   const sendStartedAt = performance.now();
@@ -671,7 +866,7 @@ export async function handleFastWhatsAppQuery(
   const sendDurationMs = Math.round(performance.now() - sendStartedAt);
 
   console.info("Fast WhatsApp operational query completed", {
-    intent: query.type,
+    intent: query?.type ?? "universal_fallback",
     resolver,
     lookupDurationMs,
     sendDurationMs,
