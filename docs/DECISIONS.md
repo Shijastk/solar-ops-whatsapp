@@ -466,3 +466,7 @@ Exact repeated PDF text reuses the existing approved active business draft while
 Company aliases now accept `document`, matching the verified ingestion code and product-alias constraint. Catalog failures persist a stock error. Duplicate replies are short Already uploaded notices. Raw-file cleanup runs hourly after the 24-hour threshold using the Storage API; message metadata, extracted text, structured items, trip links and the immutable ledger remain. GitHub schedule delays mean deletion is approximate.
 
 Migration ordering note: earlier repository migrations have timestamps later than their observed application time. The repair file is ordered after them so a fresh replay cannot overwrite the restored guard. Production was applied through the Supabase migration connector.
+
+
+## 2026-10-04 — Malayalam-first voice clarification
+Production voice evidence showed a Malayalam stock question transcribed into unrelated English words with its model number absent. Explicit `language=ml` and a Malayalam domain prompt replace language auto-detection and the English-only prompt. Retain Whisper Turbo and existing request limits. Unresolved voice queries return bounded heard-text clarification instead of general chat fallback. No missing model number, product mapping or balance is inferred. Groq documents explicit input language as improving accuracy/latency: https://console.groq.com/docs/speech-to-text .

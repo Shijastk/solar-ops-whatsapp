@@ -628,3 +628,7 @@ Automated tests cover multiline item descriptions and the deterministic verifica
 
 ### Mobile simplification verification
 Run `npm run verify`. New tests cover duplicate PDF reuse, protected mobile-action authorization, destination sanitization and the final-count tie rule. `tests/sql/duplicate-stock-rollback.sql` exercises real database stock posting/retry, a duplicate with missing e-way number, company isolation, missing identity, document aliases, atomic quantity/cancel audit, driver requirements and closed-trip attachment. It uses only synthetic fixtures and rolls back; it sends no messages. Production hardware biometrics and a signed-in phone/network upload still require device verification and must not be described as tested by CI.
+
+
+## 2026-10-04 voice regression
+Transcription request tests assert language `ml`, Malayalam context and no seeded model number. Voice query tests assert unresolved synthetic speech echoes a bounded transcript without calling general fallback or inventing a model. These tests verify request/routing behavior, not real-audio recognition accuracy. Production database evidence confirmed the reported response came after a malformed stored transcript. No outbound test messages or real stock writes were performed.

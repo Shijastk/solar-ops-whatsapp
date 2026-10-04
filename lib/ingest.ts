@@ -432,6 +432,7 @@ export async function ingestWhatsAppMessage(
         const voiceResult = await handleDocumentWorkflowInbound(
           voiceAsText,
           persistedMessage.id,
+          { fromVoice: true },
         );
 
         if (voiceResult === "ignored") {

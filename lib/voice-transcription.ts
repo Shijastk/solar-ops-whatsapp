@@ -35,11 +35,12 @@ export async function transcribeOperationalVoice(input: {
     "voice" + extensionForAudioMime(mimeType),
   );
   form.set("model", "whisper-large-v3-turbo");
+  form.set("language", "ml");
   form.set("response_format", "json");
   form.set("temperature", "0");
   form.set(
     "prompt",
-    "Solar Ops godown operations. Malayalam and English may be mixed. Common terms: trip, bill, stock, driver, vehicle, panel, inverter, Emmvee, DCR, Topcon.",
+    "സോളാർ ഗോഡൗൺ. ബിൽ, സ്റ്റോക്ക്, ട്രിപ്പ്, ഡ്രൈവർ, വാഹനം, പാനൽ, ഇൻവെർട്ടർ. Emmvee, DCR, Topcon. മലയാളവും English ഉൽപ്പന്നപ്പേരുകളും.",
   );
 
   const response = await fetch(
