@@ -44,6 +44,13 @@ type Trip = {
 };
 const selection =
   "company_id,id,status,display_name,custom_name,completed_at,removed_at,primary_destination,driver_id,vehicle_number,created_at,entry_mode,site_count,owner_name,ops_drivers(name),manual_trip_items(quantity,stock_products(id,canonical_name,unit)),trip_documents(message_id,processing_status,document_drafts(id,stock_company_id,supplier_gstin,document_number,workflow_status,stock_status,destination,vehicle_number,document_items(description,quantity,unit)))";
+export function mobileTripDisplayName(
+  t: Pick<Trip, "custom_name" | "display_name" | "entry_mode">,
+) {
+  if (t.custom_name?.trim()) return t.custom_name.trim();
+  if (t.entry_mode === "manual") return t.display_name?.trim() || "Trip";
+  return cleanDestination(t.display_name) ?? "Trip";
+}
 function serializeTrip(t: Trip) {
   return {
     companyId: t.company_id,
@@ -52,7 +59,7 @@ function serializeTrip(t: Trip) {
     completedAt: t.completed_at,
     removedAt: t.removed_at,
     destination: t.primary_destination,
-    name: cleanDestination(t.display_name) ?? "Trip",
+    name: mobileTripDisplayName(t),
     driverId: t.driver_id,
     driverName: t.ops_drivers?.name ?? null,
     vehicleNumber: t.vehicle_number,
