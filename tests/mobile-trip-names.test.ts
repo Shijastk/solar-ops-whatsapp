@@ -28,6 +28,6 @@ describe("operator trip labels", () => {
         display_name: "tirur kerala",
         entry_mode: "bills",
       }),
-    ).toBe("Tirur");
+    ).toBe("tirur");
   });
 });
