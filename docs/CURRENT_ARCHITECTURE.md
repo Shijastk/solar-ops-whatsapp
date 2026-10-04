@@ -653,3 +653,11 @@ Mobile operations return the changed trip so the app renders it without a full-h
 
 `GET /api/mobile/v1/profile?companyId=…` and `company_profile` operations require the existing bearer session. Photos never appear in the home payload and do not use the 24-hour bill media retention bucket. A display label changes only mobile presentation; canonical company/GSTIN matching stays intact.
 `20261007131435_mobile_removed_trip_bill_reuse.sql` (CLI-created, advanced for migration ordering) snapshots bill links in the immutable removal audit. The existing attach function may move a link from a removed group only when that snapshot exists and the target company matches. The draft lock serializes concurrent attachments; active-group membership cannot be stolen and stock is untouched.
+
+## Save-only mobile refinement
+
+`20261008152220_mobile_save_only_trip_ux.sql` is CLI-created and advanced to sort after the already-future-dated reuse migration. It adds a private group request snapshot and `mobile_save_bill_trip`, restricted to service_role. Existing attach/ready guards run within the same transaction. No bill/stock movement is written by grouping. `save_bill_trip` returns the saved trip; destination naming cannot replay driver selection on an acknowledged retry.
+
+`get_mobile_trip_activity` returns 30-day completed counts and pending counts by company plus a distinct all-company scope. It filters out empty/removed/cancelled groups; completion history before the range is excluded before bill joins. Active completion/pending partial indexes support these reads. `/home` adds this small aggregate while keeping old contracts compatible.
+
+The client selects PDFs in memory and uploads only after Save. `/upload` accepts an optional validated requestId, reuses a matching mobile message/hash on retry and refuses identity conflicts. Existing automatic verification/idempotent stock posting is unchanged and suppresses WhatsApp sends. Group creation happens after upload; a grouping failure does not reverse accepted independent bills. Timing logs record count-free durations and retry/duplicate flags only. This release is not a durable queue; Save remains on the draft page, unsaved PDF bytes do not survive app termination, and real-phone latency is unmeasured.

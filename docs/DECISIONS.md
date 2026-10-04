@@ -480,3 +480,9 @@ Mobile operations return the changed trip so the app renders it without a full-h
 User requested lightweight trip deletion, completion, naming and company profiles. Removing a group hides it and closes capture, retaining every stock movement and bill. Physical stock corrections and bill cancellations remain explicit separate actions. Completion is a timestamp, not another dispatch or deduction. Preserve custom names through a database trigger because both WhatsApp and mobile can populate destination names.
 
 Use a maximum 96 KiB private PNG field for a handful of company profile photos, loaded on demand. This avoids new public links, Storage retention coupling and home payload weight; never include photos in bootstrap/cache. Payments wait for operator review instead of adding fields to the current workflow.
+
+## Explicit-save drafts rather than speculative upload/preparation records
+
+PDF selection is local until Save. This avoids empty trip creation and stock processing before explicit operator intent without introducing a preparation table or a new queue. Save can partially persist independent bills before the atomic group transaction; preserve those records and disclose the state rather than reversing valid movements. Reuse upload/group UUIDs for retry. Do not claim full upload+stock+group atomicity across external Storage and Postgres.
+
+Move company switch back to the top by the latest approved workflow; keep three work tabs. Hide site/owner/name complexity together, not behind a wizard. Stock cards and chart use explicit physical-trip completion timestamps, not ready timestamps, goods units or monetary totals. The graph is operational activity, not sales accounting. No extra payments fields are added.

@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { z } from "zod";
 import { getIngestionEnv } from "@/lib/env";
 import { processPdfBytesForMessage } from "@/lib/document-processing";
 import { runDocumentAutomationForDraft } from "@/lib/document-automation";
@@ -16,6 +17,9 @@ export async function POST(request: Request) {
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
   const tripId = form?.get("tripId");
+  const requestId = form?.get("requestId");
+  if (requestId != null && !z.uuid().safeParse(requestId).success)
+    return Response.json({ error: "Invalid upload request" }, { status: 400 });
   if (
     !(file instanceof File) ||
     !file.name.toLowerCase().endsWith(".pdf") ||
@@ -30,18 +34,35 @@ export async function POST(request: Request) {
   if (!bytes.subarray(0, 5).equals(Buffer.from("%PDF-")))
     return Response.json({ error: "This file is not a PDF" }, { status: 400 });
   const db = getSupabaseAdmin();
-  const id = randomUUID();
+  const id = typeof requestId === "string" ? requestId : randomUUID();
+  const hash = createHash("sha256").update(bytes).digest("hex");
   const path = "mobile/" + id + "/bill.pdf";
   const bucket = getIngestionEnv().SUPABASE_STORAGE_BUCKET;
   let saved = false;
+  const startedAt = Date.now();
   try {
-    const { error: storageError } = await db.storage
-      .from(bucket)
-      .upload(path, bytes, { contentType: "application/pdf" });
-    if (storageError) throw new Error("Could not save PDF");
-    const { error } = await db
+    // Same file/request retries reuse the stored message, including after timeout.
+    const { data: existing, error: lookupError } = await db
       .from("whatsapp_messages")
-      .insert({
+      .select("id,whatsapp_message_id,media_sha256")
+      .eq("id", id)
+      .maybeSingle();
+    if (lookupError) throw new Error("Could not check upload");
+    if (
+      existing &&
+      (existing.whatsapp_message_id !== "mobile:" + id ||
+        existing.media_sha256 !== hash)
+    )
+      return Response.json(
+        { error: "Upload request identity conflict" },
+        { status: 409 },
+      );
+    if (!existing) {
+      const { error: storageError } = await db.storage
+        .from(bucket)
+        .upload(path, bytes, { contentType: "application/pdf" });
+      if (storageError) throw new Error("Could not save PDF");
+      const { error } = await db.from("whatsapp_messages").insert({
         id,
         whatsapp_message_id: "mobile:" + id,
         sender_phone: "mobile-operator",
@@ -50,18 +71,21 @@ export async function POST(request: Request) {
         original_filename: file.name.slice(0, 120),
         mime_type: "application/pdf",
         media_size_bytes: file.size,
-        media_sha256: createHash("sha256").update(bytes).digest("hex"),
+        media_sha256: hash,
         storage_path: path,
         received_at: new Date().toISOString(),
         processed_at: new Date().toISOString(),
         processing_status: "stored",
       });
-    if (error) {
-      await db.storage.from(bucket).remove([path]);
-      throw new Error("Could not save bill");
+      if (error) {
+        await db.storage.from(bucket).remove([path]);
+        throw new Error("Could not save bill");
+      }
     }
     saved = true;
+    const storedAt = Date.now();
     const parsed = await processPdfBytesForMessage(id, bytes);
+    const parsedAt = Date.now();
     if (!parsed.duplicate)
       await runDocumentAutomationForDraft(parsed.draftId, {
         suppressReply: true,
@@ -76,6 +100,14 @@ export async function POST(request: Request) {
       parsed.duplicate || draft.stock_status === "duplicate_document";
     if (typeof tripId === "string" && tripId && !duplicate)
       await attachMobileBill(tripId, id);
+    console.info("Mobile upload timing", {
+      storageDurationMs: storedAt - startedAt,
+      parsingDurationMs: parsedAt - storedAt,
+      verificationDurationMs: Date.now() - parsedAt,
+      durationMs: Date.now() - startedAt,
+      duplicate: Boolean(duplicate),
+      retried: Boolean(existing),
+    });
     return Response.json(
       { id, duplicate, message: duplicate ? "Already uploaded" : "Bill saved" },
       { headers: { "Cache-Control": "no-store" } },
