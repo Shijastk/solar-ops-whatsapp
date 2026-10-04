@@ -1285,6 +1285,7 @@ async function handleInteractiveAction(
 export async function handleDocumentWorkflowInbound(
   message: NormalizedWhatsAppMessage,
   storedMessageId: string,
+  options: { fromVoice?: boolean } = {},
 ): Promise<"handled" | "ignored"> {
   if (
     (await handleTripWorkflowInbound(message, storedMessageId)) === "handled"
@@ -1306,7 +1307,7 @@ export async function handleDocumentWorkflowInbound(
     return "handled";
   }
 
-  if ((await handleFastWhatsAppQuery(message, storedMessageId)) === "handled") {
+  if ((await handleFastWhatsAppQuery(message, storedMessageId, options)) === "handled") {
     return "handled";
   }
 

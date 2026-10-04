@@ -52,6 +52,9 @@ describe("operational voice transcription", () => {
     expect(init.body).toBeInstanceOf(FormData);
     const form = init.body as FormData;
     expect(form.get("model")).toBe("whisper-large-v3-turbo");
+    expect(form.get("language")).toBe("ml");
+    expect(String(form.get("prompt"))).toContain("സോളാർ");
+    expect(String(form.get("prompt"))).not.toContain("560");
     expect(form.get("response_format")).toBe("json");
     expect(form.get("temperature")).toBe("0");
     expect(form.get("file")).toBeInstanceOf(Blob);

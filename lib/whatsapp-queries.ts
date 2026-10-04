@@ -8,6 +8,7 @@ import {
 import { sendOpsReply } from "@/lib/replies";
 import {
   fixedOperationalFallback,
+  voiceQueryClarification,
   fixedUniversalFallback,
   generateUniversalWhatsAppReply,
 } from "@/lib/whatsapp-fallback";
@@ -794,6 +795,7 @@ async function answerFastQuery(
 export async function handleFastWhatsAppQuery(
   message: NormalizedWhatsAppMessage,
   storedMessageId: string,
+  options: { fromVoice?: boolean } = {},
 ): Promise<"handled" | "ignored"> {
   if (message.type !== "text" || !message.textBody) return "ignored";
 
@@ -829,6 +831,9 @@ export async function handleFastWhatsAppQuery(
 
   if (query) {
     body = await answerFastQuery(query);
+  } else if (options.fromVoice) {
+    resolver = "fixed_fallback";
+    body = voiceQueryClarification(message.textBody);
   } else if (likelyOperational) {
     resolver = "fixed_fallback";
     body = fixedOperationalFallback();
@@ -875,4 +880,3 @@ export async function handleFastWhatsAppQuery(
 
   return "handled";
 }
-

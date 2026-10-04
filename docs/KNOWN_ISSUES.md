@@ -489,3 +489,7 @@ This is intentional. Operators must add Stock IN/opening data or use an audited 
 
 ### 2026-10-03 follow-up
 The missing company alias source and cross-draft stock guard are repaired by the mobile simplification migration. Historical duplicate rows remain for audit and are classified without ledger replay. The compact home API displays canonical bills and truthful stock/trip attention states. Existing unposted canonical bills must be explicitly checked again; this release does not bulk replay historical stock. Original files still expire after approximately 24 hours, including pending reviews. OCR support is unchanged. Mobile authentication remains a shared operator session; company switching is not separate tenant authorization. APK signing still follows the existing development signing configuration.
+
+
+## 2026-10-04 — Voice recognition remains provider-dependent
+The reported Malayalam stock question lost its brand/model during transcription. Source now supplies Malayalam language/context and uses a heard-text clarification for unresolved voice. Updated transcription accuracy on the actual audio is not live-verified. Current inspected production data had no active stock product rows or ledger movements; absence of a stock record must never be presented as physical quantity zero.

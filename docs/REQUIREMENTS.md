@@ -778,3 +778,6 @@ Company aliases now accept `document`, matching the verified ingestion code and 
 Migration ordering note: earlier repository migrations have timestamps later than their observed application time. The repair file is ordered after them so a fresh replay cannot overwrite the restored guard. Production was applied through the Supabase migration connector.
 
 Today bill counts/value are computed in Postgres over the whole current IST day, with canonical identity filtering and exact company mapping. They do not depend on the recent launch/history page size.
+
+### R69 - Malayalam voice recognition and truthful clarification
+Operational voice is Malayalam-first, including English product names. Pass `language=ml` to transcription with a Malayalam domain prompt. Preserve the raw transcript. When a voice cannot resolve a supported query, show a bounded heard-text clarification in Malayalam rather than asking a general chat model to explain missing live stock facts. Never invent a missing model number or stock balance. Provider accuracy remains subject to real-audio verification.

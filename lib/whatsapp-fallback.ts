@@ -35,6 +35,11 @@ export function fixedOperationalFallback(): string {
   ].join("\n");
 }
 
+export function voiceQueryClarification(transcript: string): string {
+  const heard = transcript.normalize("NFKC").replace(/\s+/g, " ").trim().slice(0, 220);
+  return "🎙️ കേട്ടത്: “" + heard + "”\nചോദ്യം വ്യക്തമായി മനസ്സിലായില്ല. ഉൽപ്പന്നത്തിന്റെ പേരും model നമ്പറും ചേർത്ത് വീണ്ടും പറയൂ, അല്ലെങ്കിൽ text ആയി അയക്കൂ.";
+}
+
 export function fixedUniversalFallback(text: string): string {
   const normalized = text.normalize("NFKC").trim().toLowerCase();
 
