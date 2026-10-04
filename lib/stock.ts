@@ -56,6 +56,7 @@ const companySchema = z.object({
   id: z.string().uuid(),
   canonical_name: z.string(),
   gstin: z.string().nullable(),
+  profile_label: z.string().nullable().optional(),
 });
 
 const productSchema = z.object({
@@ -888,7 +889,7 @@ export async function listStockCompanies(): Promise<StockCompany[]> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("stock_companies")
-    .select("id, canonical_name, gstin")
+    .select("id, canonical_name, gstin, profile_label")
     .eq("active", true)
     .order("canonical_name", { ascending: true });
 
@@ -1134,4 +1135,3 @@ function similarityScore(left: Set<string>, right: Set<string>): number {
 
   return jaccard + (numbersMatch ? 0.25 : 0);
 }
-
