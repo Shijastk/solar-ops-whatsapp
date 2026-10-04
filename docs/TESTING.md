@@ -636,3 +636,5 @@ Transcription request tests assert language `ml`, Malayalam context and no seede
 
 ## 2026-10-04 — Daily mobile refinement
 TypeScript tests validate manual-dispatch input boundaries. Flutter tests cover immediate driver preview, rejected-write rollback, cached login restoration and stale-refresh protection. CI also builds web/Android and checks synthetic narrow-phone UI. `tests/sql/mobile-daily-rollback.sql` verifies manual trip+ledger atomicity, same-request retry, company isolation, missing-driver rejection, whole-day outgoing totals, unknown balance, explicit zero count and additive stock-IN retry. It uses synthetic fixtures and rolls back. No production stock or outbound message is changed by acceptance. Actual phone save latency and biometric hardware are separate unmeasured checks.
+
+Existing-product stock receipt tests additionally reject a product from another selected company before calling stock IN, and confirm that a valid receipt forwards the same retry UUID.
