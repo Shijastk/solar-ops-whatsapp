@@ -1,3 +1,4 @@
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -41,6 +42,23 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (parsed.data.productId) {
+      const { data: product, error } = await getSupabaseAdmin()
+        .from("stock_products")
+        .select("company_id")
+        .eq("id", parsed.data.productId)
+        .eq("active", true)
+        .single();
+      if (
+        error ||
+        !product ||
+        (parsed.data.companyId && product.company_id !== parsed.data.companyId)
+      )
+        return Response.json(
+          { error: "Choose a product from this company" },
+          { status: 409 },
+        );
+    }
     const result = parsed.data.productId
       ? await recordStockIn({
           productId: parsed.data.productId,
