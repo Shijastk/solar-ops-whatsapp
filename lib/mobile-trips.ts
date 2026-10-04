@@ -17,6 +17,7 @@ type TripBill = {
     stock_status: string;
     destination: string | null;
     vehicle_number: string | null;
+    document_items: { description: string; quantity: number; unit: string }[];
   } | null;
 };
 type Trip = {
@@ -27,19 +28,20 @@ type Trip = {
   driver_id: string | null;
   vehicle_number: string | null;
   created_at: string;
+  entry_mode: string;
+  site_count: number;
+  owner_name: string | null;
+  manual_trip_items: {
+    quantity: number;
+    stock_products: { id: string; canonical_name: string; unit: string };
+  }[];
   ops_drivers: { name: string } | null;
   trip_documents: TripBill[];
 };
 const selection =
-  "company_id,id,status,display_name,driver_id,vehicle_number,created_at,ops_drivers(name),trip_documents(message_id,processing_status,document_drafts(id,stock_company_id,supplier_gstin,document_number,workflow_status,stock_status,destination,vehicle_number))";
-export async function listMobileTrips() {
-  const { data, error } = await getSupabaseAdmin()
-    .from("delivery_trips")
-    .select(selection)
-    .order("created_at", { ascending: false })
-    .limit(60);
-  if (error) throw new Error("Failed to load trips: " + error.message);
-  return ((data ?? []) as unknown as Trip[]).map((t) => ({
+  "company_id,id,status,display_name,driver_id,vehicle_number,created_at,entry_mode,site_count,owner_name,ops_drivers(name),manual_trip_items(quantity,stock_products(id,canonical_name,unit)),trip_documents(message_id,processing_status,document_drafts(id,stock_company_id,supplier_gstin,document_number,workflow_status,stock_status,destination,vehicle_number,document_items(description,quantity,unit)))";
+function serializeTrip(t: Trip) {
+  return {
     companyId: t.company_id,
     id: t.id,
     status: t.status,
@@ -48,6 +50,32 @@ export async function listMobileTrips() {
     driverName: t.ops_drivers?.name ?? null,
     vehicleNumber: t.vehicle_number,
     createdAt: t.created_at,
+    entryMode: t.entry_mode,
+    siteCount: t.site_count,
+    ownerName: t.owner_name,
+    items:
+      t.entry_mode === "manual"
+        ? (t.manual_trip_items ?? []).map((i) => ({
+            productId: i.stock_products.id,
+            productName: i.stock_products.canonical_name,
+            quantity: Number(i.quantity),
+            unit: i.stock_products.unit,
+            companyId: t.company_id,
+          }))
+        : t.trip_documents
+            .filter(
+              (b) =>
+                b.document_drafts?.stock_status !== "duplicate_document" &&
+                b.document_drafts?.workflow_status !== "cancelled",
+            )
+            .flatMap((b) =>
+              (b.document_drafts?.document_items ?? []).map((i) => ({
+                productName: i.description,
+                quantity: Number(i.quantity),
+                unit: i.unit,
+                companyId: b.document_drafts?.stock_company_id,
+              })),
+            ),
     bills: t.trip_documents.map((b) => ({
       messageId: b.message_id,
       companyId: b.document_drafts?.stock_company_id ?? null,
@@ -61,8 +89,27 @@ export async function listMobileTrips() {
           b.document_drafts.stock_status !== "applied"),
       duplicate: b.document_drafts?.stock_status === "duplicate_document",
     })),
-  }));
+  };
 }
+export async function getMobileTrip(id: string) {
+  const { data, error } = await getSupabaseAdmin()
+    .from("delivery_trips")
+    .select(selection)
+    .eq("id", id)
+    .single();
+  if (error) throw new Error("Could not load saved trip");
+  return serializeTrip(data as unknown as Trip);
+}
+export async function listMobileTrips() {
+  const { data, error } = await getSupabaseAdmin()
+    .from("delivery_trips")
+    .select(selection)
+    .order("created_at", { ascending: false })
+    .limit(60);
+  if (error) throw new Error("Failed to load trips: " + error.message);
+  return ((data ?? []) as unknown as Trip[]).map(serializeTrip);
+}
+
 export async function listMobileDrivers() {
   const { data, error } = await getSupabaseAdmin()
     .from("ops_drivers")
@@ -86,19 +133,30 @@ export async function saveMobileDriver(name: string) {
   if (error) throw new Error("Could not save driver");
   return data;
 }
-export async function createMobileTrip(companyId: string | null = null) {
+export async function createMobileTrip(
+  companyId: string | null = null,
+  requestId?: string,
+) {
   // A distinct capture identity per mobile trip avoids colliding with WhatsApp collection.
   const { data, error } = await getSupabaseAdmin()
     .from("delivery_trips")
     .insert({
+      ...(requestId ? { id: requestId } : {}),
       company_id: companyId,
       sender_phone: "mobile:" + crypto.randomUUID(),
       display_name: "New trip",
     })
-    .select("id")
+    .select(selection)
     .single();
-  if (error) throw new Error("Could not create trip");
-  return data;
+  if (error) {
+    if (requestId && error.code === "23505") {
+      const existing = await getMobileTrip(requestId);
+      if (existing.companyId === companyId && existing.entryMode === "bills")
+        return existing;
+    }
+    throw new Error("Could not create trip");
+  }
+  return serializeTrip(data as unknown as Trip);
 }
 export async function attachMobileBill(tripId: string, messageId: string) {
   const { error } = await getSupabaseAdmin().rpc("mobile_attach_trip_bill", {
@@ -119,6 +177,7 @@ export async function updateMobileTrip(
     p_close: close,
   });
   if (error) throw new Error(error.message);
+  if (!close) return;
   const { data, error: loadError } = await db
     .from("delivery_trips")
     .select(selection)

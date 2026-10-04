@@ -4,16 +4,40 @@ import {
   verifyMobileRequest,
 } from "@/lib/mobile-api";
 import {
+  getMobileTrip,
   attachMobileBill,
   createMobileTrip,
   saveMobileDriver,
   updateMobileTrip,
 } from "@/lib/mobile-trips";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+  createMobileCompany,
+  manualItemSchema,
+  resolveManualProducts,
+} from "@/lib/mobile-catalog";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const schema = z.discriminatedUnion("action", [
+export const schema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("company"),
+    name: z.string().trim().min(1).max(200),
+    gstin: z.string().min(1).max(100),
+    allowSimilar: z.boolean().optional(),
+  }),
+  z.object({
+    action: z.literal("manual_dispatch"),
+    requestId: z.uuid(),
+    companyId: z.uuid(),
+    destination: z.string().trim().min(1).max(200),
+    driverId: z.uuid(),
+    siteCount: z.number().int().min(1).max(1000).default(1),
+    ownerName: z.string().trim().max(120).optional(),
+    items: z.array(manualItemSchema).min(1).max(30),
+  }),
   z.object({
     action: z.literal("create_trip"),
+    requestId: z.uuid().optional(),
     companyId: z.uuid().nullable().optional(),
   }),
   z.object({
@@ -42,18 +66,47 @@ export async function POST(request: Request) {
     );
   try {
     const b = parsed.data;
+    if (b.action === "company") {
+      const result = await createMobileCompany(b.name, b.gstin, b.allowSimilar);
+      return Response.json(
+        "status" in result
+          ? {
+              ...result,
+              error:
+                "A similar company exists. Check it before creating another.",
+              code: result.status,
+            }
+          : result,
+        { status: "status" in result ? 409 : 200 },
+      );
+    }
+    if (b.action === "manual_dispatch") {
+      const items = await resolveManualProducts(b.companyId, b.items);
+      const { error } = await getSupabaseAdmin().rpc("mobile_manual_dispatch", {
+        p_request_id: b.requestId,
+        p_company_id: b.companyId,
+        p_destination: b.destination,
+        p_driver_id: b.driverId,
+        p_site_count: b.siteCount,
+        p_owner: b.ownerName ?? null,
+        p_items: items,
+      });
+      if (error) throw new Error(error.message);
+      return Response.json(await getMobileTrip(b.requestId));
+    }
     if (b.action === "create_trip")
-      return Response.json(await createMobileTrip(b.companyId ?? null));
+      return Response.json(
+        await createMobileTrip(b.companyId ?? null, b.requestId),
+      );
     if (b.action === "driver")
       return Response.json(await saveMobileDriver(b.name));
     if (b.action === "attach_bill")
       await attachMobileBill(b.tripId, b.messageId);
     if (b.action === "update_trip")
       await updateMobileTrip(b.tripId, b.driverId, b.close);
-    return Response.json(
-      { status: "saved" },
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    return Response.json(await getMobileTrip(b.tripId), {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (e) {
     return Response.json(
       { error: e instanceof Error ? e.message : "Could not save" },
