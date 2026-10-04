@@ -632,3 +632,7 @@ Run `npm run verify`. New tests cover duplicate PDF reuse, protected mobile-acti
 
 ## 2026-10-04 voice regression
 Transcription request tests assert language `ml`, Malayalam context and no seeded model number. Voice query tests assert unresolved synthetic speech echoes a bounded transcript without calling general fallback or inventing a model. These tests verify request/routing behavior, not real-audio recognition accuracy. Production database evidence confirmed the reported response came after a malformed stored transcript. No outbound test messages or real stock writes were performed.
+
+
+## 2026-10-04 — Daily mobile refinement
+TypeScript tests validate manual-dispatch input boundaries. Flutter tests cover immediate driver preview, rejected-write rollback, cached login restoration and stale-refresh protection. CI also builds web/Android and checks synthetic narrow-phone UI. `tests/sql/mobile-daily-rollback.sql` verifies manual trip+ledger atomicity, same-request retry, company isolation, missing-driver rejection, whole-day outgoing totals, unknown balance, explicit zero count and additive stock-IN retry. It uses synthetic fixtures and rolls back. No production stock or outbound message is changed by acceptance. Actual phone save latency and biometric hardware are separate unmeasured checks.

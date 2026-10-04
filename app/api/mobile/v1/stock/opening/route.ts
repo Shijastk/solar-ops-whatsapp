@@ -4,12 +4,14 @@ import {
   mobileUnauthorizedResponse,
   verifyMobileRequest,
 } from "@/lib/mobile-api";
-import { createOpeningStock } from "@/lib/stock";
+import { createOpeningStock, recordStockIn } from "@/lib/stock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
+  productId: z.uuid().nullable().optional(),
+  requestId: z.uuid().optional(),
   companyId: z.string().nullable().optional(),
   companyName: z.string().nullable().optional(),
   companyGstin: z.string().nullable().optional(),
@@ -39,10 +41,34 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await createOpeningStock({
-      ...parsed.data,
-      actionKey: randomUUID(),
-    });
+    const result = parsed.data.productId
+      ? await recordStockIn({
+          productId: parsed.data.productId,
+          quantity: parsed.data.quantity,
+          actionKey: parsed.data.requestId ?? randomUUID(),
+        })
+      : await createOpeningStock({
+          ...parsed.data,
+          actionKey: parsed.data.requestId ?? randomUUID(),
+        });
+    if (
+      [
+        "potential_company_duplicate",
+        "potential_product_duplicate",
+        "not_ready",
+        "inconsistent",
+      ].includes(result.status)
+    )
+      return Response.json(
+        {
+          error:
+            result.status === "potential_product_duplicate"
+              ? "A similar product exists. Choose it or confirm a different product."
+              : "Check the company and product before saving.",
+          code: result.status,
+        },
+        { status: 409 },
+      );
     return Response.json(result, {
       headers: { "Cache-Control": "no-store" },
     });

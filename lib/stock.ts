@@ -109,6 +109,7 @@ const stockMovementSchema = z.object({
   movement_type: z.enum([
     "opening",
     "stock_in",
+    "manual_out",
     "dispatch_inferred",
     "stock_out",
     "correction",
@@ -1133,3 +1134,4 @@ function similarityScore(left: Set<string>, right: Set<string>): number {
 
   return jaccard + (numbersMatch ? 0.25 : 0);
 }
+
