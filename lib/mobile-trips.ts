@@ -31,6 +31,10 @@ type Trip = {
   entry_mode: string;
   site_count: number;
   owner_name: string | null;
+  custom_name: string | null;
+  completed_at: string | null;
+  removed_at: string | null;
+  primary_destination: string | null;
   manual_trip_items: {
     quantity: number;
     stock_products: { id: string; canonical_name: string; unit: string };
@@ -39,12 +43,15 @@ type Trip = {
   trip_documents: TripBill[];
 };
 const selection =
-  "company_id,id,status,display_name,driver_id,vehicle_number,created_at,entry_mode,site_count,owner_name,ops_drivers(name),manual_trip_items(quantity,stock_products(id,canonical_name,unit)),trip_documents(message_id,processing_status,document_drafts(id,stock_company_id,supplier_gstin,document_number,workflow_status,stock_status,destination,vehicle_number,document_items(description,quantity,unit)))";
+  "company_id,id,status,display_name,custom_name,completed_at,removed_at,primary_destination,driver_id,vehicle_number,created_at,entry_mode,site_count,owner_name,ops_drivers(name),manual_trip_items(quantity,stock_products(id,canonical_name,unit)),trip_documents(message_id,processing_status,document_drafts(id,stock_company_id,supplier_gstin,document_number,workflow_status,stock_status,destination,vehicle_number,document_items(description,quantity,unit)))";
 function serializeTrip(t: Trip) {
   return {
     companyId: t.company_id,
     id: t.id,
     status: t.status,
+    completedAt: t.completed_at,
+    removedAt: t.removed_at,
+    destination: t.primary_destination,
     name: cleanDestination(t.display_name) ?? "Trip",
     driverId: t.driver_id,
     driverName: t.ops_drivers?.name ?? null,
@@ -88,6 +95,7 @@ function serializeTrip(t: Trip) {
           b.document_drafts.workflow_status !== "recorded" ||
           b.document_drafts.stock_status !== "applied"),
       duplicate: b.document_drafts?.stock_status === "duplicate_document",
+      cancelled: b.document_drafts?.workflow_status === "cancelled",
     })),
   };
 }
@@ -104,6 +112,7 @@ export async function listMobileTrips() {
   const { data, error } = await getSupabaseAdmin()
     .from("delivery_trips")
     .select(selection)
+    .is("removed_at", null)
     .order("created_at", { ascending: false })
     .limit(60);
   if (error) throw new Error("Failed to load trips: " + error.message);
@@ -136,6 +145,7 @@ export async function saveMobileDriver(name: string) {
 export async function createMobileTrip(
   companyId: string | null = null,
   requestId?: string,
+  name?: string,
 ) {
   // A distinct capture identity per mobile trip avoids colliding with WhatsApp collection.
   const { data, error } = await getSupabaseAdmin()
@@ -145,6 +155,7 @@ export async function createMobileTrip(
       company_id: companyId,
       sender_phone: "mobile:" + crypto.randomUUID(),
       display_name: "New trip",
+      custom_name: name?.trim() || null,
     })
     .select(selection)
     .single();
@@ -189,7 +200,7 @@ export async function updateMobileTrip(
     .filter((b) => b.document_drafts?.stock_status !== "duplicate_document")
     .map((b) => cleanDestination(b.document_drafts?.destination));
   const name = choosePrimaryDestination(destinations);
-  if (name)
+  if (name && !trip.custom_name)
     await db
       .from("delivery_trips")
       .update({ display_name: name })

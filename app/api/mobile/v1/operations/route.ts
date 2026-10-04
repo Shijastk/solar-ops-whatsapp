@@ -11,6 +11,7 @@ import {
   updateMobileTrip,
 } from "@/lib/mobile-trips";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { profileSchema, saveMobileProfile } from "@/lib/mobile-profile";
 import {
   createMobileCompany,
   manualItemSchema,
@@ -19,6 +20,14 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const schema = z.discriminatedUnion("action", [
+  profileSchema,
+  z.object({
+    action: z.literal("trip_action"),
+    tripId: z.uuid(),
+    requestId: z.uuid(),
+    operation: z.enum(["rename", "complete", "remove"]),
+    name: z.string().trim().min(1).max(160).optional(),
+  }),
   z.object({
     action: z.literal("company"),
     name: z.string().trim().min(1).max(200),
@@ -33,12 +42,14 @@ export const schema = z.discriminatedUnion("action", [
     driverId: z.uuid(),
     siteCount: z.number().int().min(1).max(1000).default(1),
     ownerName: z.string().trim().max(120).optional(),
+    name: z.string().trim().max(160).optional(),
     items: z.array(manualItemSchema).min(1).max(30),
   }),
   z.object({
     action: z.literal("create_trip"),
     requestId: z.uuid().optional(),
     companyId: z.uuid().nullable().optional(),
+    name: z.string().trim().max(160).optional(),
   }),
   z.object({
     action: z.literal("driver"),
@@ -58,7 +69,18 @@ export const schema = z.discriminatedUnion("action", [
 ]);
 export async function POST(request: Request) {
   if (!verifyMobileRequest(request)) return mobileUnauthorizedResponse();
-  const parsed = schema.safeParse(await request.json().catch(() => null));
+  const text = await request.text();
+  if (text.length > 180000)
+    return Response.json({ error: "Request too large" }, { status: 413 });
+  const parsed = schema.safeParse(
+    (() => {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    })(),
+  );
   if (!parsed.success)
     return Response.json(
       { error: "Check the entered details" },
@@ -66,6 +88,18 @@ export async function POST(request: Request) {
     );
   try {
     const b = parsed.data;
+    if (b.action === "company_profile")
+      return Response.json(await saveMobileProfile(b));
+    if (b.action === "trip_action") {
+      const { error } = await getSupabaseAdmin().rpc("mobile_trip_action", {
+        p_trip_id: b.tripId,
+        p_request_id: b.requestId,
+        p_action: b.operation,
+        p_name: b.name ?? null,
+      });
+      if (error) throw new Error(error.message);
+      return Response.json(await getMobileTrip(b.tripId));
+    }
     if (b.action === "company") {
       const result = await createMobileCompany(b.name, b.gstin, b.allowSimilar);
       return Response.json(
@@ -92,11 +126,20 @@ export async function POST(request: Request) {
         p_items: items,
       });
       if (error) throw new Error(error.message);
+      if (b.name?.trim()) {
+        const renamed = await getSupabaseAdmin().rpc("mobile_trip_action", {
+          p_trip_id: b.requestId,
+          p_request_id: b.requestId,
+          p_action: "rename",
+          p_name: b.name,
+        });
+        if (renamed.error) throw new Error(renamed.error.message);
+      }
       return Response.json(await getMobileTrip(b.requestId));
     }
     if (b.action === "create_trip")
       return Response.json(
-        await createMobileTrip(b.companyId ?? null, b.requestId),
+        await createMobileTrip(b.companyId ?? null, b.requestId, b.name),
       );
     if (b.action === "driver")
       return Response.json(await saveMobileDriver(b.name));

@@ -352,7 +352,7 @@ export async function buildMobileBootstrap(now = new Date(), compact = false) {
     stock: {
       companies: companies.map((company) => ({
         id: company.id,
-        name: company.canonical_name,
+        name: company.profile_label ?? company.canonical_name,
         gstin: company.gstin,
       })),
       balances: balances.map((balance) => ({
