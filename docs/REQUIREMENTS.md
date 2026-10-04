@@ -796,3 +796,11 @@ Companies is a bottom navigation action with switching and creation. Profile and
 
 Porter/driver payments and budget calculations are deferred until the operator reviews the simplified app. Do not add payment fields to trip creation now.
 After group removal, its bill may be explicitly attached to another open trip in the same company. Preserve the original link snapshot in the removal audit; never take a bill from an active group or replay stock movements.
+
+### R72 — Explicit-save mobile trips and activity (supersedes R71 bottom switch placement)
+
+Company switching/creation is at the top; only Trips, Stock and History remain in bottom navigation. The manual form normally shows place, driver, product and quantity. Sites default to one; sites/owner/name live under one expansion. Driver creation is inside its picker. No payments/price fields are introduced.
+
+Bill-trip drafts select PDFs locally with no upload, trip or stock mutation until explicit Save trip. Save uploads/verifies bills using stable client upload UUIDs, then saves the group and all links in one database transaction. A group cannot be empty, steal an active bill, mix companies, or mark unresolved bills ready. Identical group retries return the existing group; changed payloads on the same UUID fail closed. The grouping transaction never posts/reverses stock. An upload acknowledged before a failed grouping call remains a retained bill and may already have its independent verified stock movement; the client must explain this partial-save state and reuse identifiers rather than blindly reuploading. Unsaved PDFs are memory-only; durable background upload and crash recovery are not claimed.
+
+Remove Today dispatched from mobile Stock. Top cards show Completed today and To complete; a bottom 7/30-day bar chart shows completed trips. Use completed_at, India-time bounds, nonempty active groups and full-database counts, not recent-page counts or invoice totals. Multi-company groups count once in All companies and once in each participating company. Missing summary is unavailable, not zero. This is not sales/revenue/payment accounting. Retain truthful unknown physical balances.

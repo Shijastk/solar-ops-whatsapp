@@ -17,6 +17,25 @@ const input = {
   ],
 };
 describe("manual mobile dispatch boundary", () => {
+  it("bill-trip save requires nonempty unique bills, a company, driver and stable UUID", () => {
+    const billTrip = {
+      action: "save_bill_trip",
+      requestId: uuid,
+      companyId: uuid,
+      driverId: uuid,
+      messageIds: [uuid],
+    };
+    expect(schema.safeParse(billTrip).success).toBe(true);
+    expect(schema.safeParse({ ...billTrip, messageIds: [] }).success).toBe(
+      false,
+    );
+    expect(
+      schema.safeParse({ ...billTrip, messageIds: [uuid, uuid] }).success,
+    ).toBe(false);
+    expect(schema.safeParse({ ...billTrip, driverId: null }).success).toBe(
+      false,
+    );
+  });
   it("requires company, driver and positive quantities without requiring a bill or price", () => {
     expect(schema.safeParse(input).success).toBe(true);
     expect(schema.safeParse({ ...input, driverId: null }).success).toBe(false);

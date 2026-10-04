@@ -9,6 +9,7 @@ import {
   createMobileTrip,
   saveMobileDriver,
   updateMobileTrip,
+  refreshMobileTripName,
 } from "@/lib/mobile-trips";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { profileSchema, saveMobileProfile } from "@/lib/mobile-profile";
@@ -21,6 +22,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const schema = z.discriminatedUnion("action", [
   profileSchema,
+  z.object({
+    action: z.literal("save_bill_trip"),
+    requestId: z.uuid(),
+    companyId: z.uuid(),
+    driverId: z.uuid(),
+    messageIds: z
+      .array(z.uuid())
+      .min(1)
+      .max(30)
+      .refine((ids) => new Set(ids).size === ids.length),
+    name: z.string().trim().max(160).optional(),
+  }),
   z.object({
     action: z.literal("trip_action"),
     tripId: z.uuid(),
@@ -88,6 +101,22 @@ export async function POST(request: Request) {
     );
   try {
     const b = parsed.data;
+    if (b.action === "save_bill_trip") {
+      const { data, error } = await getSupabaseAdmin().rpc(
+        "mobile_save_bill_trip",
+        {
+          p_request_id: b.requestId,
+          p_company_id: b.companyId,
+          p_driver_id: b.driverId,
+          p_message_ids: b.messageIds,
+          p_name: b.name ?? null,
+        },
+      );
+      if (error) throw new Error(error.message);
+      // Derive a destination label after the atomic save; custom names survive.
+      if (data?.status === "saved") await refreshMobileTripName(b.requestId);
+      return Response.json(await getMobileTrip(b.requestId));
+    }
     if (b.action === "company_profile")
       return Response.json(await saveMobileProfile(b));
     if (b.action === "trip_action") {

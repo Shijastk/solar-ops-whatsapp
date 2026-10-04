@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   if (!verifyMobileRequest(request)) return mobileUnauthorizedResponse();
   try {
-    const [data, trips, drivers, totals, catalog, todayStock] =
+    const [data, trips, drivers, totals, catalog, todayStock, activity] =
       await Promise.all([
         buildMobileBootstrap(new Date(), true),
         listMobileTrips(),
@@ -18,10 +18,12 @@ export async function GET(request: Request) {
         getSupabaseAdmin().rpc("get_mobile_today_totals"),
         getSupabaseAdmin().rpc("get_mobile_product_catalog"),
         getSupabaseAdmin().rpc("get_mobile_today_stock"),
+        getSupabaseAdmin().rpc("get_mobile_trip_activity"),
       ]);
     if (totals.error) throw new Error("Could not load daily bill totals");
     if (catalog.error || todayStock.error)
       throw new Error("Could not load stock overview");
+    if (activity.error) throw new Error("Could not load trip activity");
     const products = (catalog.data ?? []).map(
       (p: {
         product_id: string | null;
@@ -64,7 +66,15 @@ export async function GET(request: Request) {
       }),
     );
     return Response.json(
-      { ...data, trips, drivers, todayTotals, products, todayStock: outgoing },
+      {
+        ...data,
+        trips,
+        drivers,
+        todayTotals,
+        products,
+        todayStock: outgoing,
+        tripActivity: activity.data,
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {

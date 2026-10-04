@@ -196,6 +196,11 @@ export async function updateMobileTrip(
   });
   if (error) throw new Error(error.message);
   if (!close) return;
+  await refreshMobileTripName(tripId);
+}
+
+export async function refreshMobileTripName(tripId: string) {
+  const db = getSupabaseAdmin();
   const { data, error: loadError } = await db
     .from("delivery_trips")
     .select(selection)
