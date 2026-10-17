@@ -35,6 +35,7 @@ export type FastWhatsAppQuery =
   | { type: "stock_product_required" }
   | { type: "today_trip_summary" }
   | { type: "today_products_summary" }
+  | { type: "yesterday_products_summary" }
   | { type: "latest_trip" }
   | { type: "ops_period_summary"; period: OpsPeriod };
 
@@ -61,9 +62,12 @@ const TODAY_TERMS = [
   "today",
   "innu",
   "innathe",
+  "inn",
   "ഇന്ന്",
   "ഇന്നത്തെ",
 ];
+
+const YESTERDAY_TERMS = ["yesterday", "innale", "ഇന്നലെ", "കഴിഞ്ഞ ദിവസം"];
 
 const PENDING_TERMS = [
   "pending",
@@ -119,6 +123,9 @@ const TODAY_PRODUCT_MOVEMENT_TERMS = [
   "sent out",
   "delivered",
   "dispatched",
+  "dispatch",
+  "despatch",
+  "പോയി",
   "പോയ",
   "പോയത്",
   "പുറത്തുപോയ",
@@ -214,11 +221,13 @@ export function parseFastWhatsAppQuery(
   const hasBill = includesAny(normalized, BILL_TERMS);
   const hasCount = includesAny(normalized, COUNT_TERMS);
 
-  if (
-    includesAny(normalized, TODAY_TERMS) &&
-    includesAny(normalized, PRODUCT_TERMS) &&
-    includesAny(normalized, TODAY_PRODUCT_MOVEMENT_TERMS)
-  ) {
+  const asksForProductMovement =
+    (includesAny(normalized, PRODUCT_TERMS) || includesAny(normalized, STOCK_TERMS)) &&
+    includesAny(normalized, TODAY_PRODUCT_MOVEMENT_TERMS);
+  if (asksForProductMovement && includesAny(normalized, YESTERDAY_TERMS)) {
+    return { type: "yesterday_products_summary" };
+  }
+  if (asksForProductMovement && includesAny(normalized, TODAY_TERMS)) {
     return { type: "today_products_summary" };
   }
 
@@ -756,9 +765,14 @@ async function todayTripsSummary(now = new Date()): Promise<string> {
   return formatTripSummary(rows, names, "ഇന്നത്തെ completed trips:");
 }
 
-async function todayProductsSummary(now = new Date()): Promise<string> {
+async function productsSummaryForDay(
+  yesterday = false,
+  now = new Date(),
+): Promise<string> {
   const supabase = getSupabaseAdmin();
-  const bounds = indiaDayBounds(now);
+  const queryTime = yesterday ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
+  const bounds = indiaDayBounds(queryTime);
+  const dayLabel = yesterday ? "ഇന്നലെ" : "ഇന്ന്";
   const { data: trips, error: tripsError } = await supabase
     .from("delivery_trips")
     .select("id")
@@ -775,7 +789,7 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
 
   const tripIds = (trips ?? []).map((trip) => trip.id);
   if (tripIds.length === 0) {
-    return "ഇന്ന് completed trip രേഖപ്പെടുത്തിയിട്ടില്ല.";
+    return dayLabel + " completed trip രേഖപ്പെടുത്തിയിട്ടില്ല.";
   }
 
   const { data: tripDocuments, error: tripDocumentsError } = await supabase
@@ -798,7 +812,7 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
     ),
   );
   if (draftIds.length === 0) {
-    return "ഇന്നത്തെ completed trips-ൽ linked bill details ലഭ്യമല്ല.";
+    return dayLabel + " completed trips-ൽ linked bill details ലഭ്യമല്ല.";
   }
 
   const { data: drafts, error: draftsError } = await supabase
@@ -828,7 +842,7 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
 
   if (confirmedDraftIds.length === 0) {
     return [
-      "ഇന്ന് പോയ products: സ്ഥിരീകരിച്ച bill items കണ്ടെത്തിയില്ല.",
+      dayLabel + " പോയ products: സ്ഥിരീകരിച്ച bill items കണ്ടെത്തിയില്ല.",
       needsReviewCount > 0
         ? "⚠️ " + needsReviewCount + " bill(s) review/pending ആണ്; അതിനാൽ product total-ൽ ഉൾപ്പെടുത്തിയിട്ടില്ല."
         : null,
@@ -887,7 +901,7 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
         ? String(quantity)
         : String(Number(quantity.toFixed(3)));
   return [
-    "ഇന്ന് പോയ products (recorded bills):",
+    dayLabel + " പോയ products (recorded bills):",
     ...(lines.length === 0
       ? ["Confirmed bill-ൽ product item details ലഭ്യമല്ല."]
       : lines.slice(0, 10).map(
@@ -976,7 +990,11 @@ async function answerFastQuery(
   }
 
   if (query.type === "today_products_summary") {
-    return todayProductsSummary();
+    return productsSummaryForDay(false);
+  }
+
+  if (query.type === "yesterday_products_summary") {
+    return productsSummaryForDay(true);
   }
 
   if (query.type === "latest_trip") {
