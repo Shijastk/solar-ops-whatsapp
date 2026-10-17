@@ -72,6 +72,19 @@ const PENDING_TERMS = [
   "പെൻഡിംഗ്",
   "പരിശോധിക്കാനുള്ള",
   "കാത്തിരിക്കുന്ന",
+  "needs checking",
+  "need checking",
+  "check needed",
+  "to check",
+  "check cheyyan",
+  "check cheyyanam",
+  "verify",
+  "verification",
+  "ചെക്ക് ചെയ്യാനുള്ള",
+  "ചെക്ക് ചെയ്യണം",
+  "പരിശോധിക്കണം",
+  "പരിശോധിക്കേണ്ട",
+  "വെരിഫൈ",
 ];
 
 const LATEST_TERMS = [
@@ -805,18 +818,23 @@ export async function handleFastWhatsAppQuery(
   let query = parseFastWhatsAppQuery(message.textBody);
   const likelyOperational = !query && looksLikeOperationalQuery(message.textBody);
   let operationalClassifierFailed = false;
+  let classifierOutcome: "not_attempted" | "no_result" | "mapped" | "unsupported" | "failed" =
+    "not_attempted";
 
   if (!query && likelyOperational) {
+    classifierOutcome = "no_result";
     try {
       const classification = await classifyOperationalQueryWithGroq(
         message.textBody,
       );
       if (classification) {
+        classifierOutcome = classification.intent === "unsupported" ? "unsupported" : "mapped";
         query = mapAiClassificationToFastQuery(classification);
         if (query) resolver = "ai_intent";
       }
     } catch (error) {
       operationalClassifierFailed = true;
+      classifierOutcome = "failed";
       console.warn("WhatsApp operational intent classification failed", {
         reason:
           error instanceof Error
@@ -873,6 +891,9 @@ export async function handleFastWhatsAppQuery(
   console.info("Fast WhatsApp operational query completed", {
     intent: query?.type ?? "universal_fallback",
     resolver,
+    likelyOperational,
+    deterministicMatch: resolver === "deterministic",
+    classifierOutcome,
     lookupDurationMs,
     sendDurationMs,
     durationMs: Math.round(performance.now() - startedAt),
