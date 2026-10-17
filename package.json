@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
     "test:integration": "node scripts/integration/run-whatsapp-e2e.mjs",
-    "maintenance:media-retention": "node scripts/maintenance/media-retention.mjs"
+    "maintenance:media-retention": "node scripts/maintenance/media-retention.mjs",
+    "benchmark:voice-stt": "node scripts/benchmark/voice-stt.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

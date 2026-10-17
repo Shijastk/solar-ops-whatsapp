@@ -28,3 +28,7 @@ yarn-error.log*
 
 # generated media retention reports
 /artifacts/media-retention/
+
+# private local voice benchmark audio and reference transcripts
+/voice-benchmark/audio/
+/voice-benchmark/manifest.json

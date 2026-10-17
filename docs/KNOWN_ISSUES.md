@@ -503,3 +503,7 @@ Mobile trip filtering searches the recent 60-trip home window. History's existin
 ## Save-only mobile limitations
 
 Selected PDFs live in memory until Save; they are lost if the OS terminates the app before upload. Upload and independent bill posting precede the atomic group/link transaction; a later group failure leaves those explicitly saved bills in History, not an empty trip. The client explains partial persistence and retries with stable UUIDs. Save stays on the draft page until acknowledgement; no durable background queue is introduced. Upload timings are now instrumented but production-phone speed is not measured. Existing-bill selection shows the recent loaded window; retained older bill search remains in History. Activity summaries are full-range database counts and must not be labelled sales revenue.
+
+## K042 - Malayalam voice STT accuracy is not yet benchmarked
+
+A production voice message produced a materially incorrect Malayalam transcript. The current Groq Whisper Turbo path uses `language=ml`, `temperature=0`, and a solar-operations vocabulary prompt, but no representative reference-labelled sample set has established its accuracy. A local benchmark runner now compares Turbo with Whisper Large v3 using identical audio and request settings. It is tooling only: no provider result has been measured, the production model has not been changed, and Azure/Sarvam have not been benchmarked by this runner. A model change requires review of word/character error, latency, and critical entity/intent errors on the same sample set.
