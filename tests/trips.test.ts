@@ -5,6 +5,7 @@ import {
   combineTripItems,
   choosePrimaryDestination,
   classifyTripTextCommand,
+  extractTripStartDriverQuery,
   normalizeDriverName,
   parseIndiaPostPincodeCsv,
 } from "../lib/trips";
@@ -13,7 +14,13 @@ describe("WhatsApp trip capture helpers", () => {
   it("recognizes fast trip commands without AI", () => {
     expect(classifyTripTextCommand("trip")).toBe("start");
     expect(classifyTripTextCommand("New Trip")).toBe("start");
+    expect(classifyTripTextCommand("varum trip")).toBe("start");
+    expect(classifyTripTextCommand("വരും ട്രിപ്പ്")).toBe("start");
     expect(classifyTripTextCommand("ട്രിപ്പ്")).toBe("start");
+    expect(extractTripStartDriverQuery("trip Rasheed")).toBe("rasheed");
+    expect(extractTripStartDriverQuery("varum trip Rasheed")).toBe("rasheed");
+    expect(extractTripStartDriverQuery("ട്രിപ്പ് റഷീദ്")).toBe("റഷീദ്");
+    expect(extractTripStartDriverQuery("trip latest")).toBeNull();
     expect(classifyTripTextCommand("done")).toBe("done");
     expect(classifyTripTextCommand("ശരി")).toBe("done");
     expect(classifyTripTextCommand("complete")).toBe("done");
