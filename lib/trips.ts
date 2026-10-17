@@ -46,6 +46,90 @@ type TripDraftRow = {
   consignee_name: string | null;
 };
 
+type TripSummaryItemRow = {
+  id: string;
+  draft_id: string;
+  description: string;
+  hsn_sac: string | null;
+  quantity: number | null;
+  unit: string | null;
+};
+
+export type CombinedTripItem = {
+  description: string;
+  hsnSac: string | null;
+  quantity: number | null;
+  unit: string | null;
+};
+
+function normalizeTripItemIdentity(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function combineTripItems(items: TripSummaryItemRow[]): CombinedTripItem[] {
+  const combined = new Map<string, CombinedTripItem>();
+
+  for (const item of items) {
+    const description = item.description.normalize("NFKC").replace(/\s+/g, " ").trim();
+    if (!description) continue;
+
+    const hsnSac = item.hsn_sac?.trim().toUpperCase() || null;
+    const unit = item.unit?.normalize("NFKC").trim() || null;
+    const normalizedQuantity =
+      item.quantity !== null && Number.isFinite(Number(item.quantity))
+        ? Number(item.quantity)
+        : null;
+    const keyBase = [
+      normalizeTripItemIdentity(description),
+      hsnSac?.replace(/[^A-Z0-9]/g, "") ?? "",
+      normalizeTripItemIdentity(unit ?? ""),
+    ].join("|");
+    // Unknown quantities are kept as separate lines; they must not be counted as zero.
+    const key = normalizedQuantity === null ? keyBase + "|unknown|" + item.id : keyBase;
+    const existing = combined.get(key);
+
+    if (existing && existing.quantity !== null && normalizedQuantity !== null) {
+      existing.quantity += normalizedQuantity;
+      continue;
+    }
+
+    combined.set(key, { description, hsnSac, quantity: normalizedQuantity, unit });
+  }
+
+  return [...combined.values()];
+}
+
+async function loadTripSummaryItems(draftIds: string[]): Promise<TripSummaryItemRow[]> {
+  if (draftIds.length === 0) return [];
+  const { data, error } = await getSupabaseAdmin()
+    .from("document_items")
+    .select("id, draft_id, description, hsn_sac, quantity, unit")
+    .in("draft_id", draftIds)
+    .order("draft_id", { ascending: true })
+    .order("line_index", { ascending: true });
+
+  if (error) {
+    console.warn("Trip item summary lookup failed", {
+      reason: error.message.slice(0, 160),
+    });
+    return [];
+  }
+
+  return (data ?? []) as TripSummaryItemRow[];
+}
+
+function formatTripItemQuantity(value: number | null): string {
+  if (value === null) return "qty ?";
+  return Number.isInteger(value)
+    ? String(value)
+    : String(Number(value.toFixed(3)));
+}
+
 type PincodeLocation = {
   district: string | null;
   state: string | null;
@@ -611,6 +695,34 @@ async function sendTripReadySummary(trip: TripRow, replyToMessageId: string) {
   const review = drafts.filter(
     (draft) => draft.workflow_status === "review_required",
   ).length;
+  const summaryDraftIds = drafts
+    .filter(
+      (draft) =>
+        draft.workflow_status !== "cancelled" &&
+        draft.stock_status !== "duplicate_document",
+    )
+    .map((draft) => draft.id);
+  const combinedItems = combineTripItems(
+    await loadTripSummaryItems(summaryDraftIds),
+  );
+  const itemSummary =
+    combinedItems.length === 0
+      ? ""
+      : "\n\nItems (combined):\n" +
+        combinedItems
+          .slice(0, 8)
+          .map(
+            (item) =>
+              "• " +
+              item.description.slice(0, 64) +
+              " — " +
+              formatTripItemQuantity(item.quantity) +
+              (item.unit ? " " + item.unit : ""),
+          )
+          .join("\n") +
+        (combinedItems.length > 8
+          ? "\n+ " + String(combinedItems.length - 8) + " more products"
+          : "");
 
   let driverName: string | null = null;
   if (trip.driver_id) {
@@ -640,7 +752,8 @@ async function sendTripReadySummary(trip: TripRow, replyToMessageId: string) {
       (driverName ? "\nDriver: " + driverName : "") +
       (trip.vehicle_number ? "\nVehicle: " + trip.vehicle_number : "") +
       (review > 0 ? "\n⚠️ " + review + " bill needs review" : "") +
-      (ready > 0 ? "\n✅ " + ready + " bill stock updated" : ""),
+      (ready > 0 ? "\n✅ " + ready + " bill stock updated" : "") +
+      itemSummary,
   });
 }
 

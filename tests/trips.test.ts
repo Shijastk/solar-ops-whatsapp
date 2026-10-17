@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildTripDisplayName,
   cleanDestination,
+  combineTripItems,
   choosePrimaryDestination,
   classifyTripTextCommand,
   normalizeDriverName,
@@ -88,6 +89,30 @@ describe("WhatsApp trip capture helpers", () => {
       state: "KERALA",
       postOffice: "Tirur(kerala) H.O",
     });
+  });
+
+  it("combines matching trip products without merging distinct models or units", () => {
+    expect(
+      combineTripItems([
+        { id: "1", draft_id: "a", description: "Emmvee 560 Wp Panel", hsn_sac: "8541", quantity: 2, unit: "NOS" },
+        { id: "2", draft_id: "b", description: "EMMVEE 560 WP PANEL", hsn_sac: "8541", quantity: 3, unit: "NOS" },
+        { id: "3", draft_id: "c", description: "Emmvee 210 Wp Panel", hsn_sac: "8541", quantity: 1, unit: "NOS" },
+        { id: "4", draft_id: "d", description: "Emmvee 560 Wp Panel", hsn_sac: "8541", quantity: 4, unit: "PCS" },
+      ]),
+    ).toEqual([
+      { description: "Emmvee 560 Wp Panel", hsnSac: "8541", quantity: 5, unit: "NOS" },
+      { description: "Emmvee 210 Wp Panel", hsnSac: "8541", quantity: 1, unit: "NOS" },
+      { description: "Emmvee 560 Wp Panel", hsnSac: "8541", quantity: 4, unit: "PCS" },
+    ]);
+  });
+
+  it("keeps rows with unknown quantities separate instead of treating them as zero", () => {
+    expect(
+      combineTripItems([
+        { id: "1", draft_id: "a", description: "Panel", hsn_sac: null, quantity: null, unit: "NOS" },
+        { id: "2", draft_id: "b", description: "Panel", hsn_sac: null, quantity: null, unit: "NOS" },
+      ]),
+    ).toHaveLength(2);
   });
 
   it("normalizes driver names without losing Malayalam letters", () => {
