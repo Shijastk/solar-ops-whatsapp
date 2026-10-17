@@ -1002,11 +1002,12 @@ export async function handleFastWhatsAppQuery(
     "deterministic";
   let query = parseFastWhatsAppQuery(message.textBody);
   const likelyOperational = !query && looksLikeOperationalQuery(message.textBody);
+  let classificationReply: string | null = null;
   let operationalClassifierFailed = false;
   let classifierOutcome: "not_attempted" | "no_result" | "mapped" | "unsupported" | "failed" =
     "not_attempted";
 
-  if (!query && likelyOperational) {
+  if (!query) {
     classifierOutcome = "no_result";
     try {
       const classification = await classifyOperationalQueryWithGroq(
@@ -1016,6 +1017,7 @@ export async function handleFastWhatsAppQuery(
         classifierOutcome = classification.intent === "unsupported" ? "unsupported" : "mapped";
         query = mapAiClassificationToFastQuery(classification);
         if (query) resolver = "ai_intent";
+        else classificationReply = classification.reply;
       }
     } catch (error) {
       operationalClassifierFailed = true;
@@ -1037,6 +1039,9 @@ export async function handleFastWhatsAppQuery(
   } else if (options.fromVoice) {
     resolver = "fixed_fallback";
     body = voiceQueryClarification(message.textBody);
+  } else if (classificationReply) {
+    resolver = "ai_fallback";
+    body = classificationReply;
   } else if (likelyOperational) {
     resolver = "fixed_fallback";
     body = fixedOperationalFallback();
@@ -1044,6 +1049,13 @@ export async function handleFastWhatsAppQuery(
     if (operationalClassifierFailed) {
       console.info("Operational fallback used after classifier failure");
     }
+  } else if (
+    classifierOutcome === "failed" ||
+    classifierOutcome === "unsupported" ||
+    classifierOutcome === "mapped"
+  ) {
+    resolver = "fixed_fallback";
+    body = fixedUniversalFallback(message.textBody);
   } else {
     resolver = "ai_fallback";
     try {
