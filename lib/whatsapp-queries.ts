@@ -217,6 +217,12 @@ function extractStockProductQuery(value: string): string | null {
   return normalized ? cleaned : null;
 }
 
+export function isDriverRelatedQuestion(text: string): boolean {
+  const normalized = normalizeQueryText(text);
+  return /\\b(driver|drivers|rash?eed|rasheed|rashi|driverude|driverine)\\b/.test(normalized) ||
+    ["ഡ്രൈവർ", "ഡ്രൈവര്", "റഷീദ്", "റഷീദിനെ", "ഡ്രൈവറായിരുന്നു"].some((term) => normalized.includes(term));
+}
+
 export function parseFastWhatsAppQuery(
   text: string,
 ): FastWhatsAppQuery | null {
@@ -1049,14 +1055,15 @@ export async function handleFastWhatsAppQuery(
   let resolver: "deterministic" | "ai_intent" | "ai_fallback" | "fixed_fallback" =
     "deterministic";
   let query = parseFastWhatsAppQuery(message.textBody);
-  const likelyOperational = !query && looksLikeOperationalQuery(message.textBody);
+  const driverQuestion = !query && isDriverRelatedQuestion(message.textBody);
+  const likelyOperational = !query && !driverQuestion && looksLikeOperationalQuery(message.textBody);
   let classificationReply: string | null = null;
   let operationalClassifierFailed = false;
   let classifierOutcome: "not_attempted" | "no_result" | "mapped" | "unsupported" | "failed" =
     "not_attempted";
   let classifierDurationMs = 0;
 
-  if (!query) {
+  if (!query && !driverQuestion) {
     classifierOutcome = "no_result";
     const classifierStartedAt = performance.now();
     try {
@@ -1088,6 +1095,9 @@ export async function handleFastWhatsAppQuery(
 
   if (query) {
     body = await answerFastQuery(query);
+  } else if (driverQuestion) {
+    resolver = "fixed_fallback";
+    body = "റഷീദിന്റെ ഇന്നത്തെ trip/driver വിവരങ്ങൾ സ്ഥിരീകരിക്കാൻ കഴിയുന്ന query ഇപ്പോൾ ലഭ്യമല്ല. ഇന്നത്തെ trip details വേണമെങ്കിൽ “ഇന്നത്തെ trip” എന്ന് ചോദിക്കൂ; driver-wise lookup ചേർക്കേണ്ടതുണ്ട്.";
   } else if (options.fromVoice) {
     resolver = "fixed_fallback";
     body = voiceQueryClarification(message.textBody);
