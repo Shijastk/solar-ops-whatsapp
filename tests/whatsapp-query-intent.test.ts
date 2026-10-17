@@ -37,6 +37,7 @@ describe("WhatsApp AI intent fallback", () => {
     expect(looksLikeOperationalQuery("Hello, എങ്ങനെയുണ്ട്?")).toBe(false);
     expect(looksLikeOperationalQuery("ഇന്നത്തെ trip details എന്താണ്?")).toBe(true);
     expect(looksLikeOperationalQuery("ഈ മാസം summary")).toBe(true);
+    expect(looksLikeOperationalQuery("Innu poya products eethellam aanu")).toBe(true);
     await expect(
       classifyOperationalQueryWithGroq("Hello, എങ്ങനെയുണ്ട്?"),
     ).resolves.toBeNull();
@@ -56,8 +57,8 @@ describe("WhatsApp AI intent fallback", () => {
             {
               message: {
                 content: JSON.stringify({
-                  intent: "stock_balance",
-                  product_query: "Emmvee 560 Wp Topcon Dcr Panel",
+                  intent: "today_products_summary",
+                  product_query: null,
                   period: null,
                 }),
               },
@@ -70,12 +71,12 @@ describe("WhatsApp AI intent fallback", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await classifyOperationalQueryWithGroq(
-      "Emmvee 560 Wp Topcon Dcr Panel ഇപ്പോൾ എത്ര ബാക്കി?",
+      "Innu poya products eethellam aanu",
     );
 
     expect(result).toEqual({
-      intent: "stock_balance",
-      product_query: "Emmvee 560 Wp Topcon Dcr Panel",
+      intent: "today_products_summary",
+      product_query: null,
       period: null,
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -88,9 +89,7 @@ describe("WhatsApp AI intent fallback", () => {
     });
     expect(JSON.stringify(body)).not.toContain("groq-test-secret");
     expect(body.messages).toHaveLength(2);
-    expect(body.messages[1].content).toBe(
-      "Emmvee 560 Wp Topcon Dcr Panel ഇപ്പോൾ എത്ര ബാക്കി?",
-    );
+    expect(body.messages[1].content).toBe("Innu poya products eethellam aanu");
     expect(body.response_format.json_schema.strict).toBe(true);
     expect(body.max_completion_tokens).toBe(120);
     expect(body.reasoning_effort).toBe("low");
