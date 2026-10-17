@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterSafeFuzzyStockCandidates,
+  isDriverRelatedQuestion,
   indiaDayBounds,
   opsPeriodBounds,
   parseFastWhatsAppQuery,
@@ -38,6 +39,26 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(
       parseFastWhatsAppQuery("What products went out today?"),
     ).toEqual({ type: "today_products_summary" });
+    expect(parseFastWhatsAppQuery("ഇന്ന് എത്ര പ്രൊഡക്റ്റുകൾ പോയി?")).toEqual({
+      type: "today_products_summary",
+    });
+    expect(parseFastWhatsAppQuery("Inn ethra stock despatch aayi")).toEqual({
+      type: "today_products_summary",
+    });
+    expect(parseFastWhatsAppQuery("Innale ethra products poyi")).toEqual({
+      type: "yesterday_products_summary",
+    });
+    expect(parseFastWhatsAppQuery("ഇന്നലെ എത്ര പ്രൊഡക്റ്റുകൾ പോയി?")).toEqual({
+      type: "yesterday_products_summary",
+    });
+    expect(parseFastWhatsAppQuery("Yesterday how much trip")).toEqual({
+      type: "yesterday_trip_summary",
+    });
+    expect(parseFastWhatsAppQuery("today driver Rasheed trips")).toEqual({
+      type: "driver_trip_summary",
+      driverName: "Rasheed",
+      yesterday: false,
+    });
     expect(parseFastWhatsAppQuery("ഈ മാസം summary")).toEqual({
       type: "ops_period_summary",
       period: "this_month",
@@ -46,6 +67,12 @@ describe("fast WhatsApp operational query parsing", () => {
       type: "ops_period_summary",
       period: "last_year",
     });
+  });
+
+  it("detects driver questions so they cannot fall through to unrelated bill replies", () => {
+    expect(isDriverRelatedQuestion("Innu poya driver Rasheed ariyamo?")).toBe(true);
+    expect(isDriverRelatedQuestion("ഇന്ന് പോയത് ഡ്രൈവർ റഷീദായിരുന്നു")).toBe(true);
+    expect(isDriverRelatedQuestion("latest bill")).toBe(false);
   });
 
   it("extracts the product phrase from Malayalam and Manglish stock questions", () => {

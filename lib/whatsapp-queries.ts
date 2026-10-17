@@ -34,7 +34,10 @@ export type FastWhatsAppQuery =
   | { type: "stock_balance"; productQuery: string }
   | { type: "stock_product_required" }
   | { type: "today_trip_summary" }
+  | { type: "yesterday_trip_summary" }
+  | { type: "driver_trip_summary"; driverName: string; yesterday: boolean }
   | { type: "today_products_summary" }
+  | { type: "yesterday_products_summary" }
   | { type: "latest_trip" }
   | { type: "ops_period_summary"; period: OpsPeriod };
 
@@ -61,9 +64,12 @@ const TODAY_TERMS = [
   "today",
   "innu",
   "innathe",
+  "inn",
   "ഇന്ന്",
   "ഇന്നത്തെ",
 ];
+
+const YESTERDAY_TERMS = ["yesterday", "innale", "ഇന്നലെ", "കഴിഞ്ഞ ദിവസം"];
 
 const PENDING_TERMS = [
   "pending",
@@ -110,6 +116,10 @@ const PRODUCT_TERMS = [
   "ഉൽപ്പന്നം",
   "ഉൽപ്പന്നങ്ങൾ",
   "പ്രോഡക്റ്റ്",
+  "പ്രൊഡക്റ്റ്",
+  "പ്രൊഡക്റ്റുകൾ",
+  "പ്രൊഡക്ട്",
+  "പ്രോഡക്റ്റുകൾ",
 ];
 const TODAY_PRODUCT_MOVEMENT_TERMS = [
   "poya",
@@ -119,6 +129,9 @@ const TODAY_PRODUCT_MOVEMENT_TERMS = [
   "sent out",
   "delivered",
   "dispatched",
+  "dispatch",
+  "despatch",
+  "പോയി",
   "പോയ",
   "പോയത്",
   "പുറത്തുപോയ",
@@ -205,20 +218,48 @@ function extractStockProductQuery(value: string): string | null {
   return normalized ? cleaned : null;
 }
 
+export function isDriverRelatedQuestion(text: string): boolean {
+  const normalized = normalizeQueryText(text);
+  return /\b(driver|drivers|rash?eed|rasheed|rashi|driverude|driverine)\b/.test(normalized) ||
+    ["ഡ്രൈവർ", "ഡ്രൈവര്", "റഷീദ്", "റഷീദിനെ", "ഡ്രൈവറായിരുന്നു"].some((term) => normalized.includes(term));
+}
+
 export function parseFastWhatsAppQuery(
   text: string,
 ): FastWhatsAppQuery | null {
+  const driverMatch = text.normalize("NFKC").match(/(?:driver|ഡ്രൈവർ)\s+([\p{L}][\p{L} .'-]{1,30})/iu);
+  const asksDriverTrips = includesAny(normalizeQueryText(text), TRIP_TERMS) ||
+    /\b(driver|rash?eed|rasheed)\b/i.test(text) ||
+    ["ഡ്രൈവർ", "റഷീദ്", "റഷീദിന്റെ", "റഷീദിനെ"].some((term) => text.includes(term));
+  if (asksDriverTrips && driverMatch) {
+    const name = driverMatch[1]
+      .trim()
+      .replace(/\b(?:today|yesterday|innu|innale|trip|trips|poya|poyi|ariyamo|ariyumo|ano|aayirunnu|ayirunnu)\b.*$/i, "")
+      .replace(/(?:ആയിരുന്നു|ആണോ|അറിയാമോ|ഇന്ന്|ഇന്നലെ|ട്രിപ്പുകൾ|ട്രിപ്പ്|ട്രിപ്പുകളും).*$/u, "")
+      .replace(/[?!,.;:]+$/g, "")
+      .trim();
+    if (name) {
+      return {
+        type: "driver_trip_summary",
+        driverName: name,
+        yesterday: includesAny(normalizeQueryText(text), YESTERDAY_TERMS),
+      };
+    }
+  }
+
   const normalized = normalizeQueryText(text);
   if (!normalized) return null;
 
   const hasBill = includesAny(normalized, BILL_TERMS);
   const hasCount = includesAny(normalized, COUNT_TERMS);
 
-  if (
-    includesAny(normalized, TODAY_TERMS) &&
-    includesAny(normalized, PRODUCT_TERMS) &&
-    includesAny(normalized, TODAY_PRODUCT_MOVEMENT_TERMS)
-  ) {
+  const asksForProductMovement =
+    (includesAny(normalized, PRODUCT_TERMS) || includesAny(normalized, STOCK_TERMS)) &&
+    includesAny(normalized, TODAY_PRODUCT_MOVEMENT_TERMS);
+  if (asksForProductMovement && includesAny(normalized, YESTERDAY_TERMS)) {
+    return { type: "yesterday_products_summary" };
+  }
+  if (asksForProductMovement && includesAny(normalized, TODAY_TERMS)) {
     return { type: "today_products_summary" };
   }
 
@@ -236,6 +277,13 @@ export function parseFastWhatsAppQuery(
 
   if (hasBill && includesAny(normalized, LATEST_TERMS)) {
     return { type: "latest_bill" };
+  }
+
+  if (
+    includesAny(normalized, TRIP_TERMS) &&
+    includesAny(normalized, YESTERDAY_TERMS)
+  ) {
+    return { type: "yesterday_trip_summary" };
   }
 
   if (
@@ -733,9 +781,54 @@ function formatTripSummary(
   ].join("\n");
 }
 
-async function todayTripsSummary(now = new Date()): Promise<string> {
+async function driverTripsSummary(
+  driverName: string,
+  yesterday = false,
+  now = new Date(),
+): Promise<string> {
   const supabase = getSupabaseAdmin();
-  const bounds = indiaDayBounds(now);
+  const queryTime = yesterday ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
+  const bounds = indiaDayBounds(queryTime);
+  const { data: drivers, error: driverError } = await supabase
+    .from("ops_drivers")
+    .select("id, name");
+  if (driverError) throw new Error("Failed to load driver directory: " + driverError.message);
+  const normalizedTarget = driverName.normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]/gu, "");
+  const matched = (drivers ?? []).filter((driver) => {
+    const name = String(driver.name ?? "").normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]/gu, "");
+    return name === normalizedTarget || name.includes(normalizedTarget) || normalizedTarget.includes(name);
+  });
+  if (matched.length !== 1) {
+    return matched.length === 0
+      ? "Driver directory-ൽ “" + driverName + "” എന്ന പേര് കൃത്യമായി കണ്ടെത്താനായില്ല. പേര് confirm ചെയ്യൂ."
+      : "“" + driverName + "” എന്ന പേരിൽ ഒന്നിലധികം drivers ഉണ്ട്. കൃത്യമായ പേര് തിരഞ്ഞെടുക്കൂ.";
+  }
+  const driver = matched[0];
+  const { data: trips, error } = await supabase
+    .from("delivery_trips")
+    .select("display_name, vehicle_number, driver_id, finalized_at")
+    .eq("status", "ready")
+    .eq("driver_id", driver.id)
+    .gte("finalized_at", bounds.start)
+    .lt("finalized_at", bounds.end)
+    .order("finalized_at", { ascending: false })
+    .limit(50);
+  if (error) throw new Error("Failed to load driver trips: " + error.message);
+  const rows = (trips ?? []) as TripSummaryRow[];
+  const names = await driverNamesById(rows.map((row) => row.driver_id).filter((id): id is string => Boolean(id)));
+  return rows.length === 0
+    ? (yesterday ? "ഇന്നലെ " : "ഇന്ന് ") + driverName + " എന്ന driver-ന്റെ finalized trip കണ്ടെത്തിയില്ല."
+    : formatTripSummary(rows, names, (yesterday ? "ഇന്നലത്തെ " : "ഇന്നത്തെ ") + driverName + "യുടെ trips (ആകെ " + String(rows.length) + "):");
+}
+
+async function tripsSummaryForDay(
+  yesterday = false,
+  now = new Date(),
+): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const queryTime = yesterday ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
+  const bounds = indiaDayBounds(queryTime);
+  const dayLabel = yesterday ? "ഇന്നലത്തെ" : "ഇന്നത്തെ";
   const { data, error } = await supabase
     .from("delivery_trips")
     .select("display_name, vehicle_number, driver_id, finalized_at")
@@ -753,12 +846,17 @@ async function todayTripsSummary(now = new Date()): Promise<string> {
   const names = await driverNamesById(
     rows.map((row) => row.driver_id).filter((id): id is string => Boolean(id)),
   );
-  return formatTripSummary(rows, names, "ഇന്നത്തെ completed trips:");
+  return formatTripSummary(rows, names, dayLabel + " completed trips (ആകെ " + String(rows.length) + "):");
 }
 
-async function todayProductsSummary(now = new Date()): Promise<string> {
+async function productsSummaryForDay(
+  yesterday = false,
+  now = new Date(),
+): Promise<string> {
   const supabase = getSupabaseAdmin();
-  const bounds = indiaDayBounds(now);
+  const queryTime = yesterday ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
+  const bounds = indiaDayBounds(queryTime);
+  const dayLabel = yesterday ? "ഇന്നലെ" : "ഇന്ന്";
   const { data: trips, error: tripsError } = await supabase
     .from("delivery_trips")
     .select("id")
@@ -775,7 +873,7 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
 
   const tripIds = (trips ?? []).map((trip) => trip.id);
   if (tripIds.length === 0) {
-    return "ഇന്ന് completed trip രേഖപ്പെടുത്തിയിട്ടില്ല.";
+    return dayLabel + " completed trip രേഖപ്പെടുത്തിയിട്ടില്ല.";
   }
 
   const { data: tripDocuments, error: tripDocumentsError } = await supabase
@@ -798,7 +896,7 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
     ),
   );
   if (draftIds.length === 0) {
-    return "ഇന്നത്തെ completed trips-ൽ linked bill details ലഭ്യമല്ല.";
+    return dayLabel + " completed trips-ൽ linked bill details ലഭ്യമല്ല.";
   }
 
   const { data: drafts, error: draftsError } = await supabase
@@ -828,7 +926,7 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
 
   if (confirmedDraftIds.length === 0) {
     return [
-      "ഇന്ന് പോയ products: സ്ഥിരീകരിച്ച bill items കണ്ടെത്തിയില്ല.",
+      dayLabel + " പോയ products: സ്ഥിരീകരിച്ച bill items കണ്ടെത്തിയില്ല.",
       needsReviewCount > 0
         ? "⚠️ " + needsReviewCount + " bill(s) review/pending ആണ്; അതിനാൽ product total-ൽ ഉൾപ്പെടുത്തിയിട്ടില്ല."
         : null,
@@ -880,6 +978,11 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
   }
 
   const lines = [...combined.values()];
+  const knownTotalQuantity = lines.reduce(
+    (total, item) => total + (item.quantity ?? 0),
+    0,
+  );
+  const allQuantitiesKnown = lines.length > 0 && lines.every((item) => item.quantity !== null);
   const formatQuantity = (quantity: number | null) =>
     quantity === null
       ? "qty ?"
@@ -887,7 +990,11 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
         ? String(quantity)
         : String(Number(quantity.toFixed(3)));
   return [
-    "ഇന്ന് പോയ products (recorded bills):",
+    dayLabel + " പോയ products (recorded bills):",
+    "വ്യത്യസ്ത product lines: " + String(lines.length),
+    allQuantitiesKnown
+      ? "ആകെ quantity: " + formatQuantity(knownTotalQuantity)
+      : "ആകെ quantity: പൂർണ്ണമായി കണക്കാക്കാൻ കഴിയില്ല (ചില item quantity ലഭ്യമല്ല).",
     ...(lines.length === 0
       ? ["Confirmed bill-ൽ product item details ലഭ്യമല്ല."]
       : lines.slice(0, 10).map(
@@ -972,11 +1079,23 @@ async function answerFastQuery(
   }
 
   if (query.type === "today_trip_summary") {
-    return todayTripsSummary();
+    return tripsSummaryForDay(false);
+  }
+
+  if (query.type === "yesterday_trip_summary") {
+    return tripsSummaryForDay(true);
+  }
+
+  if (query.type === "driver_trip_summary") {
+    return driverTripsSummary(query.driverName, query.yesterday);
   }
 
   if (query.type === "today_products_summary") {
-    return todayProductsSummary();
+    return productsSummaryForDay(false);
+  }
+
+  if (query.type === "yesterday_products_summary") {
+    return productsSummaryForDay(true);
   }
 
   if (query.type === "latest_trip") {
@@ -1001,14 +1120,15 @@ export async function handleFastWhatsAppQuery(
   let resolver: "deterministic" | "ai_intent" | "ai_fallback" | "fixed_fallback" =
     "deterministic";
   let query = parseFastWhatsAppQuery(message.textBody);
-  const likelyOperational = !query && looksLikeOperationalQuery(message.textBody);
+  const driverQuestion = !query && isDriverRelatedQuestion(message.textBody);
+  const likelyOperational = !query && !driverQuestion && looksLikeOperationalQuery(message.textBody);
   let classificationReply: string | null = null;
   let operationalClassifierFailed = false;
   let classifierOutcome: "not_attempted" | "no_result" | "mapped" | "unsupported" | "failed" =
     "not_attempted";
   let classifierDurationMs = 0;
 
-  if (!query) {
+  if (!query && !driverQuestion) {
     classifierOutcome = "no_result";
     const classifierStartedAt = performance.now();
     try {
@@ -1040,6 +1160,9 @@ export async function handleFastWhatsAppQuery(
 
   if (query) {
     body = await answerFastQuery(query);
+  } else if (driverQuestion) {
+    resolver = "fixed_fallback";
+    body = "ഏത് driver-ന്റെ trips ആണ് വേണ്ടത്? Driver-ന്റെ പേര്, ഇന്ന്/ഇന്നലെ എന്ന് അയക്കൂ.";
   } else if (options.fromVoice) {
     resolver = "fixed_fallback";
     body = voiceQueryClarification(message.textBody);
