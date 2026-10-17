@@ -34,6 +34,7 @@ export type FastWhatsAppQuery =
   | { type: "stock_balance"; productQuery: string }
   | { type: "stock_product_required" }
   | { type: "today_trip_summary" }
+  | { type: "yesterday_trip_summary" }
   | { type: "today_products_summary" }
   | { type: "yesterday_products_summary" }
   | { type: "latest_trip" }
@@ -249,6 +250,13 @@ export function parseFastWhatsAppQuery(
 
   if (hasBill && includesAny(normalized, LATEST_TERMS)) {
     return { type: "latest_bill" };
+  }
+
+  if (
+    includesAny(normalized, TRIP_TERMS) &&
+    includesAny(normalized, YESTERDAY_TERMS)
+  ) {
+    return { type: "yesterday_trip_summary" };
   }
 
   if (
@@ -746,9 +754,14 @@ function formatTripSummary(
   ].join("\n");
 }
 
-async function todayTripsSummary(now = new Date()): Promise<string> {
+async function tripsSummaryForDay(
+  yesterday = false,
+  now = new Date(),
+): Promise<string> {
   const supabase = getSupabaseAdmin();
-  const bounds = indiaDayBounds(now);
+  const queryTime = yesterday ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
+  const bounds = indiaDayBounds(queryTime);
+  const dayLabel = yesterday ? "ഇന്നലത്തെ" : "ഇന്നത്തെ";
   const { data, error } = await supabase
     .from("delivery_trips")
     .select("display_name, vehicle_number, driver_id, finalized_at")
@@ -766,7 +779,7 @@ async function todayTripsSummary(now = new Date()): Promise<string> {
   const names = await driverNamesById(
     rows.map((row) => row.driver_id).filter((id): id is string => Boolean(id)),
   );
-  return formatTripSummary(rows, names, "ഇന്നത്തെ completed trips:");
+  return formatTripSummary(rows, names, dayLabel + " completed trips (ആകെ " + String(rows.length) + "):");
 }
 
 async function productsSummaryForDay(
@@ -999,7 +1012,11 @@ async function answerFastQuery(
   }
 
   if (query.type === "today_trip_summary") {
-    return todayTripsSummary();
+    return tripsSummaryForDay(false);
+  }
+
+  if (query.type === "yesterday_trip_summary") {
+    return tripsSummaryForDay(true);
   }
 
   if (query.type === "today_products_summary") {
