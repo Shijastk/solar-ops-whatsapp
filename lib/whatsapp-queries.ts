@@ -114,6 +114,10 @@ const PRODUCT_TERMS = [
   "ഉൽപ്പന്നം",
   "ഉൽപ്പന്നങ്ങൾ",
   "പ്രോഡക്റ്റ്",
+  "പ്രൊഡക്റ്റ്",
+  "പ്രൊഡക്റ്റുകൾ",
+  "പ്രൊഡക്ട്",
+  "പ്രോഡക്റ്റുകൾ",
 ];
 const TODAY_PRODUCT_MOVEMENT_TERMS = [
   "poya",
@@ -898,7 +902,7 @@ async function productsSummaryForDay(
     (total, item) => total + (item.quantity ?? 0),
     0,
   );
-  const allQuantitiesKnown = lines.every((item) => item.quantity !== null);
+  const allQuantitiesKnown = lines.length > 0 && lines.every((item) => item.quantity !== null);
   const formatQuantity = (quantity: number | null) =>
     quantity === null
       ? "qty ?"
