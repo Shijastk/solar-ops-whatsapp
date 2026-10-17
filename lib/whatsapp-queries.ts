@@ -234,11 +234,17 @@ export function parseFastWhatsAppQuery(
   if (asksDriverTrips && driverMatch) {
     const name = driverMatch[1]
       .trim()
-      .replace(/\\b(?:today|yesterday|innu|innale|trip|trips|poya|poyi|ariyamo|ariyumo|ano|aayirunnu|ayirunnu)\\b.*$/i, "")
-      .replace(/(?:ആയിരുന്നു|ആണോ|അറിയാമോ|ഇന്ന്|ഇന്നലെ|ട്രിപ്പ്|ട്രിപ്പുകൾ).*$/u, "")
+      .replace(/\b(?:today|yesterday|innu|innale|trip|trips|poya|poyi|ariyamo|ariyumo|ano|aayirunnu|ayirunnu)\b.*$/i, "")
+      .replace(/(?:ആയിരുന്നു|ആണോ|അറിയാമോ|ഇന്ന്|ഇന്നലെ|ട്രിപ്പുകൾ|ട്രിപ്പ്|ട്രിപ്പുകളും).*$/u, "")
       .replace(/[?!,.;:]+$/g, "")
       .trim();
-    return { type: "driver_trip_summary", driverName: name, yesterday: includesAny(normalizeQueryText(text), YESTERDAY_TERMS) };
+    if (name) {
+      return {
+        type: "driver_trip_summary",
+        driverName: name,
+        yesterday: includesAny(normalizeQueryText(text), YESTERDAY_TERMS),
+      };
+    }
   }
 
   const normalized = normalizeQueryText(text);
