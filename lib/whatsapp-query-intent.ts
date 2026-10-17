@@ -10,6 +10,7 @@ const supportedIntentSchema = z.enum([
   "latest_bill",
   "stock_balance",
   "today_trip_summary",
+  "yesterday_trip_summary",
   "today_products_summary",
   "yesterday_products_summary",
   "latest_trip",
@@ -58,6 +59,7 @@ const strictResponseSchema = {
         "latest_bill",
         "stock_balance",
         "today_trip_summary",
+        "yesterday_trip_summary",
         "today_products_summary",
         "yesterday_products_summary",
         "latest_trip",
@@ -212,7 +214,7 @@ export async function classifyOperationalQueryWithGroq(
           {
             role: "system",
             content:
-              "Interpret any Solar Ops WhatsApp message, including Malayalam, Manglish and English, using meaning rather than exact keywords. Never invent business facts and never generate SQL. Supported intents only: today_bill_count = asks how many PDF bills were received today; pending_bill_count = asks how many bills need review/are pending; latest_bill = asks for the most recently received bill; stock_balance = asks current stock quantity for one named product; today_trip_summary = asks which trips were completed today; today_products_summary = asks which products went out in today's completed trips; yesterday_products_summary = asks which products went out in yesterday's completed trips; latest_trip = asks for the latest completed trip; ops_period_summary = asks for an operational summary for this week/month/year or last week/month/year. For stock_balance, copy only the product phrase into product_query; use null when no product is named. For ops_period_summary set period to one of this_week, this_month, this_year, last_week, last_month, last_year. For supported intents, set reply to null. For unsupported or ambiguous requests, set intent to unsupported, product_query and period to null, and reply to a short natural response in the user's language. If the user asks for live operational data that is not covered by a supported intent, say you cannot verify that specific data yet and ask one concise clarifying question or suggest the closest supported query. For greetings/general non-live questions, respond naturally. Never claim an action was performed. Never guess live stock, bill, trip, driver, payment, or company data.",
+              "Interpret any Solar Ops WhatsApp message, including Malayalam, Manglish and English, using meaning rather than exact keywords. Never invent business facts and never generate SQL. Supported intents only: today_bill_count = asks how many PDF bills were received today; pending_bill_count = asks how many bills need review/are pending; latest_bill = asks for the most recently received bill; stock_balance = asks current stock quantity for one named product; today_trip_summary = asks which trips were completed today; yesterday_trip_summary = asks which trips were completed yesterday; today_products_summary = asks which products went out in today's completed trips; yesterday_products_summary = asks which products went out in yesterday's completed trips; latest_trip = asks for the latest completed trip; ops_period_summary = asks for an operational summary for this week/month/year or last week/month/year. For stock_balance, copy only the product phrase into product_query; use null when no product is named. For ops_period_summary set period to one of this_week, this_month, this_year, last_week, last_month, last_year. For supported intents, set reply to null. For unsupported or ambiguous requests, set intent to unsupported, product_query and period to null, and reply to a short natural response in the user's language. If the user asks for live operational data that is not covered by a supported intent, say you cannot verify that specific data yet and ask one concise clarifying question or suggest the closest supported query. For greetings/general non-live questions, respond naturally. Never claim an action was performed. Never guess live stock, bill, trip, driver, payment, or company data.",
           },
           {
             role: "user",
