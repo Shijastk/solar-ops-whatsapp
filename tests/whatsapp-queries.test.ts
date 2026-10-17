@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterSafeFuzzyStockCandidates,
+  isDriverRelatedQuestion,
   indiaDayBounds,
   opsPeriodBounds,
   parseFastWhatsAppQuery,
@@ -61,6 +62,12 @@ describe("fast WhatsApp operational query parsing", () => {
       type: "ops_period_summary",
       period: "last_year",
     });
+  });
+
+  it("detects driver questions so they cannot fall through to unrelated bill replies", () => {
+    expect(isDriverRelatedQuestion("Innu poya driver Rasheed ariyamo?")).toBe(true);
+    expect(isDriverRelatedQuestion("ഇന്ന് പോയത് ഡ്രൈവർ റഷീദായിരുന്നു")).toBe(true);
+    expect(isDriverRelatedQuestion("latest bill")).toBe(false);
   });
 
   it("extracts the product phrase from Malayalam and Manglish stock questions", () => {
