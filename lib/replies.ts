@@ -55,33 +55,16 @@ async function sendPersistedReply(input: PersistedSendInput): Promise<SendResult
 
   const supabase = getSupabaseAdmin();
 
-  const [duplicateResult, targetResult] = await Promise.all([
-    supabase
-      .from("whatsapp_outbound_messages")
-      .select("status, meta_message_id")
-      .eq("request_id", input.requestId)
-      .maybeSingle(),
-    supabase
-      .from("whatsapp_messages")
-      .select("id, whatsapp_message_id, sender_phone, received_at")
-      .eq("id", input.replyToMessageId)
-      .maybeSingle(),
-  ]);
+  // The unique request_id constraint is the authoritative idempotency guard.
+  // Avoid an extra read on every normal reply; the insert-conflict path below
+  // still returns the previously queued/sent result for duplicate webhooks.
+  const targetResult = await supabase
+    .from("whatsapp_messages")
+    .select("id, whatsapp_message_id, sender_phone, received_at")
+    .eq("id", input.replyToMessageId)
+    .maybeSingle();
 
   const preflightDurationMs = Math.round(performance.now() - totalStartedAt);
-
-  if (duplicateResult.error) {
-    throw new Error(
-      "Failed to check reply idempotency: " + duplicateResult.error.message,
-    );
-  }
-  if (duplicateResult.data) {
-    return {
-      status: duplicateResult.data.status,
-      metaMessageId: duplicateResult.data.meta_message_id,
-      duplicate: true,
-    };
-  }
 
   if (targetResult.error) {
     throw new Error("Failed to load reply target: " + targetResult.error.message);

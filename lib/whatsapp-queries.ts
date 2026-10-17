@@ -1006,9 +1006,11 @@ export async function handleFastWhatsAppQuery(
   let operationalClassifierFailed = false;
   let classifierOutcome: "not_attempted" | "no_result" | "mapped" | "unsupported" | "failed" =
     "not_attempted";
+  let classifierDurationMs = 0;
 
   if (!query) {
     classifierOutcome = "no_result";
+    const classifierStartedAt = performance.now();
     try {
       const classification = await classifyOperationalQueryWithGroq(
         message.textBody,
@@ -1028,6 +1030,8 @@ export async function handleFastWhatsAppQuery(
             ? error.message.slice(0, 180)
             : "Unknown classification error",
       });
+    } finally {
+      classifierDurationMs = Math.round(performance.now() - classifierStartedAt);
     }
   }
 
@@ -1091,6 +1095,7 @@ export async function handleFastWhatsAppQuery(
     likelyOperational,
     deterministicMatch: resolver === "deterministic",
     classifierOutcome,
+    classifierDurationMs,
     lookupDurationMs,
     sendDurationMs,
     durationMs: Math.round(performance.now() - startedAt),
