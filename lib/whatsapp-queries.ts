@@ -894,6 +894,11 @@ async function productsSummaryForDay(
   }
 
   const lines = [...combined.values()];
+  const knownTotalQuantity = lines.reduce(
+    (total, item) => total + (item.quantity ?? 0),
+    0,
+  );
+  const allQuantitiesKnown = lines.every((item) => item.quantity !== null);
   const formatQuantity = (quantity: number | null) =>
     quantity === null
       ? "qty ?"
@@ -902,6 +907,10 @@ async function productsSummaryForDay(
         : String(Number(quantity.toFixed(3)));
   return [
     dayLabel + " പോയ products (recorded bills):",
+    "വ്യത്യസ്ത product lines: " + String(lines.length),
+    allQuantitiesKnown
+      ? "ആകെ quantity: " + formatQuantity(knownTotalQuantity)
+      : "ആകെ quantity: പൂർണ്ണമായി കണക്കാക്കാൻ കഴിയില്ല (ചില item quantity ലഭ്യമല്ല).",
     ...(lines.length === 0
       ? ["Confirmed bill-ൽ product item details ലഭ്യമല്ല."]
       : lines.slice(0, 10).map(
