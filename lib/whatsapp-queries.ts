@@ -784,7 +784,7 @@ async function driverTripsSummary(
   const queryTime = yesterday ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
   const bounds = indiaDayBounds(queryTime);
   const { data: drivers, error: driverError } = await supabase
-    .from("drivers")
+    .from("ops_drivers")
     .select("id, name");
   if (driverError) throw new Error("Failed to load driver directory: " + driverError.message);
   const normalizedTarget = driverName.normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]/gu, "");
