@@ -44,6 +44,7 @@ export function isWithinCustomerServiceWindow(
 }
 
 async function sendPersistedReply(input: PersistedSendInput): Promise<SendResult> {
+  const totalStartedAt = performance.now();
   const body = input.body.trim();
   if (!body) {
     throw new Error("Reply text is required");
@@ -66,6 +67,8 @@ async function sendPersistedReply(input: PersistedSendInput): Promise<SendResult
       .eq("id", input.replyToMessageId)
       .maybeSingle(),
   ]);
+
+  const preflightDurationMs = Math.round(performance.now() - totalStartedAt);
 
   if (duplicateResult.error) {
     throw new Error(
@@ -148,13 +151,20 @@ async function sendPersistedReply(input: PersistedSendInput): Promise<SendResult
     throw new Error("Failed to queue WhatsApp reply: " + queueError.message);
   }
 
+  const queueDurationMs = Math.round(performance.now() - totalStartedAt) - preflightDurationMs;
+  let providerDurationMs = 0;
+  let persistenceDurationMs = 0;
+
   try {
+    const providerStartedAt = performance.now();
     const metaMessageId = await input.send({
       recipientPhone: target.sender_phone,
       whatsappMessageId: target.whatsapp_message_id,
     });
+    providerDurationMs = Math.round(performance.now() - providerStartedAt);
     const now = new Date().toISOString();
 
+    const persistenceStartedAt = performance.now();
     const { error: updateError } = await supabase
       .from("whatsapp_outbound_messages")
       .update({
@@ -166,11 +176,24 @@ async function sendPersistedReply(input: PersistedSendInput): Promise<SendResult
       })
       .eq("request_id", input.requestId);
 
+    persistenceDurationMs = Math.round(performance.now() - persistenceStartedAt);
     if (updateError) {
       throw new Error(
         "WhatsApp reply was sent but persistence failed: " +
           updateError.message,
       );
+    }
+
+    const totalDurationMs = Math.round(performance.now() - totalStartedAt);
+    if (totalDurationMs >= 700) {
+      console.info("WhatsApp outbound send timing", {
+        messageKind: input.messageKind,
+        preflightDurationMs,
+        queueDurationMs,
+        providerDurationMs,
+        persistenceDurationMs,
+        totalDurationMs,
+      });
     }
 
     return { status: "sent", metaMessageId, duplicate: false };

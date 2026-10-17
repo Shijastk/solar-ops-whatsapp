@@ -10,6 +10,7 @@ const supportedIntentSchema = z.enum([
   "latest_bill",
   "stock_balance",
   "today_trip_summary",
+  "today_products_summary",
   "latest_trip",
   "ops_period_summary",
   "unsupported",
@@ -55,6 +56,7 @@ const strictResponseSchema = {
         "latest_bill",
         "stock_balance",
         "today_trip_summary",
+        "today_products_summary",
         "latest_trip",
         "ops_period_summary",
         "unsupported",
@@ -202,7 +204,7 @@ export async function classifyOperationalQueryWithGroq(
           {
             role: "system",
             content:
-              "Classify a Solar Ops operator question. Do not answer the question and do not invent business facts. Supported intents only: today_bill_count = asks how many PDF bills were received today; pending_bill_count = asks how many bills need review/are pending; latest_bill = asks for the most recently received bill; stock_balance = asks the current stock quantity for one named product; today_trip_summary = asks which trips were completed today; latest_trip = asks for the latest completed trip; ops_period_summary = asks for an operational summary for this week/month/year or last week/month/year. For stock_balance, copy only the product phrase from the user into product_query; use null when not named. For ops_period_summary set period to one of this_week, this_month, this_year, last_week, last_month, last_year. For every other intent set period to null. For every other request including arbitrary SQL-like questions, edits, commands, greetings, explanations, or ambiguous meaning, return unsupported. Understand Malayalam, Manglish and English.",
+              "Classify a Solar Ops operator question. Do not answer the question and do not invent business facts. Supported intents only: today_bill_count = asks how many PDF bills were received today; pending_bill_count = asks how many bills need review/are pending; latest_bill = asks for the most recently received bill; stock_balance = asks the current stock quantity for one named product; today_trip_summary = asks which trips were completed today; today_products_summary = asks which products went out in today's completed trips; latest_trip = asks for the latest completed trip; ops_period_summary = asks for an operational summary for this week/month/year or last week/month/year. For stock_balance, copy only the product phrase from the user into product_query; use null when not named. For ops_period_summary set period to one of this_week, this_month, this_year, last_week, last_month, last_year. For every other intent set period to null. For every other request including arbitrary SQL-like questions, edits, commands, greetings, explanations, or ambiguous meaning, return unsupported. Understand Malayalam, Manglish and English.",
           },
           {
             role: "user",

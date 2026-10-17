@@ -32,6 +32,12 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(parseFastWhatsAppQuery("latest trip")).toEqual({
       type: "latest_trip",
     });
+    expect(
+      parseFastWhatsAppQuery("Innu poya products eethellam aanu"),
+    ).toEqual({ type: "today_products_summary" });
+    expect(
+      parseFastWhatsAppQuery("What products went out today?"),
+    ).toEqual({ type: "today_products_summary" });
     expect(parseFastWhatsAppQuery("ഈ മാസം summary")).toEqual({
       type: "ops_period_summary",
       period: "this_month",
