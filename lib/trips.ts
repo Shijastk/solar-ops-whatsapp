@@ -226,16 +226,23 @@ export function extractTripStartDriverQuery(value: string): string | null {
     "trip",
     "ട്രിപ്പ്",
   ];
-  const reserved = new Set([
+  const reserved = [
     "latest", "last", "today", "summary", "details", "status", "bill",
     "bills", "stock", "products", "product", "count", "pending", "cancel",
     "done", "driver", "history", "list", "report", "trips", "trip",
-  ]);
+  ];
 
   for (const prefix of prefixes) {
     if (!text.startsWith(prefix + " ")) continue;
     const candidate = text.slice(prefix.length).trim();
-    if (!candidate || reserved.has(candidate)) return null;
+    if (
+      !candidate ||
+      reserved.some(
+        (word) => candidate === word || candidate.startsWith(word + " "),
+      )
+    ) {
+      return null;
+    }
     return candidate;
   }
 
