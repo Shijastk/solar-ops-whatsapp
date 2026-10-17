@@ -34,6 +34,7 @@ export type FastWhatsAppQuery =
   | { type: "stock_balance"; productQuery: string }
   | { type: "stock_product_required" }
   | { type: "today_trip_summary" }
+  | { type: "today_products_summary" }
   | { type: "latest_trip" }
   | { type: "ops_period_summary"; period: OpsPeriod };
 
@@ -99,6 +100,29 @@ const LATEST_TERMS = [
 
 const STOCK_TERMS = ["stock", "സ്റ്റോക്ക്"];
 const TRIP_TERMS = ["trip", "trips", "ട്രിപ്പ്", "ട്രിപ്പുകൾ"];
+const PRODUCT_TERMS = [
+  "product",
+  "products",
+  "item",
+  "items",
+  "സാധനം",
+  "സാധനങ്ങൾ",
+  "ഉൽപ്പന്നം",
+  "ഉൽപ്പന്നങ്ങൾ",
+  "പ്രോഡക്റ്റ്",
+];
+const TODAY_PRODUCT_MOVEMENT_TERMS = [
+  "poya",
+  "poyi",
+  "went",
+  "went out",
+  "sent out",
+  "delivered",
+  "dispatched",
+  "പോയ",
+  "പോയത്",
+  "പുറത്തുപോയ",
+];
 const TRIP_LATEST_TERMS = ["latest", "last", "recent", "അവസാന", "ലാസ്റ്റ്"];
 
 const PERIOD_TERMS: Array<{ period: OpsPeriod; terms: string[] }> = [
@@ -189,6 +213,14 @@ export function parseFastWhatsAppQuery(
 
   const hasBill = includesAny(normalized, BILL_TERMS);
   const hasCount = includesAny(normalized, COUNT_TERMS);
+
+  if (
+    includesAny(normalized, TODAY_TERMS) &&
+    includesAny(normalized, PRODUCT_TERMS) &&
+    includesAny(normalized, TODAY_PRODUCT_MOVEMENT_TERMS)
+  ) {
+    return { type: "today_products_summary" };
+  }
 
   if (hasBill && includesAny(normalized, PENDING_TERMS)) {
     return { type: "pending_bill_count" };
@@ -724,6 +756,142 @@ async function todayTripsSummary(now = new Date()): Promise<string> {
   return formatTripSummary(rows, names, "ഇന്നത്തെ completed trips:");
 }
 
+async function todayProductsSummary(now = new Date()): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const bounds = indiaDayBounds(now);
+  const { data: trips, error: tripsError } = await supabase
+    .from("delivery_trips")
+    .select("id")
+    .eq("status", "ready")
+    .gte("finalized_at", bounds.start)
+    .lt("finalized_at", bounds.end)
+    .limit(50);
+
+  if (tripsError) {
+    throw new Error("Failed to load today's completed trips: " + tripsError.message);
+  }
+
+  const tripIds = (trips ?? []).map((trip) => trip.id);
+  if (tripIds.length === 0) {
+    return "ഇന്ന് completed trip രേഖപ്പെടുത്തിയിട്ടില്ല.";
+  }
+
+  const { data: tripDocuments, error: tripDocumentsError } = await supabase
+    .from("trip_documents")
+    .select("draft_id")
+    .in("trip_id", tripIds)
+    .not("draft_id", "is", null);
+
+  if (tripDocumentsError) {
+    throw new Error("Failed to load today's trip bills: " + tripDocumentsError.message);
+  }
+
+  const draftIds = Array.from(
+    new Set(
+      (tripDocuments ?? [])
+        .map((row) => row.draft_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  if (draftIds.length === 0) {
+    return "ഇന്നത്തെ completed trips-ൽ linked bill details ലഭ്യമല്ല.";
+  }
+
+  const { data: drafts, error: draftsError } = await supabase
+    .from("document_drafts")
+    .select("id, workflow_status, stock_status")
+    .in("id", draftIds);
+
+  if (draftsError) {
+    throw new Error("Failed to load today's trip bill status: " + draftsError.message);
+  }
+
+  const draftRows = drafts ?? [];
+  const confirmedDraftIds = draftRows
+    .filter(
+      (draft) =>
+        draft.workflow_status === "recorded" &&
+        draft.stock_status !== "duplicate_document" &&
+        draft.workflow_status !== "cancelled",
+    )
+    .map((draft) => draft.id);
+  const needsReviewCount = draftRows.filter(
+    (draft) =>
+      draft.workflow_status === "review_required" ||
+      draft.workflow_status === "pending",
+  ).length;
+
+  if (confirmedDraftIds.length === 0) {
+    return [
+      "ഇന്ന് പോയ products: സ്ഥിരീകരിച്ച bill items കണ്ടെത്തിയില്ല.",
+      needsReviewCount > 0
+        ? "⚠️ " + needsReviewCount + " bill(s) review/pending ആണ്; അതിനാൽ product total-ൽ ഉൾപ്പെടുത്തിയിട്ടില്ല."
+        : null,
+    ].filter((line): line is string => Boolean(line)).join("\n");
+  }
+
+  const { data: items, error: itemsError } = await supabase
+    .from("document_items")
+    .select("id, draft_id, description, hsn_sac, quantity, unit")
+    .in("draft_id", confirmedDraftIds)
+    .order("draft_id", { ascending: true })
+    .order("line_index", { ascending: true });
+
+  if (itemsError) {
+    throw new Error("Failed to load today's trip product items: " + itemsError.message);
+  }
+
+  const combined = new Map<
+    string,
+    { description: string; quantity: number | null; unit: string | null }
+  >();
+  for (const item of items ?? []) {
+    const description = String(item.description ?? "").normalize("NFKC").replace(/\\s+/g, " ").trim();
+    if (!description) continue;
+    const hsn = String(item.hsn_sac ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const unit = String(item.unit ?? "").normalize("NFKC").trim();
+    const normalizedDescription = description.toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu, " ").trim();
+    const keyBase = [normalizedDescription, hsn, unit.toLowerCase()].join("|");
+    const rawQuantity = item.quantity;
+    const quantity =
+      rawQuantity !== null && rawQuantity !== undefined && Number.isFinite(Number(rawQuantity))
+        ? Number(rawQuantity)
+        : null;
+    const key = quantity === null ? keyBase + "|unknown|" + String(item.id) : keyBase;
+    const existing = combined.get(key);
+    if (existing && existing.quantity !== null && quantity !== null) {
+      existing.quantity += quantity;
+    } else {
+      combined.set(key, { description, quantity, unit: unit || null });
+    }
+  }
+
+  const lines = [...combined.values()];
+  const formatQuantity = (quantity: number | null) =>
+    quantity === null
+      ? "qty ?"
+      : Number.isInteger(quantity)
+        ? String(quantity)
+        : String(Number(quantity.toFixed(3)));
+  return [
+    "ഇന്ന് പോയ products (recorded bills):",
+    ...(lines.length === 0
+      ? ["Confirmed bill-ൽ product item details ലഭ്യമല്ല."]
+      : lines.slice(0, 10).map(
+          (item) =>
+            "• " +
+            item.description.slice(0, 64) +
+            " — " +
+            formatQuantity(item.quantity) +
+            (item.unit ? " " + item.unit : ""),
+        )),
+    ...(lines.length > 10 ? ["+ " + String(lines.length - 10) + " more products"] : []),
+    ...(needsReviewCount > 0
+      ? ["⚠️ " + needsReviewCount + " bill(s) review/pending ആണ്; product total-ൽ ഉൾപ്പെടുത്തിയിട്ടില്ല."]
+      : []),
+  ].join("\\n");
+}
+
 async function latestTripSummary(): Promise<string> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -792,6 +960,10 @@ async function answerFastQuery(
 
   if (query.type === "today_trip_summary") {
     return todayTripsSummary();
+  }
+
+  if (query.type === "today_products_summary") {
+    return todayProductsSummary();
   }
 
   if (query.type === "latest_trip") {
