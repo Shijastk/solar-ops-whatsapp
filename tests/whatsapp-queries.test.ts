@@ -17,6 +17,12 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(parseFastWhatsAppQuery("pending bill ethra")).toEqual({
       type: "pending_bill_count",
     });
+    expect(parseFastWhatsAppQuery("How many bills need checking?")).toEqual({
+      type: "pending_bill_count",
+    });
+    expect(parseFastWhatsAppQuery("ഇന്ന് എത്ര ബില്ലുകൾ ചെക്ക് ചെയ്യണം?")).toEqual({
+      type: "pending_bill_count",
+    });
     expect(parseFastWhatsAppQuery("latest bill")).toEqual({
       type: "latest_bill",
     });
