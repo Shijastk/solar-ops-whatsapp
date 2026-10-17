@@ -41,8 +41,6 @@ describe("WhatsApp AI intent fallback", () => {
                   intent: "unsupported",
                   product_query: null,
                   period: null,
-                  reply: "അത് ഇപ്പോൾ സ്ഥിരീകരിക്കാൻ കഴിയില്ല.",
-
                   reply: "ഹായ്! എന്താണ് അറിയേണ്ടത്?",
                 }),
               },
@@ -136,6 +134,7 @@ describe("WhatsApp AI intent fallback", () => {
                   intent: "unsupported",
                   product_query: null,
                   period: null,
+                  reply: "അത് ഇപ്പോൾ സ്ഥിരീകരിക്കാൻ കഴിയില്ല.",
                 }),
               },
             },
