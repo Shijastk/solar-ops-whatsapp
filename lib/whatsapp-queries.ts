@@ -35,6 +35,7 @@ export type FastWhatsAppQuery =
   | { type: "stock_product_required" }
   | { type: "today_trip_summary" }
   | { type: "yesterday_trip_summary" }
+  | { type: "driver_trip_summary"; driverName: string; yesterday: boolean }
   | { type: "today_products_summary" }
   | { type: "yesterday_products_summary" }
   | { type: "latest_trip" }
@@ -226,6 +227,15 @@ export function isDriverRelatedQuestion(text: string): boolean {
 export function parseFastWhatsAppQuery(
   text: string,
 ): FastWhatsAppQuery | null {
+  const driverMatch = text.normalize("NFKC").match(/(?:driver|ഡ്രൈവർ)\s+([\p{L}][\p{L} .'-]{1,30})/iu);
+  const asksDriverTrips = includesAny(normalizeQueryText(text), TRIP_TERMS) ||
+    /\b(driver|rash?eed|rasheed)\b/i.test(text) ||
+    ["ഡ്രൈവർ", "റഷീദ്", "റഷീദിന്റെ", "റഷീദിനെ"].some((term) => text.includes(term));
+  if (asksDriverTrips && driverMatch) {
+    const name = driverMatch[1].trim().replace(/[?!,.;:]+$/g, "");
+    return { type: "driver_trip_summary", driverName: name, yesterday: includesAny(normalizeQueryText(text), YESTERDAY_TERMS) };
+  }
+
   const normalized = normalizeQueryText(text);
   if (!normalized) return null;
 
@@ -760,6 +770,46 @@ function formatTripSummary(
   ].join("\n");
 }
 
+async function driverTripsSummary(
+  driverName: string,
+  yesterday = false,
+  now = new Date(),
+): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const queryTime = yesterday ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
+  const bounds = indiaDayBounds(queryTime);
+  const { data: drivers, error: driverError } = await supabase
+    .from("drivers")
+    .select("id, name");
+  if (driverError) throw new Error("Failed to load driver directory: " + driverError.message);
+  const normalizedTarget = driverName.normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]/gu, "");
+  const matched = (drivers ?? []).filter((driver) => {
+    const name = String(driver.name ?? "").normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]/gu, "");
+    return name === normalizedTarget || name.includes(normalizedTarget) || normalizedTarget.includes(name);
+  });
+  if (matched.length !== 1) {
+    return matched.length === 0
+      ? "Driver directory-ൽ “" + driverName + "” എന്ന പേര് കൃത്യമായി കണ്ടെത്താനായില്ല. പേര് confirm ചെയ്യൂ."
+      : "“" + driverName + "” എന്ന പേരിൽ ഒന്നിലധികം drivers ഉണ്ട്. കൃത്യമായ പേര് തിരഞ്ഞെടുക്കൂ.";
+  }
+  const driver = matched[0];
+  const { data: trips, error } = await supabase
+    .from("delivery_trips")
+    .select("display_name, vehicle_number, driver_id, finalized_at")
+    .eq("status", "ready")
+    .eq("driver_id", driver.id)
+    .gte("finalized_at", bounds.start)
+    .lt("finalized_at", bounds.end)
+    .order("finalized_at", { ascending: false })
+    .limit(50);
+  if (error) throw new Error("Failed to load driver trips: " + error.message);
+  const rows = (trips ?? []) as TripSummaryRow[];
+  const names = await driverNamesById(rows.map((row) => row.driver_id).filter((id): id is string => Boolean(id)));
+  return rows.length === 0
+    ? (yesterday ? "ഇന്നലെ " : "ഇന്ന് ") + driverName + " എന്ന driver-ന്റെ finalized trip കണ്ടെത്തിയില്ല."
+    : formatTripSummary(rows, names, (yesterday ? "ഇന്നലത്തെ " : "ഇന്നത്തെ ") + driverName + "യുടെ trips (ആകെ " + String(rows.length) + "):");
+}
+
 async function tripsSummaryForDay(
   yesterday = false,
   now = new Date(),
@@ -1025,6 +1075,10 @@ async function answerFastQuery(
     return tripsSummaryForDay(true);
   }
 
+  if (query.type === "driver_trip_summary") {
+    return driverTripsSummary(query.driverName, query.yesterday);
+  }
+
   if (query.type === "today_products_summary") {
     return productsSummaryForDay(false);
   }
@@ -1097,7 +1151,7 @@ export async function handleFastWhatsAppQuery(
     body = await answerFastQuery(query);
   } else if (driverQuestion) {
     resolver = "fixed_fallback";
-    body = "റഷീദിന്റെ ഇന്നത്തെ trip/driver വിവരങ്ങൾ സ്ഥിരീകരിക്കാൻ കഴിയുന്ന query ഇപ്പോൾ ലഭ്യമല്ല. ഇന്നത്തെ trip details വേണമെങ്കിൽ “ഇന്നത്തെ trip” എന്ന് ചോദിക്കൂ; driver-wise lookup ചേർക്കേണ്ടതുണ്ട്.";
+    body = "ഏത് driver-ന്റെ trips ആണ് വേണ്ടത്? Driver-ന്റെ പേര്, ഇന്ന്/ഇന്നലെ എന്ന് അയക്കൂ.";
   } else if (options.fromVoice) {
     resolver = "fixed_fallback";
     body = voiceQueryClarification(message.textBody);
