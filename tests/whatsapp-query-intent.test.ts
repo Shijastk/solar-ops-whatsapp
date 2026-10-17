@@ -116,7 +116,7 @@ describe("WhatsApp AI intent fallback", () => {
     expect(body.messages).toHaveLength(2);
     expect(body.messages[1].content).toBe("Innu poya products eethellam aanu");
     expect(body.response_format.json_schema.strict).toBe(true);
-    expect(body.max_completion_tokens).toBe(120);
+    expect(body.max_completion_tokens).toBe(200);
     expect(body.reasoning_effort).toBe("low");
   });
 
