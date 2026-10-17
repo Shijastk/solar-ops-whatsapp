@@ -262,5 +262,6 @@ export async function classifyOperationalQueryWithGroq(
     intent: parsed.data.intent,
     product_query: productQuery,
     period: parsed.data.period,
+    reply: parsed.data.reply?.normalize("NFKC").trim() || null,
   };
 }
