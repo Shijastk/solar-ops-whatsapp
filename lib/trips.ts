@@ -1127,6 +1127,7 @@ async function assignDriver(input: {
   trip: TripRow;
   driverId: string;
   replyToMessageId: string;
+  closeCollection?: boolean;
 }) {
   const supabase = getSupabaseAdmin();
   const { data: driver, error: driverError } = await supabase
@@ -1154,7 +1155,7 @@ async function assignDriver(input: {
       updated_at: now,
     })
     .eq("id", input.trip.id)
-    .in("status", ["awaiting_driver", "awaiting_driver_name"]);
+    .in("status", ["collecting", "awaiting_driver", "awaiting_driver_name"]);
 
   if (error) throw new Error("Failed to assign trip driver: " + error.message);
 
@@ -1169,7 +1170,9 @@ async function assignDriver(input: {
         "trip-driver-set:" + input.trip.id + ":" + driver.id,
       ),
       replyToMessageId: input.replyToMessageId,
-      body: "✅ Driver: " + driver.name + " set.",
+      body: input.closeCollection
+        ? "✅ Driver: " + driver.name + " set. Bills collection closed; pending bills process ആയാൽ final summary സ്വയം വരും."
+        : "✅ Driver: " + driver.name + " set.",
     });
     return;
   }
@@ -1356,6 +1359,40 @@ export async function handleTripWorkflowInbound(
   if (command === "cancel") {
     await cancelTrip(message, storedMessageId);
     return "handled";
+  }
+
+  // After sending bills, typing an exact saved driver name closes collection
+  // and assigns that driver; no separate "done" message is required.
+  if (active?.status === "collecting") {
+    const match = await findActiveDriverExact(message.textBody);
+    if (match.status === "matched") {
+      const docs = await loadTripDocuments(active.id);
+      if (docs.length === 0) {
+        await sendOpsReply({
+          requestId: deterministicUuid("trip-driver-before-bills:" + storedMessageId),
+          replyToMessageId: storedMessageId,
+          knownInboundAt: message.timestamp,
+          body: "ആദ്യം ഈ trip-ലേക്ക് PDF bill അയക്കൂ. Bill ലഭിച്ച ശേഷം driver-ന്റെ saved പേര് അയച്ചാൽ trip close ചെയ്യും.",
+        });
+      } else {
+        await assignDriver({
+          trip: active,
+          driverId: match.driver.id,
+          replyToMessageId: storedMessageId,
+          closeCollection: true,
+        });
+      }
+      return "handled";
+    }
+    if (match.status === "ambiguous") {
+      await sendDriverPicker(
+        active,
+        storedMessageId,
+        (await loadTripDocuments(active.id)).length,
+        "ഒരേ പേരിൽ ഒന്നിലധികം active drivers ഉണ്ട്. Trip close ചെയ്യാൻ list-ൽ നിന്ന് ശരിയായ driver തിരഞ്ഞെടുക്കൂ.",
+      );
+      return "handled";
+    }
   }
 
   const requestedDriver = extractTripStartDriverQuery(message.textBody);
