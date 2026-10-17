@@ -146,6 +146,7 @@ export async function markWhatsAppMessageReadAndTyping(
         message_id: messageId,
         typing_indicator: { type: "text" },
       }),
+      signal: AbortSignal.timeout(1500),
       cache: "no-store",
     },
   );
