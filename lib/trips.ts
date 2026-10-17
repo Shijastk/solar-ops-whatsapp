@@ -166,6 +166,10 @@ export function classifyTripTextCommand(value: string): TripTextCommand {
     "trip",
     "new trip",
     "start trip",
+    "varum trip",
+    "varunna trip",
+    "വരും ട്രിപ്പ്",
+    "വരുന്ന ട്രിപ്പ്",
     "ട്രിപ്പ്",
     "ന്യൂ ട്രിപ്പ്",
     "പുതിയ ട്രിപ്പ്",
@@ -208,6 +212,36 @@ export function classifyTripTextCommand(value: string): TripTextCommand {
   return null;
 }
 
+export function extractTripStartDriverQuery(value: string): string | null {
+  const text = normalizeText(value);
+  const prefixes = [
+    "new trip",
+    "start trip",
+    "varunna trip",
+    "varum trip",
+    "പുതിയ ട്രിപ്പ്",
+    "വരുന്ന ട്രിപ്പ്",
+    "വരും ട്രിപ്പ്",
+    "ന്യൂ ട്രിപ്പ്",
+    "trip",
+    "ട്രിപ്പ്",
+  ];
+  const reserved = new Set([
+    "latest", "last", "today", "summary", "details", "status", "bill",
+    "bills", "stock", "products", "product", "count", "pending", "cancel",
+    "done", "driver", "history", "list", "report", "trips", "trip",
+  ]);
+
+  for (const prefix of prefixes) {
+    if (!text.startsWith(prefix + " ")) continue;
+    const candidate = text.slice(prefix.length).trim();
+    if (!candidate || reserved.has(candidate)) return null;
+    return candidate;
+  }
+
+  return null;
+}
+
 export function normalizeDriverName(value: string): string {
   return value
     .normalize("NFKC")
@@ -215,6 +249,40 @@ export function normalizeDriverName(value: string): string {
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+type ActiveDriverMatch =
+  | { status: "matched"; driver: { id: string; name: string } }
+  | { status: "ambiguous" }
+  | { status: "not_found" };
+
+async function findActiveDriverExact(value: string): Promise<ActiveDriverMatch> {
+  const supabase = getSupabaseAdmin();
+  const raw = value.normalize("NFKC").trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw);
+  const normalizedName = normalizeDriverName(raw);
+  if (!isUuid && !normalizedName) return { status: "not_found" };
+
+  let query = supabase
+    .from("ops_drivers")
+    .select("id, name")
+    .eq("active", true)
+    .limit(2);
+
+  query = isUuid
+    ? query.eq("id", raw)
+    : query.eq("normalized_name", normalizedName);
+
+  const { data, error } = await query;
+  if (error) throw new Error("Failed to match saved driver: " + error.message);
+  const rows = data ?? [];
+  if (rows.length === 1) {
+    return {
+      status: "matched",
+      driver: { id: rows[0].id, name: rows[0].name },
+    };
+  }
+  return rows.length > 1 ? { status: "ambiguous" } : { status: "not_found" };
 }
 
 function displayCase(value: string): string {
@@ -522,6 +590,7 @@ async function sendHomeMenu(
 async function startTrip(
   message: NormalizedWhatsAppMessage,
   storedMessageId: string,
+  driver?: { id: string; name: string },
 ) {
   const existing = await loadActiveTrip(message.senderPhone);
   if (existing) {
@@ -552,6 +621,7 @@ async function startTrip(
   const { error } = await supabase.from("delivery_trips").insert({
     sender_phone: message.senderPhone,
     status: "collecting",
+    driver_id: driver?.id ?? null,
     started_by_message_id: storedMessageId,
   });
 
@@ -560,7 +630,10 @@ async function startTrip(
   await sendOpsReply({
     requestId: deterministicUuid("trip-opened:" + storedMessageId),
     replyToMessageId: storedMessageId,
-    body: "🚚 New Trip തുറന്നു. ഇനി PDF bills തുടർച്ചയായി അയക്കൂ — ഓരോ bill-നും reply കാത്തിരിക്കേണ്ട. എല്ലാം അയച്ച ശേഷം done / ശരി / complete എന്ന് അയക്കൂ.",
+    body:
+      "🚚 New Trip തുറന്നു." +
+      (driver ? "\nDriver: " + driver.name + " set." : "") +
+      "\nഇനി PDF bills തുടർച്ചയായി അയക്കൂ — ഓരോ bill-നും reply കാത്തിരിക്കേണ്ട. എല്ലാം അയച്ച ശേഷം done / ശരി / complete എന്ന് അയക്കൂ.",
     knownInboundAt: message.timestamp,
   });
 }
@@ -642,6 +715,7 @@ async function sendDriverPicker(
   trip: TripRow,
   replyToMessageId: string,
   totalBills: number,
+  notice?: string,
 ) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -658,6 +732,7 @@ async function sendDriverPicker(
     requestId: deterministicUuid("trip-driver-picker:" + trip.id),
     replyToMessageId,
     body:
+      (notice ? notice + "\n\n" : "") +
       "🚚 " +
       (trip.display_name ?? "Trip") +
       "\nBills: " +
@@ -983,10 +1058,11 @@ async function closeTripCollection(
   }
 
   const supabase = getSupabaseAdmin();
+  const nextStatus = trip.driver_id ? "closing" : "awaiting_driver";
   const { data: updated, error } = await supabase
     .from("delivery_trips")
     .update({
-      status: "awaiting_driver",
+      status: nextStatus,
       updated_at: new Date().toISOString(),
     })
     .eq("id", trip.id)
@@ -998,6 +1074,19 @@ async function closeTripCollection(
 
   if (error)
     throw new Error("Failed to close trip collection: " + error.message);
+
+  if (trip.driver_id) {
+    const result = await finalizeTripCollection(trip.id, storedMessageId);
+    if (result === "waiting") {
+      await sendOpsReply({
+        requestId: deterministicUuid("trip-waiting-bills:" + storedMessageId),
+        replyToMessageId: storedMessageId,
+        knownInboundAt: message.timestamp,
+        body: "✅ Bills collection closed. Driver already set. Bills ഇപ്പോഴും process ചെയ്യുകയാണ്; final summary സ്വയം വരും.",
+      });
+    }
+    return;
+  }
 
   // Ask for the driver immediately. Bill parsing/verification continues in the background.
   await sendDriverPicker(updated as TripRow, storedMessageId, docs.length);
@@ -1118,33 +1207,45 @@ async function createAndAssignDriver(
     return;
   }
 
-  const supabase = getSupabaseAdmin();
-  const { data: existing, error: existingError } = await supabase
-    .from("ops_drivers")
-    .select("id, name")
-    .eq("normalized_name", normalizedName)
-    .maybeSingle();
-
-  if (existingError) {
-    throw new Error(
-      "Failed to check driver identity: " + existingError.message,
+  const existing = await findActiveDriverExact(name);
+  if (existing.status === "ambiguous") {
+    await sendDriverPicker(
+      trip,
+      replyToMessageId,
+      (await loadTripDocuments(trip.id)).length,
+      "ഒരേ പേരിൽ ഒന്നിലധികം active drivers ഉണ്ട്. താഴെയുള്ള list-ൽ നിന്ന് ശരിയായ ആളെ തിരഞ്ഞെടുക്കൂ.",
     );
+    return;
+  }
+  if (existing.status === "matched") {
+    await assignDriver({
+      trip,
+      driverId: existing.driver.id,
+      replyToMessageId,
+    });
+    return;
   }
 
-  let driver = existing;
-  if (!driver) {
-    const { data: created, error } = await supabase
-      .from("ops_drivers")
-      .insert({ name, normalized_name: normalizedName })
-      .select("id, name")
-      .single();
-    if (error) throw new Error("Failed to save driver: " + error.message);
-    driver = created;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(name)) {
+    await sendOpsReply({
+      requestId: deterministicUuid("trip-driver-id-not-found:" + replyToMessageId),
+      replyToMessageId,
+      body: "ഈ driver ID-യ്ക്ക് active match കണ്ടെത്തിയില്ല. Saved driver-ന്റെ പേര് അയക്കൂ.",
+    });
+    return;
   }
+
+  const supabase = getSupabaseAdmin();
+  const { data: created, error } = await supabase
+    .from("ops_drivers")
+    .insert({ name, normalized_name: normalizedName })
+    .select("id, name")
+    .single();
+  if (error) throw new Error("Failed to save driver: " + error.message);
 
   await assignDriver({
     trip,
-    driverId: driver.id,
+    driverId: created.id,
     replyToMessageId,
   });
 }
@@ -1247,6 +1348,52 @@ export async function handleTripWorkflowInbound(
   }
   if (command === "cancel") {
     await cancelTrip(message, storedMessageId);
+    return "handled";
+  }
+
+  const requestedDriver = extractTripStartDriverQuery(message.textBody);
+  if (requestedDriver) {
+    if (active) {
+      await startTrip(message, storedMessageId);
+      return "handled";
+    }
+    const match = await findActiveDriverExact(requestedDriver);
+    if (match.status === "matched") {
+      await startTrip(message, storedMessageId, match.driver);
+    } else {
+      await sendOpsReply({
+        requestId: deterministicUuid("trip-driver-start-no-match:" + storedMessageId),
+        replyToMessageId: storedMessageId,
+        knownInboundAt: message.timestamp,
+        body:
+          (match.status === "ambiguous"
+            ? "ഒരേ പേരിൽ ഒന്നിലധികം active drivers ഉണ്ട്. "
+            : "Saved active driver-നോട് exact match കണ്ടെത്തിയില്ല. ") +
+          "Trip create ചെയ്തിട്ടില്ല. Driver-ന്റെ saved name കൃത്യമായി അയക്കൂ; driver മുൻകൂട്ടി set ചെയ്യാതെ trip തുടങ്ങാൻ trip അല്ലെങ്കിൽ varum trip അയക്കൂ.",
+      });
+    }
+    return "handled";
+  }
+
+  if (active?.status === "awaiting_driver") {
+    const match = await findActiveDriverExact(message.textBody);
+    if (match.status === "matched") {
+      await assignDriver({
+        trip: active,
+        driverId: match.driver.id,
+        replyToMessageId: storedMessageId,
+      });
+    } else {
+      const docs = await loadTripDocuments(active.id);
+      await sendDriverPicker(
+        active,
+        storedMessageId,
+        docs.length,
+        match.status === "ambiguous"
+          ? "ഒരേ പേരിൽ ഒന്നിലധികം active drivers ഉണ്ട്. List-ൽ നിന്ന് ശരിയായ ആളെ തിരഞ്ഞെടുക്കൂ."
+          : "Saved active driver-നോട് exact match കണ്ടെത്തിയില്ല. List-ൽ നിന്ന് തിരഞ്ഞെടുക്കൂ; പുതിയ driver ചേർക്കാൻ + New Driver തിരഞ്ഞെടുക്കൂ.",
+      );
+    }
     return "handled";
   }
 
