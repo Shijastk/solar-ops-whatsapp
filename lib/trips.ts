@@ -1385,10 +1385,28 @@ export async function handleTripWorkflowInbound(
       return "handled";
     }
     if (match.status === "ambiguous") {
+      const docs = await loadTripDocuments(active.id);
+      if (docs.length === 0) {
+        await sendOpsReply({
+          requestId: deterministicUuid("trip-driver-ambiguous-empty:" + storedMessageId),
+          replyToMessageId: storedMessageId,
+          knownInboundAt: message.timestamp,
+          body: "ആദ്യം PDF bill അയക്കൂ. അതിനുശേഷം driver തിരഞ്ഞെടുക്കാം.",
+        });
+        return "handled";
+      }
+      const { data: waiting, error } = await getSupabaseAdmin()
+        .from("delivery_trips")
+        .update({ status: "awaiting_driver", updated_at: new Date().toISOString() })
+        .eq("id", active.id)
+        .eq("status", "collecting")
+        .select("id, sender_phone, status, display_name, primary_destination, destination_pincode, destination_district, destination_state, vehicle_number, driver_id")
+        .single();
+      if (error) throw new Error("Failed to close trip for driver selection: " + error.message);
       await sendDriverPicker(
-        active,
+        waiting as TripRow,
         storedMessageId,
-        (await loadTripDocuments(active.id)).length,
+        docs.length,
         "ഒരേ പേരിൽ ഒന്നിലധികം active drivers ഉണ്ട്. Trip close ചെയ്യാൻ list-ൽ നിന്ന് ശരിയായ driver തിരഞ്ഞെടുക്കൂ.",
       );
       return "handled";
