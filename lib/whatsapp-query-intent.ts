@@ -31,6 +31,7 @@ const classificationSchema = z.object({
   intent: supportedIntentSchema,
   product_query: z.string().nullable(),
   period: periodSchema,
+  reply: z.string().max(900).nullable(),
 });
 
 const groqResponseSchema = z.object({
@@ -77,8 +78,11 @@ const strictResponseSchema = {
         null
       ],
     },
+    reply: {
+      type: ["string", "null"],
+    },
   },
-  required: ["intent", "product_query", "period"],
+  required: ["intent", "product_query", "period", "reply"],
   additionalProperties: false,
 } as const;
 
@@ -182,8 +186,6 @@ async function readGroqErrorDetail(response: Response): Promise<string | null> {
 export async function classifyOperationalQueryWithGroq(
   text: string,
 ): Promise<AiOperationalQueryClassification | null> {
-  if (!looksLikeOperationalQuery(text)) return null;
-
   const env = getDocumentAutomationEnv();
   if (!env.enabled || !env.apiKey) return null;
 
@@ -204,7 +206,7 @@ export async function classifyOperationalQueryWithGroq(
           {
             role: "system",
             content:
-              "Classify a Solar Ops operator question. Do not answer the question and do not invent business facts. Supported intents only: today_bill_count = asks how many PDF bills were received today; pending_bill_count = asks how many bills need review/are pending; latest_bill = asks for the most recently received bill; stock_balance = asks the current stock quantity for one named product; today_trip_summary = asks which trips were completed today; today_products_summary = asks which products went out in today's completed trips; latest_trip = asks for the latest completed trip; ops_period_summary = asks for an operational summary for this week/month/year or last week/month/year. For stock_balance, copy only the product phrase from the user into product_query; use null when not named. For ops_period_summary set period to one of this_week, this_month, this_year, last_week, last_month, last_year. For every other intent set period to null. For every other request including arbitrary SQL-like questions, edits, commands, greetings, explanations, or ambiguous meaning, return unsupported. Understand Malayalam, Manglish and English.",
+              "Interpret any Solar Ops WhatsApp message, including Malayalam, Manglish and English, using meaning rather than exact keywords. Never invent business facts and never generate SQL. Supported intents only: today_bill_count = asks how many PDF bills were received today; pending_bill_count = asks how many bills need review/are pending; latest_bill = asks for the most recently received bill; stock_balance = asks current stock quantity for one named product; today_trip_summary = asks which trips were completed today; today_products_summary = asks which products went out in today's completed trips; latest_trip = asks for the latest completed trip; ops_period_summary = asks for an operational summary for this week/month/year or last week/month/year. For stock_balance, copy only the product phrase into product_query; use null when no product is named. For ops_period_summary set period to one of this_week, this_month, this_year, last_week, last_month, last_year. For supported intents, set reply to null. For unsupported or ambiguous requests, set intent to unsupported, product_query and period to null, and reply to a short natural response in the user's language. If the user asks for live operational data that is not covered by a supported intent, say you cannot verify that specific data yet and ask one concise clarifying question or suggest the closest supported query. For greetings/general non-live questions, respond naturally. Never claim an action was performed. Never guess live stock, bill, trip, driver, payment, or company data.",
           },
           {
             role: "user",
@@ -221,7 +223,7 @@ export async function classifyOperationalQueryWithGroq(
         },
         reasoning_effort: "low",
         include_reasoning: false,
-        max_completion_tokens: 120,
+        max_completion_tokens: 200,
         stream: false,
       }),
       signal: AbortSignal.timeout(Math.min(env.timeoutMs, 4000)),
