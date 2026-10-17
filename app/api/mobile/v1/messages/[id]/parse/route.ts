@@ -23,6 +23,9 @@ export async function POST(
     return Response.json({ error: "Invalid message id" }, { status: 400 });
   }
 
+  const startedAt = performance.now();
+  let parseDurationMs = 0;
+  let automationDurationMs = 0;
   try {
     const { data: existing, error: readError } = await getSupabaseAdmin()
       .from("document_drafts")
@@ -30,9 +33,6 @@ export async function POST(
       .eq("message_id", id)
       .maybeSingle();
     if (readError) throw new Error("Could not load bill");
-    const startedAt = performance.now();
-    let parseDurationMs = 0;
-    let automationDurationMs = 0;
     const parseStartedAt = performance.now();
     const result =
       existing?.parse_status === "approved" ||
@@ -59,13 +59,16 @@ export async function POST(
         Boolean(existing.extracted_text),
     });
     return Response.json(
-      { status: result.status, automationStatus },
+      { status: result.status },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
     console.error("Mobile document parsing failed", {
       message:
         error instanceof Error ? error.message.slice(0, 300) : "Unknown error",
+      parseDurationMs,
+      automationDurationMs,
+      durationMs: Math.round(performance.now() - startedAt),
     });
     return Response.json(
       { error: "Document parsing failed" },
