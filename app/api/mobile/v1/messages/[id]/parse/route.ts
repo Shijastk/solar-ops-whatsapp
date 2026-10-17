@@ -26,19 +26,40 @@ export async function POST(
   try {
     const { data: existing, error: readError } = await getSupabaseAdmin()
       .from("document_drafts")
-      .select("id,parse_status,workflow_status")
+      .select("id,parse_status,workflow_status,extracted_text")
       .eq("message_id", id)
       .maybeSingle();
     if (readError) throw new Error("Could not load bill");
+    const startedAt = performance.now();
+    let parseDurationMs = 0;
+    let automationDurationMs = 0;
+    const parseStartedAt = performance.now();
     const result =
-      existing?.parse_status === "approved"
+      existing?.parse_status === "approved" ||
+      (existing?.parse_status === "ready_for_review" &&
+        Boolean(existing.extracted_text))
         ? { draftId: existing.id, status: existing.parse_status }
         : await processStoredPdfMessage(id);
-    await runDocumentAutomationForDraft(result.draftId, {
-      suppressReply: true,
+    parseDurationMs = Math.round(performance.now() - parseStartedAt);
+
+    const automationStartedAt = performance.now();
+    const automationStatus = await runDocumentAutomationForDraft(
+      result.draftId,
+      { suppressReply: true },
+    );
+    automationDurationMs = Math.round(performance.now() - automationStartedAt);
+    console.info("Mobile document check completed", {
+      parseDurationMs,
+      automationDurationMs,
+      durationMs: Math.round(performance.now() - startedAt),
+      parseStatus: result.status,
+      automationStatus,
+      reusedExtractedText:
+        existing?.parse_status === "ready_for_review" &&
+        Boolean(existing.extracted_text),
     });
     return Response.json(
-      { status: result.status },
+      { status: result.status, automationStatus },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
