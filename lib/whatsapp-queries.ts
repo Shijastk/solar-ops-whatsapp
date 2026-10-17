@@ -768,7 +768,9 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
     .limit(50);
 
   if (tripsError) {
-    throw new Error("Failed to load today's completed trips: " + tripsError.message);
+    throw new Error(
+      "Failed to load today's completed trips: " + tripsError.message,
+    );
   }
 
   const tripIds = (trips ?? []).map((trip) => trip.id);
@@ -783,7 +785,9 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
     .not("draft_id", "is", null);
 
   if (tripDocumentsError) {
-    throw new Error("Failed to load today's trip bills: " + tripDocumentsError.message);
+    throw new Error(
+      "Failed to load today's trip bills: " + tripDocumentsError.message,
+    );
   }
 
   const draftIds = Array.from(
@@ -803,7 +807,9 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
     .in("id", draftIds);
 
   if (draftsError) {
-    throw new Error("Failed to load today's trip bill status: " + draftsError.message);
+    throw new Error(
+      "Failed to load today's trip bill status: " + draftsError.message,
+    );
   }
 
   const draftRows = drafts ?? [];
@@ -811,8 +817,7 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
     .filter(
       (draft) =>
         draft.workflow_status === "recorded" &&
-        draft.stock_status !== "duplicate_document" &&
-        draft.workflow_status !== "cancelled",
+        draft.stock_status !== "duplicate_document",
     )
     .map((draft) => draft.id);
   const needsReviewCount = draftRows.filter(
@@ -838,7 +843,9 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
     .order("line_index", { ascending: true });
 
   if (itemsError) {
-    throw new Error("Failed to load today's trip product items: " + itemsError.message);
+    throw new Error(
+      "Failed to load today's trip product items: " + itemsError.message,
+    );
   }
 
   const combined = new Map<
@@ -846,11 +853,17 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
     { description: string; quantity: number | null; unit: string | null }
   >();
   for (const item of items ?? []) {
-    const description = String(item.description ?? "").normalize("NFKC").replace(/\\s+/g, " ").trim();
+    const description = String(item.description ?? "")
+      .normalize("NFKC")
+      .replace(/\s+/g, " ")
+      .trim();
     if (!description) continue;
     const hsn = String(item.hsn_sac ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
     const unit = String(item.unit ?? "").normalize("NFKC").trim();
-    const normalizedDescription = description.toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu, " ").trim();
+    const normalizedDescription = description
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
     const keyBase = [normalizedDescription, hsn, unit.toLowerCase()].join("|");
     const rawQuantity = item.quantity;
     const quantity =
@@ -889,7 +902,7 @@ async function todayProductsSummary(now = new Date()): Promise<string> {
     ...(needsReviewCount > 0
       ? ["⚠️ " + needsReviewCount + " bill(s) review/pending ആണ്; product total-ൽ ഉൾപ്പെടുത്തിയിട്ടില്ല."]
       : []),
-  ].join("\\n");
+  ].join("\n");
 }
 
 async function latestTripSummary(): Promise<string> {
