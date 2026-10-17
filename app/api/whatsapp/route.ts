@@ -2,6 +2,7 @@ import { ZodError } from "zod";
 import { getWebhookEnv } from "@/lib/env";
 import { ingestWhatsAppMessage } from "@/lib/ingest";
 import { applyWhatsAppStatusUpdates } from "@/lib/replies";
+import { markWhatsAppMessageReadAndTyping } from "@/lib/meta-messages";
 import { verifyMetaSignature } from "@/lib/signature";
 import {
   extractWhatsAppMessages,
@@ -68,6 +69,17 @@ export async function POST(request: Request) {
 
     const messages = extractWhatsAppMessages(payload);
     const statuses = extractWhatsAppStatuses(payload);
+    const readTypingPromises = messages.map((message) =>
+      markWhatsAppMessageReadAndTyping(message.messageId).catch((error) => {
+        console.warn("WhatsApp read/typing indicator failed", {
+          messageType: message.type,
+          reason:
+            error instanceof Error
+              ? error.message.slice(0, 180)
+              : "Unknown read/typing error",
+        });
+      }),
+    );
     const statusUpdates =
       statuses.length > 0 ? await applyWhatsAppStatusUpdates(statuses) : 0;
 
@@ -92,6 +104,8 @@ export async function POST(request: Request) {
         result,
       });
     }
+
+    await Promise.all(readTypingPromises);
 
     console.info("WhatsApp webhook processing summary", {
       messageCount: messages.length,
