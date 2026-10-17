@@ -27,11 +27,29 @@ afterEach(() => {
 });
 
 describe("WhatsApp AI intent fallback", () => {
-  it("does not spend AI calls on ordinary chat without an operations hint", async () => {
+  it("uses AI to interpret unmatched chat even without operations keywords", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
 
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  intent: "unsupported",
+                  product_query: null,
+                  period: null,
+                  reply: "ഹായ്! എന്താണ് അറിയേണ്ടത്?",
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     expect(looksLikeOperationalQuery("Hello, എങ്ങനെയുണ്ട്?")).toBe(false);
@@ -40,8 +58,13 @@ describe("WhatsApp AI intent fallback", () => {
     expect(looksLikeOperationalQuery("Innu poya products eethellam aanu")).toBe(true);
     await expect(
       classifyOperationalQueryWithGroq("Hello, എങ്ങനെയുണ്ട്?"),
-    ).resolves.toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
+    ).resolves.toEqual({
+      intent: "unsupported",
+      product_query: null,
+      period: null,
+      reply: "ഹായ്! എന്താണ് അറിയേണ്ടത്?",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("sends only bounded user text for unresolved operational intent classification", async () => {
@@ -60,6 +83,7 @@ describe("WhatsApp AI intent fallback", () => {
                   intent: "today_products_summary",
                   product_query: null,
                   period: null,
+                  reply: null,
                 }),
               },
             },
@@ -78,6 +102,7 @@ describe("WhatsApp AI intent fallback", () => {
       intent: "today_products_summary",
       product_query: null,
       period: null,
+      reply: null,
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -91,7 +116,7 @@ describe("WhatsApp AI intent fallback", () => {
     expect(body.messages).toHaveLength(2);
     expect(body.messages[1].content).toBe("Innu poya products eethellam aanu");
     expect(body.response_format.json_schema.strict).toBe(true);
-    expect(body.max_completion_tokens).toBe(120);
+    expect(body.max_completion_tokens).toBe(200);
     expect(body.reasoning_effort).toBe("low");
   });
 
@@ -109,6 +134,7 @@ describe("WhatsApp AI intent fallback", () => {
                   intent: "unsupported",
                   product_query: null,
                   period: null,
+                  reply: "അത് ഇപ്പോൾ സ്ഥിരീകരിക്കാൻ കഴിയില്ല.",
                 }),
               },
             },

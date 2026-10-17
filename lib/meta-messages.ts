@@ -119,6 +119,50 @@ function replyContext(replyToMessageId: string | null | undefined) {
     : {};
 }
 
+export async function markWhatsAppMessageReadAndTyping(
+  messageId: string,
+): Promise<void> {
+  const env = getIngestionEnv();
+
+  if (!env.WHATSAPP_PHONE_NUMBER_ID) {
+    throw new Error("WhatsApp Phone Number ID is not configured");
+  }
+
+  const response = await fetch(
+    "https://graph.facebook.com/" +
+      env.META_GRAPH_API_VERSION +
+      "/" +
+      encodeURIComponent(env.WHATSAPP_PHONE_NUMBER_ID) +
+      "/messages",
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + env.WHATSAPP_ACCESS_TOKEN,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId,
+        typing_indicator: { type: "text" },
+      }),
+      signal: AbortSignal.timeout(1500),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const providerSummary = await readMetaErrorSummary(response);
+    throw new Error(
+      "WhatsApp read/typing request failed with HTTP " +
+        response.status +
+        (providerSummary ? "; " + providerSummary : ""),
+    );
+  }
+
+  await response.body?.cancel();
+}
+
 export async function sendWhatsAppTextReply(input: {
   recipientPhone: string;
   replyToMessageId: string;
