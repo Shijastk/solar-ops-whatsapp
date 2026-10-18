@@ -13,7 +13,7 @@ Finish driver operations as a reliable, tested capability before treating the wi
 - Deactivation deliberately fails closed because a durable sender-scoped confirmation flow is not yet implemented.
 - The driver handler is gated by `SOLAR_OPS_DRIVER_AGENT_ENABLED`; production flag must remain unchanged during development.
 - `lib/ingest.ts` calls the driver handler before the document workflow for text messages.
-- The driver table is queried as `ops_drivers` with `id`, `name`, `normalized_name`, and `active`; the canonical schema file did not declare this table in the inspected main branch, so its creation source must be located before any schema-dependent write/confirmation design.
+- The driver table is queried as `ops_drivers` with `id`, `name`, `normalized_name`, and `active`; the inspected `supabase/schema.sql` and listed migrations did not expose its creation source, so the authoritative source still needs to be located before schema-dependent write/confirmation design.
 - The existing WhatsApp integration test can target production by default and must not be run blindly.
 
 ## Work in this branch
@@ -45,4 +45,5 @@ Finish driver operations as a reliable, tested capability before treating the wi
 |---|---|---|---|
 | 2026-10-18 | Added driver listing parser and handler | `ee5e63647f13ef01f3fe777c5779453dd80552d3` | Implemented; superseded by type-safety fix below; CI pending |
 | 2026-10-18 | Avoid accessing `intent.name` for list intents | `3cdb6bc4c9be4ee6c05ed3c53533280aa4276bd3` | Fix committed; CI pending |
-| 2026-10-18 | Added list-intent parser tests | `0f802d3449a9fe7aca264c394a46e9db542f0da5` | Tests committed; CI pending |
+| 2026-10-18 | Added list-intent parser tests | `0f802d3449a9fe7aca264c394a46e9db542f0da5` | Tests committed; superseded by final branch head |
+| 2026-10-18 | Narrowed Malayalam/Manglish parser action type after adding `list` | `ed50364381571a407234db7a464dcf10e827a290`; CI run `39126913313` | CI queued at last check; do not claim PASS until result is inspected |
