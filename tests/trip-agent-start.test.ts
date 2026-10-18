@@ -192,6 +192,31 @@ describe("natural-language trip start", () => {
     expect(state.insertedTrips).toHaveLength(0);
   });
 
+  it("does not treat a trip question as a driver name while awaiting driver entry", async () => {
+    state.activeTrip = {
+      id: "active-trip",
+      sender_phone: "15550001111",
+      status: "awaiting_driver_name",
+      display_name: null,
+      primary_destination: null,
+      destination_pincode: null,
+      destination_district: null,
+      destination_state: null,
+      vehicle_number: null,
+      driver_id: null,
+    };
+
+    const result = await handleTripWorkflowInbound(
+      makeMessage("What is the latest trip?"),
+      "stored-trip-message-question",
+    );
+
+    expect(result).toBe("ignored");
+    expect(state.from).not.toHaveBeenCalledWith("ops_drivers");
+    expect(state.insertedTrips).toHaveLength(0);
+    expect(state.sendReply).not.toHaveBeenCalled();
+  });
+
   it("handles a concurrent active-trip uniqueness conflict without creating a second trip", async () => {
     state.duplicateInsert = true;
 
