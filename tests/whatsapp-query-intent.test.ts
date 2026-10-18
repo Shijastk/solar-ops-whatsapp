@@ -280,6 +280,51 @@ describe("WhatsApp AI intent fallback", () => {
     });
   });
 
+  it("classifies broad stock-list questions into the live inventory intent", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  intent: "stock_inventory_summary",
+                  product_query: null,
+                  driver_name: null,
+                  yesterday: false,
+                  period: null,
+                  reply: null,
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      classifyOperationalQueryWithGroq("show me the stock we have"),
+    ).resolves.toEqual({
+      intent: "stock_inventory_summary",
+      product_query: null,
+      driver_name: null,
+      yesterday: false,
+      period: null,
+      reply: null,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body.response_format.json_schema.schema.properties.intent.enum).toContain(
+      "stock_inventory_summary",
+    );
+  });
+
   it("returns null when Groq-backed automation is disabled", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "false";
     delete process.env.GROQ_API_KEY;
