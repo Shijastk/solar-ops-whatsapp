@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { normalizeDriverName, parseDriverMutation } from "@/lib/driver-agent";
 
 describe("driver mutation intent parser", () => {
+  it("parses explicit driver-list requests", () => {
+    expect(parseDriverMutation("List drivers")).toEqual({ action: "list" });
+    expect(parseDriverMutation("Show all drivers")).toEqual({ action: "list" });
+    expect(parseDriverMutation("driver list kaanikku")).toEqual({ action: "list" });
+  });
+
   it("parses explicit English create requests", () => {
     expect(parseDriverMutation("Add new driver named Mohammed")).toEqual({
       action: "create",
