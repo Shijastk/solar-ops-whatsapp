@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFastWhatsAppQuery } from "@/lib/whatsapp-queries";
+import { isDriverRelatedQuestion, parseFastWhatsAppQuery } from "@/lib/whatsapp-queries";
 
 describe("parseFastWhatsAppQuery driver trip requests", () => {
   it("extracts a Malayalam name that appears before 'എന്ന ഡ്രൈവർ'", () => {
@@ -24,5 +24,11 @@ describe("parseFastWhatsAppQuery driver trip requests", () => {
       driverName: "Rasheed",
       yesterday: false,
     });
+  });
+});
+
+describe("isDriverRelatedQuestion voice transcript guard", () => {
+  it("recognizes a common garbled Malayalam ASR spelling of driver", () => {
+    expect(isDriverRelatedQuestion("ടൃഷീദയം എന്നാന ട്രാഇവര ഇന്ന്യ ട്രിപ്പുകൾ പോയിട്ടുണ്ടോ?")).toBe(true);
   });
 });
