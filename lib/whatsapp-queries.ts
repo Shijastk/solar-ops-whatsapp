@@ -107,7 +107,7 @@ const LATEST_TERMS = [
   "ലാസ്റ്റ്",
 ];
 
-const STOCK_TERMS = ["stock", "സ്റ്റോക്ക്"];
+const STOCK_TERMS = ["stock", "സ്റ്റോക്ക"];
 const TRIP_TERMS = ["trip", "trips", "ട്രിപ്പ്", "ട്രിപ്പുകൾ"];
 const PRODUCT_TERMS = [
   "product",
