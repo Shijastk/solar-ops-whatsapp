@@ -92,8 +92,6 @@ export async function handleDriverMutation(
   if (!intent) return "ignored";
 
   const supabase = getSupabaseAdmin();
-  const name = normalizeDriverName(intent.name);
-  const key = normalizedKey(name);
 
   if (intent.action === "list") {
     const { data: drivers, error } = await supabase
@@ -118,6 +116,9 @@ export async function handleDriverMutation(
     });
     return "handled";
   }
+
+  const name = normalizeDriverName(intent.name);
+  const key = normalizedKey(name);
 
   if (intent.action === "create") {
     const { data: existing, error: lookupError } = await supabase
