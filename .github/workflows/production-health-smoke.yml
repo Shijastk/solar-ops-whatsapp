@@ -1,0 +1,82 @@
+name: Production Health Smoke
+
+on:
+  schedule:
+    - cron: "13 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-health-smoke
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: production-health
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check deployed health endpoint
+        id: health
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --retry-delay 2 \
+            --retry-all-errors \
+            --max-time 15 \
+            --dump-header /tmp/health-headers.txt \
+            --output /tmp/health.json \
+            https://solar-ops-whatsapp.vercel.app/api/health
+
+          node <<'NODE'
+          const fs = require("node:fs");
+
+          const body = JSON.parse(fs.readFileSync("/tmp/health.json", "utf8"));
+          const headers = fs.readFileSync("/tmp/health-headers.txt", "utf8").toLowerCase();
+
+          function fail(message) {
+            console.error(`FAIL: ${message}`);
+            process.exitCode = 1;
+          }
+
+          if (body.ok !== true) fail("health response did not report ok=true");
+          if (body.service !== "solar-ops-whatsapp") fail("unexpected service identifier");
+          if (body.configured !== true) fail("required webhook/ingestion configuration is not valid");
+
+          const configuration = body.configuration;
+          if (!configuration || typeof configuration !== "object") {
+            fail("configuration diagnostics are missing");
+          } else {
+            const presence = configuration.presence;
+            if (!presence || typeof presence !== "object") {
+              fail("configuration presence diagnostics are missing");
+            } else if (Object.values(presence).some((value) => typeof value !== "boolean")) {
+              fail("health endpoint returned a non-boolean environment presence value");
+            }
+
+            const validation = configuration.validation;
+            if (!validation || validation.webhook !== true || validation.ingestion !== true) {
+              fail("webhook or ingestion validation is not healthy");
+            }
+
+            const serialized = JSON.stringify(configuration);
+            if (/(apiKey|accessToken|secretKey|verifyToken|password)\s*:/i.test(serialized)) {
+              fail("health diagnostics appear to expose a secret-bearing field");
+            }
+          }
+
+          if (!headers.includes("cache-control: no-store")) {
+            fail("health response is missing Cache-Control: no-store");
+          }
+
+          if (process.exitCode === undefined) {
+            console.log("PASS: production health, configuration validation, and response-safety checks");
+          }
+          NODE
