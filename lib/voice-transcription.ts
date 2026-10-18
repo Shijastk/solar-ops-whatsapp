@@ -1,75 +1,74 @@
 import { z } from "zod";
-import { getDocumentAutomationEnv } from "@/lib/env";
+import { getVoiceTranscriptionEnv } from "@/lib/env";
 
 const transcriptionSchema = z.object({
-  text: z.string(),
+  RecognitionStatus: z.string(),
+  DisplayText: z.string().optional(),
 });
 
-function extensionForAudioMime(mimeType: string): string {
+function azureContentType(mimeType: string): string {
   const normalized = mimeType.toLowerCase().split(";")[0].trim();
-  if (normalized === "audio/ogg") return ".ogg";
-  if (normalized === "audio/mpeg") return ".mp3";
-  if (normalized === "audio/mp4") return ".m4a";
-  if (normalized === "audio/wav" || normalized === "audio/x-wav") return ".wav";
-  if (normalized === "audio/webm") return ".webm";
-  return ".ogg";
+  if (normalized === "audio/ogg" || normalized === "application/ogg") {
+    return "audio/ogg; codecs=opus";
+  }
+  if (normalized === "audio/wav" || normalized === "audio/x-wav") {
+    return "audio/wav; codecs=audio/pcm; samplerate=16000";
+  }
+  return normalized || "application/octet-stream";
 }
 
 export async function transcribeOperationalVoice(input: {
   bytes: Uint8Array;
   mimeType: string;
 }): Promise<string> {
-  const env = getDocumentAutomationEnv();
+  const env = getVoiceTranscriptionEnv();
   if (!env.apiKey) {
-    throw new Error("Groq API key is not configured for voice transcription");
+    throw new Error("Azure Speech key is not configured for voice transcription");
+  }
+  if (input.bytes.byteLength === 0) {
+    throw new Error("Voice transcription received an empty audio payload");
   }
 
-  const mimeType = input.mimeType.toLowerCase().split(";")[0].trim();
+  const region = env.region.toLowerCase();
+  if (!/^[a-z0-9-]+$/.test(region)) {
+    throw new Error("Azure Speech region configuration is invalid");
+  }
+
   const audioBuffer = new ArrayBuffer(input.bytes.byteLength);
   new Uint8Array(audioBuffer).set(input.bytes);
+  const contentType = azureContentType(input.mimeType);
 
-  const form = new FormData();
-  form.set(
-    "file",
-    new Blob([audioBuffer], { type: mimeType || "audio/ogg" }),
-    "voice" + extensionForAudioMime(mimeType),
+  const url = new URL(
+    `https://${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`,
   );
-  form.set("model", "whisper-large-v3-turbo");
-  form.set("language", "ml");
-  form.set("response_format", "json");
-  form.set("temperature", "0");
-  form.set(
-    "prompt",
-    "സോളാർ ഗോഡൗൺ. ബിൽ, സ്റ്റോക്ക്, ട്രിപ്പ്, ഡ്രൈവർ, വാഹനം, പാനൽ, ഇൻവെർട്ടർ. Emmvee, DCR, Topcon. മലയാളവും English ഉൽപ്പന്നപ്പേരുകളും.",
-  );
+  url.searchParams.set("language", "ml-IN");
+  url.searchParams.set("format", "simple");
 
-  const response = await fetch(
-    "https://api.groq.com/openai/v1/audio/transcriptions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + env.apiKey,
-      },
-      body: form,
-      cache: "no-store",
-      signal: AbortSignal.timeout(Math.min(env.timeoutMs, 6000)),
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Ocp-Apim-Subscription-Key": env.apiKey,
+      "Content-Type": contentType,
+      Accept: "application/json",
     },
-  );
+    body: audioBuffer,
+    cache: "no-store",
+    signal: AbortSignal.timeout(Math.min(env.timeoutMs, 6000)),
+  });
 
   if (!response.ok) {
-    throw new Error(
-      "Groq voice transcription failed with HTTP " + response.status,
-    );
+    // Do not include provider response bodies or credentials in application logs.
+    throw new Error("Azure Speech transcription failed with HTTP " + response.status);
   }
 
   const parsed = transcriptionSchema.safeParse(await response.json());
-  if (!parsed.success) {
-    throw new Error("Groq voice transcription response was invalid");
+  if (!parsed.success || parsed.data.RecognitionStatus !== "Success") {
+    throw new Error("Azure Speech transcription returned no recognized speech");
   }
 
-  return parsed.data.text
+  return (parsed.data.DisplayText ?? "")
     .normalize("NFKC")
-    .replace(/\s+/g, " ")
+    .replace(/\\s+/g, " ")
     .trim()
     .slice(0, 1200);
 }
