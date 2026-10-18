@@ -1497,7 +1497,7 @@ export async function handleTripWorkflowInbound(
   }
 
   if (looksLikePotentialTripStartRequest(message.textBody)) {
-    let classification;
+    let classification: Awaited<ReturnType<typeof classifyOperationalQueryWithGroq>> = null;
     try {
       classification = await classifyOperationalQueryWithGroq(message.textBody);
     } catch (error) {
