@@ -238,32 +238,8 @@ export function isDriverRelatedQuestion(text: string): boolean {
 export function parseFastWhatsAppQuery(
   text: string,
 ): FastWhatsAppQuery | null {
-  const rawText = text.normalize("NFKC").trim();
-  const driverAfterName = rawText.match(
-    /([\p{L}][\p{L} .'-]{1,30}?)\s+എന്ന\s+ഡ്രൈവർ/iu,
-  );
-  const driverBeforeName = rawText.match(
-    /(?:\bdriver\b|ഡ്രൈവർ)\s+([\p{L}][\p{L} .'-]{1,30})/iu,
-  );
-  const driverMatch = driverAfterName ?? driverBeforeName;
-  const asksDriverTrips = includesAny(normalizeQueryText(text), TRIP_TERMS) ||
-    /\b(driver|rash?eed|rasheed)\b/i.test(text) ||
-    ["ഡ്രൈവർ", "റഷീദ്", "റഷീദിന്റെ", "റഷീദിനെ"].some((term) => text.includes(term));
-  if (asksDriverTrips && driverMatch) {
-    const name = driverMatch[1]
-      .trim()
-      .replace(/\b(?:today|yesterday|innu|innale|trip|trips|poya|poyi|ariyamo|ariyumo|ano|aayirunnu|ayirunnu)\b.*$/i, "")
-      .replace(/(?:ആയിരുന്നു|ആണോ|അറിയാമോ|ഇന്ന്|ഇന്നലെ|ട്രിപ്പുകൾ|ട്രിപ്പ്|ട്രിപ്പുകളും|എത്ര|പോയിട്ടുണ്ട്|പോയി).*$/u, "")
-      .replace(/[?!,.;:]+$/g, "")
-      .trim();
-    if (name) {
-      return {
-        type: "driver_trip_summary",
-        driverName: name,
-        yesterday: includesAny(normalizeQueryText(text), YESTERDAY_TERMS),
-      };
-    }
-  }
+  // Driver names and intents are resolved by semantic classification, not word position.
+  if (isDriverRelatedQuestion(text)) return null;
 
   const normalized = normalizeQueryText(text);
   if (!normalized) return null;
