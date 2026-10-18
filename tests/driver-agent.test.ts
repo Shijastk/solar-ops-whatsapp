@@ -65,6 +65,18 @@ describe("driver mutation intent parser", () => {
     expect(parseDriverMutation("Remove driver")).toBeNull();
   });
 
+  it("rejects placeholder, too-short, and overlong driver names", () => {
+    expect(parseDriverMutation("Add new driver named named")).toBeNull();
+    expect(parseDriverMutation("Add new driver named A")).toBeNull();
+    expect(parseDriverMutation("Add new driver named " + "A".repeat(121))).toBeNull();
+  });
+
+  it("does not infer a driver-list action from general Malayalam/Manglish mentions", () => {
+    expect(parseDriverMutation("driver venam")).toBeNull();
+    expect(parseDriverMutation("Rasheed driver aanu")).toBeNull();
+    expect(parseDriverMutation("driversine kurichu parayu")).toBeNull();
+  });
+
   it("normalizes Unicode and whitespace consistently", () => {
     expect(normalizeDriverName("  Mohammed   Ali  ")).toBe("Mohammed Ali");
   });
