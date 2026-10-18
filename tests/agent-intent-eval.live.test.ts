@@ -10,7 +10,6 @@ const cases: Array<{
   expected: string;
   namedDriver?: string;
   yesterday?: boolean;
-  neverStartTrip?: boolean;
 }> = [
   { id: "stock-summary-en", input: "show me the stock we have", expected: "stock_inventory_summary" },
   { id: "stock-summary-ml", input: "നമ്മുടെ സ്റ്റോക്ക് ലിസ്റ്റ് കാണിക്കൂ", expected: "stock_inventory_summary" },
