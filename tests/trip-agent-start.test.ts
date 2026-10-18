@@ -164,6 +164,21 @@ afterEach(() => {
 });
 
 describe("natural-language trip start", () => {
+  it("preserves the existing explicit trip command when the new rollout flag is off", async () => {
+    delete process.env.SOLAR_OPS_NATURAL_TRIP_START_ENABLED;
+    const fetchMock = mockIntent("start_trip");
+
+    const result = await handleTripWorkflowInbound(
+      makeMessage("trip"),
+      "stored-trip-message-existing-command",
+    );
+
+    expect(result).toBe("handled");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(state.insertedTrips).toHaveLength(1);
+    expect(state.sendReply.mock.calls[0][0].body).toContain("New Trip തുറന്നു");
+  });
+
   it("opens a trip only when the bounded classifier returns start_trip", async () => {
     const fetchMock = mockIntent("start_trip");
     const result = await handleTripWorkflowInbound(
