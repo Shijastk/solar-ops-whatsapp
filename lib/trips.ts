@@ -674,6 +674,19 @@ async function startTrip(
     started_by_message_id: storedMessageId,
   });
 
+  if (error?.code === "23505") {
+    const concurrentTrip = await loadActiveTrip(message.senderPhone);
+    if (concurrentTrip) {
+      await sendOpsReply({
+        requestId: deterministicUuid("trip-already-open-race:" + storedMessageId),
+        replyToMessageId: storedMessageId,
+        body: "🚚 ഒരു trip ഇതിനകം open ആണ്. അതേ trip-ലേക്ക് bills അയക്കൂ; duplicate trip create ചെയ്തിട്ടില്ല.",
+        knownInboundAt: message.timestamp,
+      });
+      return;
+    }
+  }
+
   if (error) throw new Error("Failed to create trip: " + error.message);
 
   await sendOpsReply({
