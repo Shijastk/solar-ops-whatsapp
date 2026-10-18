@@ -361,7 +361,7 @@ export function parseFastWhatsAppQuery(
 export function mapAiClassificationToFastQuery(
   classification: AiOperationalQueryClassification,
 ): FastWhatsAppQuery | null {
-  if (classification.intent === "unsupported") return null;
+  if (classification.intent === "unsupported" || classification.intent === "start_trip") return null;
 
   if (classification.intent === "stock_balance") {
     return classification.product_query
