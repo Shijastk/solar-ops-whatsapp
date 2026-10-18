@@ -51,6 +51,54 @@ beforeEach(() => {
   }));
   state.from.mockReturnValue(chain);
   state.sendReply.mockResolvedValue(undefined);
+);
+
+describe("driver agent isolated read-only handler", () => {
+  it("lists active drivers only and uses a bounded query", async () => {
+    const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+    process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
+    try {
+      const result = await handleDriverMutation(makeMessage("List drivers"), "stored-inbound-1");
+      expect(result).toBe("handled");
+      expect(state.from).toHaveBeenCalledWith("ops_drivers");
+      expect(state.sendReply).toHaveBeenCalledTimes(1);
+      expect(state.sendReply.mock.calls[0][0].body).toContain("Rasheed");
+      expect(state.sendReply.mock.calls[0][0].body).toContain("Sameer");
+      expect(state.sendReply.mock.calls[0][0].body).not.toContain("Old Driver");
+      expect(state.sendReply.mock.calls[0][0].body).toContain("Active drivers (2)");
+    } finally {
+      if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+      else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
+    }
+  });
+
+  it("does not query the database when the feature gate is disabled", async () => {
+    const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+    delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+    try {
+      const result = await handleDriverMutation(makeMessage("List drivers"), "stored-inbound-2");
+      expect(result).toBe("ignored");
+      expect(state.from).not.toHaveBeenCalled();
+      expect(state.sendReply).not.toHaveBeenCalled();
+    } finally {
+      if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+      else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
+    }
+  });
+
+  it("does not query or reply for an ambiguous message", async () => {
+    const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+    process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
+    try {
+      const result = await handleDriverMutation(makeMessage("Rasheed driver aanu"), "stored-inbound-3");
+      expect(result).toBe("ignored");
+      expect(state.from).not.toHaveBeenCalled();
+      expect(state.sendReply).not.toHaveBeenCalled();
+    } finally {
+      if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+      else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
+    }
+  });
   it("replies clearly when there are no active drivers", async () => {
     const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
     process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
@@ -99,52 +147,4 @@ beforeEach(() => {
     }
   });
 
-});
-
-describe("driver agent isolated read-only handler", () => {
-  it("lists active drivers only and uses a bounded query", async () => {
-    const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
-    process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
-    try {
-      const result = await handleDriverMutation(makeMessage("List drivers"), "stored-inbound-1");
-      expect(result).toBe("handled");
-      expect(state.from).toHaveBeenCalledWith("ops_drivers");
-      expect(state.sendReply).toHaveBeenCalledTimes(1);
-      expect(state.sendReply.mock.calls[0][0].body).toContain("Rasheed");
-      expect(state.sendReply.mock.calls[0][0].body).toContain("Sameer");
-      expect(state.sendReply.mock.calls[0][0].body).not.toContain("Old Driver");
-      expect(state.sendReply.mock.calls[0][0].body).toContain("Active drivers (2)");
-    } finally {
-      if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
-      else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
-    }
-  });
-
-  it("does not query the database when the feature gate is disabled", async () => {
-    const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
-    delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
-    try {
-      const result = await handleDriverMutation(makeMessage("List drivers"), "stored-inbound-2");
-      expect(result).toBe("ignored");
-      expect(state.from).not.toHaveBeenCalled();
-      expect(state.sendReply).not.toHaveBeenCalled();
-    } finally {
-      if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
-      else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
-    }
-  });
-
-  it("does not query or reply for an ambiguous message", async () => {
-    const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
-    process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
-    try {
-      const result = await handleDriverMutation(makeMessage("Rasheed driver aanu"), "stored-inbound-3");
-      expect(result).toBe("ignored");
-      expect(state.from).not.toHaveBeenCalled();
-      expect(state.sendReply).not.toHaveBeenCalled();
-    } finally {
-      if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
-      else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
-    }
-  });
 });
