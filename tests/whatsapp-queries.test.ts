@@ -4,6 +4,7 @@ import {
   formatStockInventorySummary,
   isDriverRelatedQuestion,
   indiaDayBounds,
+  mapAiClassificationToFastQuery,
   opsPeriodBounds,
   parseFastWhatsAppQuery,
 } from "../lib/whatsapp-queries";
@@ -157,6 +158,19 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(summary).toContain("ആദ്യത്തെ 20 entries");
     expect(summary).toContain("മറ്റു entries ഉണ്ട്");
     expect(summary).not.toContain("Product 21:");
+  });
+
+  it("never routes a trip-start action through the read-only query handler", () => {
+    expect(
+      mapAiClassificationToFastQuery({
+        intent: "start_trip",
+        product_query: null,
+        driver_name: null,
+        yesterday: false,
+        period: null,
+        reply: null,
+      }),
+    ).toBeNull();
   });
 
   it("does not intercept arbitrary text or correction-only values", () => {
