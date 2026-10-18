@@ -49,7 +49,6 @@ Finish driver operations as a reliable, tested capability before treating the wi
 | 2026-10-18 | Narrowed Malayalam/Manglish parser action type after adding `list` | `ed50364381571a407234db7a464dcf10e827a290`; CI run `39126913313` | PASS: typecheck, lint, unit tests, production build |
 | 2026-10-18 | Read-only inspection of live `ops_drivers` columns and public table list | Supabase `information_schema` queries (read-only) | PASS: schema metadata verified; no business rows read or modified |
 
-
 ## Continuation verification — 2026-10-18 evening
 
 - GitHub Actions run [39127751846](https://github.com/Shijastk/solar-ops-whatsapp/actions/runs/39127751846) was inspected through its job details. The `quality` job completed with conclusion **success**; dependency install, Typecheck, Lint, Unit tests, and Production build steps all completed successfully.
@@ -65,7 +64,6 @@ Finish driver operations as a reliable, tested capability before treating the wi
 2. Finish read-only `ops_drivers` metadata audit (indexes, RLS/policies, grants, triggers), then document the schema source gap and add a reproducible migration on a non-main branch only when supported by evidence.
 3. Extend isolated mocked handler tests for create/list/error/duplicate/verification behavior. Keep deactivation fail-closed until sender-scoped, expiring, one-time confirmation is implemented and tested.
 4. Keep production feature gate disabled; do not merge any PR without explicit approval.
-
 
 ### Additional read-only schema audit
 
@@ -91,3 +89,23 @@ This narrows the schema gap but does not identify the original table-creation mi
 - Exact-head GitHub Actions run [39131203720](https://github.com/Shijastk/solar-ops-whatsapp/actions/runs/39131203720) completed with **success** on `73a31e0b218b859a50038109de65f749a9e2b648`. Dependency install, typecheck, lint, unit tests, and production build all passed.
 - Tests use mocked Supabase and reply transport only. No production driver rows were read or mutated and no WhatsApp messages were sent.
 - PR #60 remains draft/unmerged. Deactivation is still fail-closed pending a reviewed durable sender-scoped confirmation implementation and isolated persistence verification.
+
+---
+
+## Superseding implementation update — PR #60
+
+This section supersedes the earlier "Remaining driver completion criteria" and interim deactivation status above. The entries above are retained as historical execution notes.
+
+### Implemented on PR head `644166b8dcbe62109ea16a678dffe8e0abf28370`
+
+- Driver create/list handling includes normalized-name duplicate protection, read-after-write verification, active-only listing, stable alphabetical ordering, and a bounded 50-driver response.
+- Deactivation confirmation is sender-bound, expires after five minutes, uses a cryptographically random one-time token, stores only its SHA-256 hash, and is consumed atomically by a PostgreSQL RPC. Wrong-sender, expired, and replayed confirmations are rejected.
+- Added catalog and confirmation migrations, plus isolated PostgreSQL 16 integration tests for migration application, successful deactivation, wrong-sender rejection, expiry, and replay.
+- Added isolated handler tests with mocked Supabase and reply transport.
+
+### Exact-head verification and safety boundary
+
+- GitHub Actions run [39132229905](https://github.com/Shijastk/solar-ops-whatsapp/actions/runs/39132229905) passed on exact head `644166b8dcbe62109ea16a678dffe8e0abf28370`: dependency installation, TypeScript typecheck, lint, unit tests, production build, and isolated PostgreSQL migration/integration tests.
+- No production rows were changed and no WhatsApp messages were sent.
+- Migrations have **not** been applied to Supabase. `SOLAR_OPS_DRIVER_AGENT_ENABLED` remains disabled.
+- This PR targets `agent/driver-automation-continuation`, not `main`. Integration remains subject to the conflict-resolution commit and a fresh mergeability/CI check.
