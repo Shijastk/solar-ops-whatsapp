@@ -21,7 +21,7 @@ vi.mock("@/lib/replies", () => ({
 import { handleTripWorkflowInbound } from "@/lib/trips";
 
 function makeChain(table: string) {
-  const chain: Record<string, any> = {};
+  const chain: Record<string, unknown> = {};
   for (const method of ["select", "eq", "in", "order", "limit"]) {
     chain[method] = vi.fn(() => chain);
   }
