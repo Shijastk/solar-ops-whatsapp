@@ -235,7 +235,7 @@ export function looksLikePotentialTripStartRequest(value: string): boolean {
   const informationalTerms = [
     "latest", "last", "today", "yesterday", "summary", "details", "status",
     "history", "report", "count", "list", "which", "what", "show", "tell",
-    "know", "how many", "pending", "bill", "bills", "stock", "products",
+    "want to know", "need to know", "how many", "pending", "bill", "bills", "stock", "products",
     "product", "ഇന്നത്തെ", "ഇന്നലെ", "അവസാന", "വിശദാംശ", "സ്റ്റാറ്റസ്",
     "ചരിത്രം", "റിപ്പോർട്ട്", "എത്ര", "കഴിഞ്ഞ", "പോയി", "കാണിക്കൂ",
   ];
