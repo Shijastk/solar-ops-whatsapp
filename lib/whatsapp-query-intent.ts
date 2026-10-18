@@ -174,13 +174,6 @@ function findExactDriverNameInQuery(
   return matches.length === 1 ? matches[0] : null;
 }
 
-function explicitlyMentionsYesterday(value: string): boolean {
-  const tokens = normalizeNameTokens(value);
-  return ["yesterday", "innale", "ഇന്നലെ", "കഴിഞ്ഞ", "ദിവസം"].some((term) =>
-    term.includes(" ") ? value.normalize("NFKC").toLocaleLowerCase("en").includes(term) : tokens.includes(term),
-  );
-}
-
 function normalizeQueryText(value: string): string {
   return value
     .normalize("NFKC")
