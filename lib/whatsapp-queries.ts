@@ -220,7 +220,7 @@ function extractStockProductQuery(value: string): string | null {
 
 export function isDriverRelatedQuestion(text: string): boolean {
   const normalized = normalizeQueryText(text);
-  return /\\b(driver|drivers|rash?eed|rasheed|rashi|driverude|driverine)\\b/.test(normalized) ||
+  return /\b(driver|drivers|rash?eed|rasheed|rashi|driverude|driverine)\b/.test(normalized) ||
     [
       "ഡ്രൈവർ",
       "ഡ്രൈവര്",
@@ -239,19 +239,19 @@ export function parseFastWhatsAppQuery(
 ): FastWhatsAppQuery | null {
   const rawText = text.normalize("NFKC").trim();
   const driverAfterName = rawText.match(
-    /([\\p{L}][\\p{L} .'-]{1,30}?)\\s+എന്ന\\s+ഡ്രൈവർ/iu,
+    /([\p{L}][\p{L} .'-]{1,30}?)\s+എന്ന\s+ഡ്രൈവർ/iu,
   );
   const driverBeforeName = rawText.match(
-    /(?:\\bdriver\\b|ഡ്രൈവർ)\\s+([\\p{L}][\\p{L} .'-]{1,30})/iu,
+    /(?:\bdriver\b|ഡ്രൈവർ)\s+([\p{L}][\p{L} .'-]{1,30})/iu,
   );
   const driverMatch = driverAfterName ?? driverBeforeName;
   const asksDriverTrips = includesAny(normalizeQueryText(text), TRIP_TERMS) ||
-    /\\b(driver|rash?eed|rasheed)\\b/i.test(text) ||
+    /\b(driver|rash?eed|rasheed)\b/i.test(text) ||
     ["ഡ്രൈവർ", "റഷീദ്", "റഷീദിന്റെ", "റഷീദിനെ"].some((term) => text.includes(term));
   if (asksDriverTrips && driverMatch) {
     const name = driverMatch[1]
       .trim()
-      .replace(/\\b(?:today|yesterday|innu|innale|trip|trips|poya|poyi|ariyamo|ariyumo|ano|aayirunnu|ayirunnu)\\b.*$/i, "")
+      .replace(/\b(?:today|yesterday|innu|innale|trip|trips|poya|poyi|ariyamo|ariyumo|ano|aayirunnu|ayirunnu)\b.*$/i, "")
       .replace(/(?:ആയിരുന്നു|ആണോ|അറിയാമോ|ഇന്ന്|ഇന്നലെ|ട്രിപ്പുകൾ|ട്രിപ്പ്|ട്രിപ്പുകളും|എത്ര|പോയിട്ടുണ്ട്|പോയി).*$/u, "")
       .replace(/[?!,.;:]+$/g, "")
       .trim();
