@@ -714,20 +714,17 @@ function formatStockMatches(
     .join("\n");
 }
 
-async function stockInventorySummary(): Promise<string> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("stock_balances")
-    .select("company_name, product_name, unit, current_quantity, balance_known")
-    .order("company_name", { ascending: true })
-    .order("product_name", { ascending: true })
-    .limit(MAX_STOCK_SUMMARY_ROWS + 1);
+export type StockInventorySummaryRow = {
+  company_name: string;
+  product_name: string;
+  unit: string;
+  current_quantity: number | string;
+  balance_known: boolean;
+};
 
-  if (error) {
-    throw new Error("Failed to load stock inventory summary: " + error.message);
-  }
-
-  const rows = data ?? [];
+export function formatStockInventorySummary(
+  rows: StockInventorySummaryRow[],
+): string {
   if (rows.length === 0) {
     return "നിലവിലെ stock catalogue-ൽ products ഒന്നും കണ്ടെത്തിയില്ല.";
   }
@@ -735,8 +732,8 @@ async function stockInventorySummary(): Promise<string> {
   const hasMore = rows.length > MAX_STOCK_SUMMARY_ROWS;
   const visibleRows = rows.slice(0, MAX_STOCK_SUMMARY_ROWS);
   const lines = visibleRows.map((row) => {
-    const company = String(row.company_name ?? "").slice(0, 64);
-    const product = String(row.product_name ?? "").slice(0, 72);
+    const company = row.company_name.slice(0, 64);
+    const product = row.product_name.slice(0, 72);
     const balance = row.balance_known
       ? String(Number(row.current_quantity)) + (row.unit ? " " + row.unit : "")
       : "count ഇനിയും add ചെയ്തിട്ടില്ല";
@@ -752,6 +749,22 @@ async function stockInventorySummary(): Promise<string> {
       ? ["മറ്റു entries ഉണ്ട്. കൃത്യമായ product name പറഞ്ഞാൽ അതിന്റെ balance നോക്കാം."]
       : []),
   ].join("\n");
+}
+
+async function stockInventorySummary(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("stock_balances")
+    .select("company_name, product_name, unit, current_quantity, balance_known")
+    .order("company_name", { ascending: true })
+    .order("product_name", { ascending: true })
+    .limit(MAX_STOCK_SUMMARY_ROWS + 1);
+
+  if (error) {
+    throw new Error("Failed to load stock inventory summary: " + error.message);
+  }
+
+  return formatStockInventorySummary(data ?? []);
 }
 
 async function stockBalanceAnswer(productQuery: string): Promise<string> {
