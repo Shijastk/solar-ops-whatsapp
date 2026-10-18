@@ -100,6 +100,9 @@ DOCUMENT_AUTOMATION_ENABLED=false
 GROQ_API_KEY
 GROQ_MODEL=openai/gpt-oss-20b
 GROQ_TIMEOUT_MS=7000
+
+# Natural-language trip-start rollout (disabled by default)
+SOLAR_OPS_NATURAL_TRIP_START_ENABLED=false
 ```
 
 Important temporary test state:
@@ -509,3 +512,6 @@ After the backend and Flutter builds are deployed:
 9. let the signed mobile session expire and confirm the app returns to login rather than continuing with stale authorization
 
 Do not describe authenticated production mobile access as device-verified until a real installed build completes these steps.
+
+
+Natural-language trip creation is a separate write-path rollout. Keep `SOLAR_OPS_NATURAL_TRIP_START_ENABLED=false` until the exact-head CI passes and the operator is ready for a restricted WhatsApp acceptance test. Existing explicit `trip` / `New Trip` commands continue to work while this flag is off. Set it to the literal string `true` in Vercel Production only when explicitly approved; changing this setting requires a fresh deployment.
