@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import { deterministicUuid } from "@/lib/idempotency";
 import { sendOpsReply } from "@/lib/replies";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -88,10 +89,36 @@ export async function handleDriverMutation(
   if (message.type !== "text" || !message.textBody) return "ignored";
   if (process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED !== "true") return "ignored";
 
+  const supabase = getSupabaseAdmin();
+  const confirmationMatch = message.textBody.trim().match(/^confirm\\s+driver\\s+([a-f0-9]{48})$/i);
+
+  if (confirmationMatch) {
+    const tokenHash = createHash("sha256").update(confirmationMatch[1].toLowerCase()).digest("hex");
+    const { data, error } = await supabase.rpc("confirm_ops_driver_deactivation", {
+      p_token_hash: tokenHash,
+      p_sender_phone: message.senderPhone,
+    });
+
+    if (error) throw new Error("Driver deactivation confirmation failed");
+
+    const result = data as { status?: string; driver_name?: string } | null;
+    const body = result?.status === "deactivated"
+      ? "✅ " + result.driver_name + " എന്ന driver deactivate ചെയ്തു."
+      : result?.status === "already_inactive"
+        ? "ℹ️ ഈ driver ഇതിനകം inactive ആണ്. വീണ്ടും മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല."
+        : "⚠️ Confirmation token അസാധുവാണ്, കാലാവധി കഴിഞ്ഞു, അല്ലെങ്കിൽ ഈ sender-ന് നൽകിയതല്ല. മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല.";
+
+    await sendOpsReply({
+      requestId: deterministicUuid("driver-deactivate-confirm-result:" + message.messageId),
+      replyToMessageId: storedMessageId,
+      knownInboundAt: message.timestamp,
+      body,
+    });
+    return "handled";
+  }
+
   const intent = parseDriverMutation(message.textBody);
   if (!intent) return "ignored";
-
-  const supabase = getSupabaseAdmin();
 
   if (intent.action === "list") {
     const { data: drivers, error } = await supabase
@@ -229,14 +256,28 @@ export async function handleDriverMutation(
     return "handled";
   }
 
-  // Fail closed until a durable, sender-scoped confirmation flow exists.
-  // Deactivation is a consequential write; recognizing "delete/remove" alone
-  // must not change production data without a separate confirmation step.
+  const token = randomBytes(24).toString("hex");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  const { error: confirmationInsertError } = await supabase
+    .from("ops_driver_action_confirmations")
+    .insert({
+      token_hash: tokenHash,
+      sender_phone: message.senderPhone,
+      driver_id: matches[0].id,
+      action: "deactivate",
+      expires_at: expiresAt,
+    });
+
+  if (confirmationInsertError) {
+    throw new Error("Driver deactivation confirmation could not be created");
+  }
+
   await sendOpsReply({
-    requestId: deterministicUuid("driver-deactivate-confirmation-required:" + message.messageId),
+    requestId: deterministicUuid("driver-deactivate-confirmation:" + message.messageId),
     replyToMessageId: storedMessageId,
     knownInboundAt: message.timestamp,
-    body: "⚠️ " + matches[0].name + " എന്ന driver-നെ deactivate ചെയ്യാൻ confirmation flow ഇനിയും തയ്യാറായിട്ടില്ല. ഇപ്പോൾ മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല.",
+    body: "⚠️ " + matches[0].name + " എന്ന driver-നെ deactivate ചെയ്യാൻ 5 മിനിറ്റിനുള്ളിൽ ഇതേ WhatsApp നമ്പറിൽ നിന്ന് കൃത്യമായി ഈ സന്ദേശം reply ചെയ്യുക: CONFIRM DRIVER " + token + "\\nToken ഒരിക്കൽ മാത്രം ഉപയോഗിക്കാം. നിങ്ങൾ ആവശ്യപ്പെട്ടിട്ടില്ലെങ്കിൽ അവഗണിക്കുക.",
   });
   return "handled";
 }
