@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
 type DriverIntent =
+  | { action: "list" }
   | { action: "create"; name: string }
   | { action: "deactivate"; name: string };
 
@@ -22,6 +23,8 @@ function normalizedKey(value: string): string {
 export function parseDriverMutation(text: string): DriverIntent | null {
   const value = normalizeDriverName(text).replace(/[.!?।]+$/g, "").trim();
   const patterns: Array<{ action: DriverIntent["action"]; regex: RegExp }> = [
+    { action: "list", regex: /^(?:please\s+)?(?:list|show|display)\s+(?:all\s+)?drivers$/i },
+    { action: "list", regex: /^(?:drivers|driver list)\s+(?:list|show|parayu|kaanikku)$/i },
     {
       action: "create",
       regex: /^(?:please\s+)?(?:add|create|register)\s+(?:a\s+)?(?:new\s+)?driver\s+(?:named\s+)?(.+?)(?:\s+(?:as\s+a\s+new\s+driver))?$/i,
@@ -52,9 +55,10 @@ export function parseDriverMutation(text: string): DriverIntent | null {
 
   for (const entry of patterns) {
     const match = value.match(entry.regex);
+    if (entry.action === "list" && match) return { action: "list" };
     if (match?.[1]) {
       const name = normalizeDriverName(match[1].replace(/^(?:the|a|an)\s+/i, "").replace(/[.!?।]+$/g, ""));
-      if (isValidDriverName(name)) return { action: entry.action, name };
+      if (isValidDriverName(name)) return { action: entry.action as "create" | "deactivate", name };
     }
   }
 
@@ -90,6 +94,30 @@ export async function handleDriverMutation(
   const supabase = getSupabaseAdmin();
   const name = normalizeDriverName(intent.name);
   const key = normalizedKey(name);
+
+  if (intent.action === "list") {
+    const { data: drivers, error } = await supabase
+      .from("ops_drivers")
+      .select("name, active")
+      .order("name", { ascending: true })
+      .limit(50);
+
+    if (error) throw new Error("Driver list lookup failed: " + error.message);
+
+    const activeDrivers = (drivers ?? []).filter((driver) => driver.active);
+    const body = activeDrivers.length
+      ? "🚚 Active drivers (" + activeDrivers.length + "):\n" +
+        activeDrivers.map((driver, index) => String(index + 1) + ". " + driver.name).join("\n")
+      : "ℹ️ ഇപ്പോൾ active drivers ഒന്നുമില്ല.";
+
+    await sendOpsReply({
+      requestId: deterministicUuid("driver-list:" + message.messageId),
+      replyToMessageId: storedMessageId,
+      knownInboundAt: message.timestamp,
+      body,
+    });
+    return "handled";
+  }
 
   if (intent.action === "create") {
     const { data: existing, error: lookupError } = await supabase
