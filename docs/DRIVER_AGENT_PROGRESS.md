@@ -48,3 +48,12 @@ Finish driver operations as a reliable, tested capability before treating the wi
 | 2026-10-18 | Added list-intent parser tests | `0f802d3449a9fe7aca264c394a46e9db542f0da5` | Tests committed; superseded by final branch head |
 | 2026-10-18 | Narrowed Malayalam/Manglish parser action type after adding `list` | `ed50364381571a407234db7a464dcf10e827a290`; CI run `39126913313` | PASS: typecheck, lint, unit tests, production build |
 | 2026-10-18 | Read-only inspection of live `ops_drivers` columns and public table list | Supabase `information_schema` queries (read-only) | PASS: schema metadata verified; no business rows read or modified |
+
+
+## Follow-up test expansion — 2026-10-18
+
+- Added parser tests on `test/driver-agent-handler-isolation` commit `315238234f90f3810925a01b4eb9179086649bdc` for placeholder names, one-character names, names longer than 120 characters, and ambiguous Malayalam/Manglish mentions.
+- This is test-only; it does not change runtime code, production data, or the production feature gate.
+- CI for the latest head commit is **not yet confirmed**. The commit workflow/status queries returned no associated runs/statuses at inspection time; do not treat the previous successful run as evidence for this latest test change.
+- PR #60 remains open and draft, head SHA `315238234f90f3810925a01b4eb9179086649bdc`; PR #57, #58, and #59 were also observed open, unmerged, and draft. No PR was merged.
+- Next: wait for/inspect CI for the exact latest head; if it fails, diagnose and fix before proceeding to mocked create-handler coverage. Continue to avoid production mutations and leave deactivation fail-closed.
