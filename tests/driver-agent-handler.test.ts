@@ -4,6 +4,7 @@ const state = vi.hoisted(() => ({
   drivers: [] as Array<{ name: string; active: boolean }>,
   from: vi.fn(),
   sendReply: vi.fn(),
+  queryError: null as { message: string } | null,
 }));
 
 vi.mock("@/lib/supabase-admin", () => ({
@@ -27,6 +28,7 @@ function makeMessage(textBody: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  state.queryError = null;
   state.drivers = [
     { name: "Rasheed", active: true },
     { name: "Old Driver", active: false },
@@ -40,11 +42,40 @@ beforeEach(() => {
   chain.select.mockReturnValue(chain);
   chain.order.mockReturnValue(chain);
   chain.limit.mockImplementation(async () => ({
-    data: [...state.drivers].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 50),
-    error: null,
+    data: state.queryError ? null : [...state.drivers].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 50),
+    error: state.queryError,
   }));
   state.from.mockReturnValue(chain);
   state.sendReply.mockResolvedValue(undefined);
+  it("replies clearly when there are no active drivers", async () => {
+    const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+    process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
+    state.drivers = [{ name: "Old Driver", active: false }];
+    try {
+      const result = await handleDriverMutation(makeMessage("List drivers"), "stored-inbound-empty");
+      expect(result).toBe("handled");
+      expect(state.sendReply.mock.calls[0][0].body).toContain("active drivers ഒന്നുമില്ല");
+    } finally {
+      if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+      else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
+    }
+  });
+
+  it("fails closed and does not send a misleading reply on database errors", async () => {
+    const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+    process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
+    state.queryError = { message: "simulated database failure" };
+    try {
+      await expect(
+        handleDriverMutation(makeMessage("List drivers"), "stored-inbound-error"),
+      ).rejects.toThrow("Driver list lookup failed");
+      expect(state.sendReply).not.toHaveBeenCalled();
+    } finally {
+      if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+      else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
+    }
+  });
+
 });
 
 describe("driver agent isolated read-only handler", () => {
