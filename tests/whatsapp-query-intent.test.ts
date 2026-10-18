@@ -202,6 +202,45 @@ describe("WhatsApp AI intent fallback", () => {
     });
   });
 
+  it("supplies canonical driver directory names for Malayalam driver questions", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  intent: "driver_trip_summary",
+                  product_query: null,
+                  driver_name: "rasheed",
+                  yesterday: false,
+                  period: null,
+                  reply: null,
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      classifyOperationalQueryWithGroq("റഷീദ് എന്ന ഡ്രൈവർ ഇന്ന് എത്ര ട്രിപ്പ് പോയി?", {
+        driverNames: ["abdulla", "Majeed", "rasheed"],
+      }),
+    ).resolves.toMatchObject({ intent: "driver_trip_summary", driver_name: "rasheed" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body.messages[0].content).toContain('["abdulla","Majeed","rasheed"]');
+    expect(body.messages[0].content).toContain("exact canonical spelling");
+  });
+
   it("classifies active driver count questions", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
