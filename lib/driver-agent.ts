@@ -196,6 +196,17 @@ export async function handleDriverMutation(
     return "handled";
   }
 
+  // Fail closed until a durable, sender-scoped confirmation flow exists.
+  // Deactivation is a consequential write; recognizing "delete/remove" alone
+  // must not change production data without a separate confirmation step.
+  await sendOpsReply({
+    requestId: deterministicUuid("driver-deactivate-confirmation-required:" + message.messageId),
+    replyToMessageId: storedMessageId,
+    knownInboundAt: message.timestamp,
+    body: "⚠️ " + matches[0].name + " എന്ന driver-നെ deactivate ചെയ്യാൻ confirmation flow ഇനിയും തയ്യാറായിട്ടില്ല. ഇപ്പോൾ മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല.",
+  });
+  return "handled";
+
   const target = matches[0];
   const { data: updated, error: updateError } = await supabase
     .from("ops_drivers")
