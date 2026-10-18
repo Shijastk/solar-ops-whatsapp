@@ -13,7 +13,7 @@ Finish driver operations as a reliable, tested capability before treating the wi
 - Deactivation deliberately fails closed because a durable sender-scoped confirmation flow is not yet implemented.
 - The driver handler is gated by `SOLAR_OPS_DRIVER_AGENT_ENABLED`; production flag must remain unchanged during development.
 - `lib/ingest.ts` calls the driver handler before the document workflow for text messages.
-- The driver table is queried as `ops_drivers` with `id`, `name`, `normalized_name`, and `active`; the inspected `supabase/schema.sql` and listed migrations did not expose its creation source, so the authoritative source still needs to be located before schema-dependent write/confirmation design.
+- The checked-in `supabase/schema.sql` and listed migrations do not expose the `ops_drivers` creation source. A read-only Supabase `information_schema.columns` query verified live fields: `id uuid`, `name text`, `normalized_name text`, `active boolean`, nullable `last_used_at timestamptz`, and `created_at`/`updated_at` timestamps. The missing checked-in migration remains a reproducibility gap.
 - The existing WhatsApp integration test can target production by default and must not be run blindly.
 
 ## Work in this branch
@@ -25,8 +25,8 @@ Finish driver operations as a reliable, tested capability before treating the wi
 
 ## Required verification
 
-- GitHub Actions must pass typecheck, lint, unit tests, and production build for the current branch.
-- Review any CI failure and fix it before moving on.
+- GitHub Actions run `39126913313` passed on code commit `ed50364381571a407234db7a464dcf10e827a290`: dependency install, TypeScript typecheck, lint, unit tests, and production build all succeeded.
+- The final branch head later changed only the progress document; runtime code is unchanged from the tested code commit. The branch is still unmerged and not live-verified.
 - This code branch is not merged and must not be considered deployed or live-verified.
 
 ## Remaining driver completion criteria
@@ -46,5 +46,5 @@ Finish driver operations as a reliable, tested capability before treating the wi
 | 2026-10-18 | Added driver listing parser and handler | `ee5e63647f13ef01f3fe777c5779453dd80552d3` | Implemented; superseded by type-safety fix below; CI pending |
 | 2026-10-18 | Avoid accessing `intent.name` for list intents | `3cdb6bc4c9be4ee6c05ed3c53533280aa4276bd3` | Fix committed; CI pending |
 | 2026-10-18 | Added list-intent parser tests | `0f802d3449a9fe7aca264c394a46e9db542f0da5` | Tests committed; superseded by final branch head |
-| 2026-10-18 | Narrowed Malayalam/Manglish parser action type after adding `list` | `ed50364381571a407234db7a464dcf10e827a290`; CI run `39126913313` | Typecheck, lint, and unit tests passed; production build was still running at last check |
-| 2026-10-18 | Read-only inspection of live `ops_drivers` columns and public table list | Supabase `information_schema` queries (read-only) | Confirmed live table shape; no data rows read or modified |
+| 2026-10-18 | Narrowed Malayalam/Manglish parser action type after adding `list` | `ed50364381571a407234db7a464dcf10e827a290`; CI run `39126913313` | PASS: typecheck, lint, unit tests, production build |
+| 2026-10-18 | Read-only inspection of live `ops_drivers` columns and public table list | Supabase `information_schema` queries (read-only) | PASS: schema metadata verified; no business rows read or modified |
