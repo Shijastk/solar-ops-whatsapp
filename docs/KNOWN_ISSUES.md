@@ -507,3 +507,10 @@ Selected PDFs live in memory until Save; they are lost if the OS terminates the 
 ## K042 - Malayalam voice STT accuracy is not yet benchmarked
 
 A production voice message produced a materially incorrect Malayalam transcript. The current Groq Whisper Turbo path uses `language=ml`, `temperature=0`, and a solar-operations vocabulary prompt, but no representative reference-labelled sample set has established its accuracy. A local benchmark runner now compares Turbo with Whisper Large v3 using identical audio and request settings. It is tooling only: no provider result has been measured, the production model has not been changed, and Azure/Sarvam have not been benchmarked by this runner. A model change requires review of word/character error, latency, and critical entity/intent errors on the same sample set.
+
+
+## Status reconciliation — 2026-10-18
+
+The older K037 wording that voice transcription and the Groq fallback were not implemented is stale relative to the current source: `lib/ingest.ts` transcribes voice messages and routes the transcript through the shared text query/document workflow; `lib/whatsapp-queries.ts` includes a bounded Groq intent fallback and a bounded conversational fallback. Their live phrasing/latency quality still requires a controlled, user-observed WhatsApp acceptance test.
+
+The current stock-query implementation already supports product-specific live balances with exact/approved-alias matching and guarded fuzzy read suggestions. Branch `agent/stock-query-agent` adds a broad read-only stock inventory summary from `stock_balances`, capped at 20 visible rows. This new slice is not production-accepted until CI passes and a user-controlled live query is observed. It must not mutate stock or infer quantities.
