@@ -233,13 +233,13 @@ export function looksLikePotentialTripStartRequest(value: string): boolean {
   if (!mentionsTrip) return false;
 
   const informationalTerms = [
-    "latest", "last", "today", "yesterday", "summary", "details", "status",
+    "latest", "last", "today", "yesterday", "tomorrow", "tonight", "week", "month", "year", "summary", "details", "status",
     "history", "report", "count", "list", "which", "what", "show", "tell",
     "want to know", "need to know", "how many", "how", "when", "where", "who",
     "pending", "bill", "bills", "stock", "products", "product", "data",
     "information", "info", "about", "available", "ഇന്നത്തെ", "ഇന്നലെ",
     "അവസാന", "വിശദാംശ", "വിവരം", "സ്റ്റാറ്റസ്", "ചരിത്രം", "റിപ്പോർട്ട്",
-    "സമ്മറി", "എത്ര", "കഴിഞ്ഞ", "പോയി", "കാണിക്കൂ", "പറയൂ", "അറിയണം",
+    "സമ്മറി", "ആഴ്ച", "മാസം", "വർഷം", "നാളെ", "ഇന്ന്", "ഇന്നലെ", "എത്ര", "കഴിഞ്ഞ", "പോയി", "കാണിക്കൂ", "പറയൂ", "അറിയണം",
   ];
   if (informationalTerms.some((term) => text.includes(term))) return false;
 
