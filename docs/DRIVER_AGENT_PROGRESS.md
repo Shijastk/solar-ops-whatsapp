@@ -54,7 +54,7 @@ Finish driver operations as a reliable, tested capability before treating the wi
 
 - Added parser tests on `test/driver-agent-handler-isolation` commit `315238234f90f3810925a01b4eb9179086649bdc` for placeholder names, one-character names, names longer than 120 characters, and ambiguous Malayalam/Manglish mentions.
 - This is test-only; it does not change runtime code, production data, or the production feature gate.
-- CI for the latest head commit is **not yet confirmed**. The commit workflow/status queries returned no associated runs/statuses at inspection time; do not treat the previous successful run as evidence for this latest test change.
+- At the time of this entry, the connector's commit-workflow query did not expose the push-triggered run. Later, the direct GitHub Actions run metadata and job logs verified the exact current test head; see the CI verification entry below.
 - PR #60 remains open and draft, head SHA `315238234f90f3810925a01b4eb9179086649bdc`; PR #57, #58, and #59 were also observed open, unmerged, and draft. No PR was merged.
 - Next: wait for/inspect CI for the exact latest head; if it fails, diagnose and fix before proceeding to mocked create-handler coverage. Continue to avoid production mutations and leave deactivation fail-closed.
 
@@ -62,7 +62,15 @@ Finish driver operations as a reliable, tested capability before treating the wi
 
 - Added isolated create-handler tests in commit `265eee22c4a3f7ef87f6178b37e282c3452d01b7` for verification-query failure and concurrent unique-key insert conflict. The tests mock Supabase and reply transport; they do not access production rows or send WhatsApp messages.
 - Latest known PR #60 head is being rechecked after this commit. The repository CI workflow `.github/workflows/ci.yml` runs on pushes and on pull requests targeting `main`; PR #60 currently targets `agent/driver-automation-continuation`, so its pull-request event does not match that branch filter.
-- The available commit-workflow query only returns pull-request-triggered runs and does not expose push-triggered runs; combined commit status returned no status entries for the prior head. Therefore CI for the latest commit cannot be claimed as passing from the currently available evidence.
+- The connector's convenience workflow query filters to pull-request-triggered runs. Direct GitHub Actions REST metadata was subsequently used to inspect push-triggered runs and job logs; see the exact-head CI result below.
 - Do not treat earlier successful run `39126913313` as verification for the newer tests. Do not merge or enable the production feature gate. Driver completion is still blocked on exact-head CI evidence, isolated persistence verification, authoritative schema provenance, and a durable sender-scoped expiring one-time deactivation confirmation flow.
 
-- CI trigger correction committed on the PR base branch: `agent/driver-automation-continuation` now appears in `.github/workflows/ci.yml`'s `pull_request.branches` filter (base-branch commit `3db620fb8c52d117a66c8eb6401d69dbd2a53cfc`). This keeps checks scoped to the continuation branch and does not change production deployment or the feature flag. The PR head was then updated to `4d194b716cd31a8212f7d2d0821f8dedc033d4ee`; rechecking still returned no PR-triggered workflow runs and no combined status entries. The wrapper's workflow query filters out push-triggered runs, so this is an evidence-access gap, not proof that push CI did not run.
+- CI trigger correction committed on the PR base branch: `agent/driver-automation-continuation` now appears in `.github/workflows/ci.yml`'s `pull_request.branches` filter (base-branch commit `3db620fb8c52d117a66c8eb6401d69dbd2a53cfc`). Direct GitHub Actions API evidence confirms push-triggered CI runs on the test branch.
+
+
+## Exact-head CI result — 2026-10-18
+
+- Commit `1b99ca6b8f6c9b8ec16a9bd1262a3773d3ac431b` fixed the invalid TypeScript declarations in `tests/driver-agent-create.test.ts`.
+- GitHub Actions run [39130929497](https://github.com/Shijastk/solar-ops-whatsapp/actions/runs/39130929497) completed with **success** on exact head SHA `1b99ca6b8f6c9b8ec16a9bd1262a3773d3ac431b`.
+- All required steps passed: dependency install, TypeScript typecheck, lint, unit tests, and production build.
+- This result applies to that exact SHA only. The next commit will require its own CI verification. PR #60 remains draft/unmerged; no production data or WhatsApp messages were changed; production feature flag remains disabled.
