@@ -36,6 +36,7 @@ export type FastWhatsAppQuery =
   | { type: "today_trip_summary" }
   | { type: "yesterday_trip_summary" }
   | { type: "driver_trip_summary"; driverName: string; yesterday: boolean }
+  | { type: "driver_count" }
   | { type: "today_products_summary" }
   | { type: "yesterday_products_summary" }
   | { type: "latest_trip" }
@@ -237,32 +238,8 @@ export function isDriverRelatedQuestion(text: string): boolean {
 export function parseFastWhatsAppQuery(
   text: string,
 ): FastWhatsAppQuery | null {
-  const rawText = text.normalize("NFKC").trim();
-  const driverAfterName = rawText.match(
-    /([\p{L}][\p{L} .'-]{1,30}?)\s+എന്ന\s+ഡ്രൈവർ/iu,
-  );
-  const driverBeforeName = rawText.match(
-    /(?:\bdriver\b|ഡ്രൈവർ)\s+([\p{L}][\p{L} .'-]{1,30})/iu,
-  );
-  const driverMatch = driverAfterName ?? driverBeforeName;
-  const asksDriverTrips = includesAny(normalizeQueryText(text), TRIP_TERMS) ||
-    /\b(driver|rash?eed|rasheed)\b/i.test(text) ||
-    ["ഡ്രൈവർ", "റഷീദ്", "റഷീദിന്റെ", "റഷീദിനെ"].some((term) => text.includes(term));
-  if (asksDriverTrips && driverMatch) {
-    const name = driverMatch[1]
-      .trim()
-      .replace(/\b(?:today|yesterday|innu|innale|trip|trips|poya|poyi|ariyamo|ariyumo|ano|aayirunnu|ayirunnu)\b.*$/i, "")
-      .replace(/(?:ആയിരുന്നു|ആണോ|അറിയാമോ|ഇന്ന്|ഇന്നലെ|ട്രിപ്പുകൾ|ട്രിപ്പ്|ട്രിപ്പുകളും|എത്ര|പോയിട്ടുണ്ട്|പോയി).*$/u, "")
-      .replace(/[?!,.;:]+$/g, "")
-      .trim();
-    if (name) {
-      return {
-        type: "driver_trip_summary",
-        driverName: name,
-        yesterday: includesAny(normalizeQueryText(text), YESTERDAY_TERMS),
-      };
-    }
-  }
+  // Driver names and intents are resolved by semantic classification, not word position.
+  if (isDriverRelatedQuestion(text)) return null;
 
   const normalized = normalizeQueryText(text);
   if (!normalized) return null;
@@ -346,6 +323,13 @@ export function mapAiClassificationToFastQuery(
     return classification.product_query
       ? { type: "stock_balance", productQuery: classification.product_query }
       : { type: "stock_product_required" };
+  }
+
+  if (classification.intent === "driver_trip_summary") {
+    const driverName = classification.driver_name?.trim();
+    return driverName
+      ? { type: "driver_trip_summary", driverName, yesterday: classification.yesterday }
+      : null;
   }
 
   if (classification.intent === "ops_period_summary") {
@@ -445,6 +429,20 @@ export function indiaDayBounds(now = new Date()): {
       startShiftedUtc + 24 * 60 * 60 * 1000 - IST_OFFSET_MS,
     ).toISOString(),
   };
+}
+
+async function activeDriverCount(): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const { count, error } = await supabase
+    .from("ops_drivers")
+    .select("id", { count: "exact", head: true })
+    .eq("active", true);
+
+  if (error) {
+    throw new Error("Failed to count active drivers: " + error.message);
+  }
+
+  return count ?? 0;
 }
 
 async function todayBillCount(now = new Date()): Promise<number> {
@@ -1077,6 +1075,11 @@ async function operationalPeriodSummary(
 async function answerFastQuery(
   query: FastWhatsAppQuery,
 ): Promise<string> {
+  if (query.type === "driver_count") {
+    const count = await activeDriverCount();
+    return "നിലവിൽ active ആയ ഡ്രൈവർമാർ: " + String(count) + ".";
+  }
+
   if (query.type === "today_bill_count") {
     const count = await todayBillCount();
     return "ഇന്ന് ലഭിച്ച PDF ബില്ലുകൾ: " + String(count) + ".";
@@ -1136,7 +1139,10 @@ export async function handleFastWhatsAppQuery(
   const startedAt = performance.now();
   let resolver: "deterministic" | "ai_intent" | "ai_fallback" | "fixed_fallback" =
     "deterministic";
-  let query = parseFastWhatsAppQuery(message.textBody);
+  // Resolve driver questions semantically; positional name regexes can mistake question/date words for a driver name.
+  let query = isDriverRelatedQuestion(message.textBody)
+    ? null
+    : parseFastWhatsAppQuery(message.textBody);
   const driverQuestion = !query && isDriverRelatedQuestion(message.textBody);
   const likelyOperational = !query && !driverQuestion && looksLikeOperationalQuery(message.textBody);
   let classificationReply: string | null = null;
@@ -1145,12 +1151,25 @@ export async function handleFastWhatsAppQuery(
     "not_attempted";
   let classifierDurationMs = 0;
 
-  if (!query && !driverQuestion) {
+  if (!query) {
     classifierOutcome = "no_result";
     const classifierStartedAt = performance.now();
     try {
+      let driverNames: string[] | undefined;
+      if (driverQuestion) {
+        const supabase = getSupabaseAdmin();
+        const { data: drivers, error: driverDirectoryError } = await supabase
+          .from("ops_drivers")
+          .select("name")
+          .eq("active", true);
+        if (driverDirectoryError) {
+          throw new Error("Failed to load driver directory for intent resolution: " + driverDirectoryError.message);
+        }
+        driverNames = (drivers ?? []).map((driver) => String(driver.name ?? "")).filter(Boolean);
+      }
       const classification = await classifyOperationalQueryWithGroq(
         message.textBody,
+        { driverNames },
       );
       if (classification) {
         classifierOutcome = classification.intent === "unsupported" ? "unsupported" : "mapped";

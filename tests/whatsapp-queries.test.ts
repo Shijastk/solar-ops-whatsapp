@@ -54,11 +54,7 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(parseFastWhatsAppQuery("Yesterday how much trip")).toEqual({
       type: "yesterday_trip_summary",
     });
-    expect(parseFastWhatsAppQuery("today driver Rasheed trips")).toEqual({
-      type: "driver_trip_summary",
-      driverName: "Rasheed",
-      yesterday: false,
-    });
+    expect(parseFastWhatsAppQuery("today driver Rasheed trips")).toBeNull();
     expect(parseFastWhatsAppQuery("ഈ മാസം summary")).toEqual({
       type: "ops_period_summary",
       period: "this_month",
@@ -67,6 +63,13 @@ describe("fast WhatsApp operational query parsing", () => {
       type: "ops_period_summary",
       period: "last_year",
     });
+  });
+
+  it("routes driver wording to semantic classification instead of positional name parsing", () => {
+    expect(parseFastWhatsAppQuery("റഷീദ് എന്ന ഡ്രൈവർ ഇന്ന് എത്ര ട്രിപ്പ് പോയിട്ടുണ്ട്?")).toBeNull();
+    expect(parseFastWhatsAppQuery("ഡ്രൈവർ റഷീദിന് എത്ര ട്രിപ്പ്?")).toBeNull();
+    expect(parseFastWhatsAppQuery("ഇന്നലെ രാത്രി പോയ ഡ്രൈവർ റഷീദ് ആയിരുന്നോ?")).toBeNull();
+    expect(parseFastWhatsAppQuery("എത്ര ഡ്രൈവർമാരുണ്ട്?")).toBeNull();
   });
 
   it("detects driver questions so they cannot fall through to unrelated bill replies", () => {
