@@ -514,3 +514,10 @@ A production voice message produced a materially incorrect Malayalam transcript.
 The older K037 wording that voice transcription and the Groq fallback were not implemented is stale relative to the current source: `lib/ingest.ts` transcribes voice messages and routes the transcript through the shared text query/document workflow; `lib/whatsapp-queries.ts` includes a bounded Groq intent fallback and a bounded conversational fallback. Their live phrasing/latency quality still requires a controlled, user-observed WhatsApp acceptance test.
 
 The current stock-query implementation already supports product-specific live balances with exact/approved-alias matching and guarded fuzzy read suggestions. Branch `agent/stock-query-agent` adds a broad read-only stock inventory summary from `stock_balances`, capped at 20 visible rows. This new slice is not production-accepted until CI passes and a user-controlled live query is observed. It must not mutate stock or infer quantities.
+
+
+## K043 - Natural-language trip creation requires live acceptance
+
+Branch `agent/natural-language-trip-start` adds bounded semantic classification for explicit trip-start requests and reuses the existing trip workflow. Deterministic English/Manglish/Malayalam start phrases remain the fast path. Named drivers are resolved only against exact active-directory matches; unknown/ambiguous names do not create a trip. The existing database uniqueness constraint prevents duplicate active trips per sender.
+
+Unit/handler/CI verification is pending for this branch. A live WhatsApp test must be performed by the operator; automated CI does not prove Groq production configuration, real Meta inbound delivery, or end-to-end latency.
