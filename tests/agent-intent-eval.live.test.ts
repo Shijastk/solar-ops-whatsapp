@@ -4,7 +4,7 @@ import { classifyOperationalQueryWithGroq } from "../lib/whatsapp-query-intent";
 
 const runLiveEvaluation = process.env.SOLAR_OPS_RUN_LIVE_AGENT_EVAL === "true";
 
-const cases = [
+const cases: Array<{\n  id: string;\n  input: string;\n  expected: string;\n  namedDriver?: string;\n  yesterday?: boolean;\n  requiresReply?: boolean;\n  neverStartTrip?: boolean;\n}> = [
   { id: "stock-summary-en", input: "show me the stock we have", expected: "stock_inventory_summary" },
   { id: "stock-summary-ml", input: "നമ്മുടെ സ്റ്റോക്ക് ലിസ്റ്റ് കാണിക്കൂ", expected: "stock_inventory_summary" },
   { id: "driver-count-ml", input: "എത്ര ഡ്രൈവർമാരുണ്ട്?", expected: "driver_count" },
