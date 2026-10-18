@@ -1155,8 +1155,21 @@ export async function handleFastWhatsAppQuery(
     classifierOutcome = "no_result";
     const classifierStartedAt = performance.now();
     try {
+      let driverNames: string[] | undefined;
+      if (driverQuestion) {
+        const supabase = getSupabaseAdmin();
+        const { data: drivers, error: driverDirectoryError } = await supabase
+          .from("ops_drivers")
+          .select("name")
+          .eq("active", true);
+        if (driverDirectoryError) {
+          throw new Error("Failed to load driver directory for intent resolution: " + driverDirectoryError.message);
+        }
+        driverNames = (drivers ?? []).map((driver) => String(driver.name ?? "")).filter(Boolean);
+      }
       const classification = await classifyOperationalQueryWithGroq(
         message.textBody,
+        { driverNames },
       );
       if (classification) {
         classifierOutcome = classification.intent === "unsupported" ? "unsupported" : "mapped";
