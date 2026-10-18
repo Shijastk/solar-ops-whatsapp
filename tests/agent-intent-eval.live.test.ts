@@ -33,9 +33,9 @@ function sanitizeProviderError(error: unknown): { errorType: string; errorMessag
   const errorType = error instanceof Error ? error.name : "UnknownError";
   const rawMessage = error instanceof Error ? error.message : String(error);
   const errorMessage = rawMessage
-    .replace(/Bearer\\s+[^\\s,;]+/gi, "Bearer [redacted]")
-    .replace(/\\b(?:gsk_|sk-)[A-Za-z0-9_-]{8,}\\b/g, "[redacted]")
-    .replace(/\\s+/g, " ")
+    .replace(/Bearer\s+[^\s,;]+/gi, "Bearer [redacted]")
+    .replace(/\b(?:gsk_|sk-)[A-Za-z0-9_-]{8,}\b/g, "[redacted]")
+    .replace(/\s+/g, " ")
     .trim()
     .slice(0, 180);
   return { errorType, errorMessage: errorMessage || "No error message provided" };
