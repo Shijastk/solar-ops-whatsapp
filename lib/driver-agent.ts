@@ -44,8 +44,9 @@ export function parseDriverMutation(text: string): DriverIntent | null {
   // captured only from explicit action phrases; general mentions never write.
   const malayalamPatterns: Array<{ action: DriverIntent["action"]; regex: RegExp }> = [
     { action: "create", regex: /^(.+?)\\s+(?:പുതിയ\\s+)?ഡ്രൈവറായി\\s+(?:ആഡ്\\s+ചെയ്യണം|ചേർക്കണം|ചേർക്കൂ)$/u },
-    { action: "create", regex: /^(.+?)\\s+(?:new\\s+)?driver\\s+ആയി\\s+add\\s+ചെയ്യണം$/iu },
+    { action: "create", regex: /^(.+?)\\s+(?:new\\s+)?driver\\s+(?:ആയി|ayi)\\s+add\\s+(?:ചെയ്യണം|cheyyanam|cheyyu)$/iu },
     { action: "deactivate", regex: /^(.+?)യെ?\\s+(?:ഡ്രൈവർ\\s+ലിസ്റ്റിൽ\\s+നിന്ന്\\s+)?(?:ഡിലീറ്റ്\\s+ചെയ്യണം|ഡിലീറ്റ്|ഒഴിവാക്കണം|നീക്കം\\s+ചെയ്യണം)$/u },
+    { action: "deactivate", regex: /^(.+?)\\s+(?:delete|remove|deactivate)\\s+(?:cheyyanam|cheyyu|ചെയ്യണം)$/iu },
     { action: "deactivate", regex: /^(?:delete|remove)\\s+(.+?)\\s+driver$/i },
   ];
 
@@ -61,7 +62,7 @@ export function parseDriverMutation(text: string): DriverIntent | null {
     const match = value.match(entry.regex);
     const candidate = match?.[1] ?? "";
     if (candidate) {
-      const name = normalizeDriverName(candidate.replace(/(?:നെ|യെ|യെ?)+$/u, ""));
+      const name = normalizeDriverName(candidate.replace(/(?:നെ|യെ|യെ?)+$/u, "").replace(/ine$/i, ""));
       if (isValidDriverName(name)) return { action: entry.action, name };
     }
   }
