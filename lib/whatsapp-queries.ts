@@ -348,6 +348,13 @@ export function mapAiClassificationToFastQuery(
       : { type: "stock_product_required" };
   }
 
+  if (classification.intent === "driver_trip_summary") {
+    const driverName = classification.driver_name?.trim();
+    return driverName
+      ? { type: "driver_trip_summary", driverName, yesterday: classification.yesterday }
+      : null;
+  }
+
   if (classification.intent === "ops_period_summary") {
     return classification.period
       ? { type: "ops_period_summary", period: classification.period }
@@ -1145,7 +1152,7 @@ export async function handleFastWhatsAppQuery(
     "not_attempted";
   let classifierDurationMs = 0;
 
-  if (!query && !driverQuestion) {
+  if (!query) {
     classifierOutcome = "no_result";
     const classifierStartedAt = performance.now();
     try {
