@@ -65,3 +65,15 @@ Finish driver operations as a reliable, tested capability before treating the wi
 2. Finish read-only `ops_drivers` metadata audit (indexes, RLS/policies, grants, triggers), then document the schema source gap and add a reproducible migration on a non-main branch only when supported by evidence.
 3. Extend isolated mocked handler tests for create/list/error/duplicate/verification behavior. Keep deactivation fail-closed until sender-scoped, expiring, one-time confirmation is implemented and tested.
 4. Keep production feature gate disabled; do not merge any PR without explicit approval.
+
+
+### Additional read-only schema audit
+
+- `public.ops_drivers` has exactly two reported indexes: primary-key unique index on `id` and unique index on `normalized_name`.
+- Row-level security is enabled; `FORCE ROW LEVEL SECURITY` is false.
+- `pg_policies` reports no policies for this table.
+- `information_schema.triggers` reports no triggers for this table.
+- Table grants visible in `information_schema.role_table_grants` were for `postgres` and `service_role`; service_role has SELECT/INSERT/UPDATE/DELETE plus related table privileges. No anon/authenticated grants were returned by this query.
+- These are read-only catalog observations, not proof of effective access in every runtime path. The driver handler's server-side client and key handling still need code-level verification; no secrets were inspected.
+
+This narrows the schema gap but does not identify the original table-creation migration. Do not apply a production migration based only on these observations. A safe next implementation step is to add isolated mocked handler tests for create/list/error cases while separately tracing schema provenance through repository history and Supabase migration metadata.
