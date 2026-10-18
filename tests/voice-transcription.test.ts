@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { transcribeOperationalVoice } from "../lib/voice-transcription";
 
 const keys = ["AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION", "AZURE_SPEECH_TIMEOUT_MS"] as const;
-const originals = Object.fromEntries(keys.map((key) => [key, process.env[key])) as Record<(typeof keys)[number], string | undefined>;
+const originals = Object.fromEntries(keys.map((key) => [key, process.env[key]])) as Record<(typeof keys)[number], string | undefined>;
 
 afterEach(() => {
   vi.unstubAllGlobals();
