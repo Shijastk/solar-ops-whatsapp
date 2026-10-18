@@ -32,6 +32,7 @@ describe("WhatsApp trip capture helpers", () => {
     expect(looksLikePotentialTripStartRequest("Please open a new trip with Unknown Driver")).toBe(true);
     expect(looksLikePotentialTripStartRequest("I want to know today's trip details")).toBe(false);
     expect(looksLikePotentialTripStartRequest("show latest trip")).toBe(false);
+    expect(looksLikePotentialTripStartRequest("I need trip data")).toBe(false);
     expect(classifyTripTextCommand("done")).toBe("done");
     expect(classifyTripTextCommand("ശരി")).toBe("done");
     expect(classifyTripTextCommand("complete")).toBe("done");
