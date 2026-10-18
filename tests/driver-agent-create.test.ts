@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   from: vi.fn(),
+  rpc: vi.fn(),
   sendReply: vi.fn(),
   existing: null as { id: string; name: string; active: boolean } | null,
   created: null as { id: string; name: string; active: boolean } | null,
@@ -11,13 +12,16 @@ const state = vi.hoisted(() => ({
   verifyError: null as { message: string } | null,
   insertPayload: null as { name: string; normalized_name: string; active: boolean } | null,
   listRows: [] as Array<{ name: string; active: boolean }>,
+  driverMatches: [] as Array<{ id: string; name: string; active: boolean }>,
   listError: null as { message: string } | null,
+  confirmationInsertError: null as { message: string } | null,
+  rpcResult: null as { data: { status: string; driver_name?: string } | null; error: { message: string } | null } | null,
   maybeSingleCount: 0,
   originalFeatureFlag: undefined as string | undefined,
 }));
 
 vi.mock("@/lib/supabase-admin", () => ({
-  getSupabaseAdmin: () => ({ from: state.from }),
+  getSupabaseAdmin: () => ({ from: state.from, rpc: state.rpc }),
 }));
 vi.mock("@/lib/replies", () => ({
   sendOpsReply: state.sendReply,
@@ -45,13 +49,22 @@ beforeEach(() => {
   state.verifyError = null;
   state.insertPayload = null;
   state.listRows = [];
+  state.driverMatches = [];
   state.listError = null;
+  state.confirmationInsertError = null;
+  state.rpcResult = { data: { status: "deactivated", driver_name: "Mohammed Ali" }, error: null };
   state.maybeSingleCount = 0;
   state.originalFeatureFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
   process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
 
+  state.rpc.mockImplementation(async (name: string, args: unknown) => {
+    state.rpc.mock.calls[state.rpc.mock.calls.length - 1];
+    if (name !== "confirm_ops_driver_deactivation") throw new Error("Unexpected RPC: " + name);
+    return state.rpcResult;
+  });
   state.from.mockImplementation((table: string) => {
-    if (table !== "ops_drivers") throw new Error("Unexpected table: " + table);
+    if (table !== "ops_drivers" && table !== "ops_driver_action_confirmations") throw new Error("Unexpected table: " + table);
+    const filters: Array<[string, unknown]> = [];
     const query: {
       select: ReturnType<typeof vi.fn>;
       eq: ReturnType<typeof vi.fn>;
@@ -61,6 +74,7 @@ beforeEach(() => {
       order: ReturnType<typeof vi.fn>;
       limit: ReturnType<typeof vi.fn>;
       then: ReturnType<typeof vi.fn>;
+      filters: Array<[string, unknown]>;
     } = {
       select: vi.fn(),
       eq: vi.fn(),
@@ -70,14 +84,23 @@ beforeEach(() => {
       order: vi.fn(),
       limit: vi.fn(),
       then: vi.fn(),
+      filters,
     };
     query.select.mockReturnValue(query);
-    query.eq.mockReturnValue(query);
+    query.eq.mockImplementation((column: string, value: unknown) => {
+      filters.push([column, value]);
+      return query;
+    });
     query.order.mockReturnValue(query);
     query.limit.mockReturnValue(query);
-    query.then.mockImplementation((resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
-      Promise.resolve({ data: state.listRows, error: state.listError }).then(resolve, reject),
-    );
+    query.then.mockImplementation((resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
+      const value = table === "ops_driver_action_confirmations"
+        ? { data: null, error: state.confirmationInsertError }
+        : filters.some(([column]) => column === "normalized_name")
+          ? { data: state.driverMatches, error: state.listError }
+          : { data: state.listRows, error: state.listError };
+      return Promise.resolve(value).then(resolve, reject);
+    });
     query.insert.mockImplementation((payload: typeof state.insertPayload) => {
       state.insertPayload = payload;
       return query;
@@ -241,6 +264,61 @@ describe("driver agent isolated create handler", () => {
       handleDriverMutation(makeMessage("List drivers"), "stored-driver-list-error"),
     ).rejects.toThrow("Driver list lookup failed");
     expect(state.sendReply).not.toHaveBeenCalled();
+  });
+
+
+  it("creates a sender-scoped one-time confirmation for driver deactivation", async () => {
+    state.driverMatches = [{ id: "driver-1", name: "Mohammed Ali", active: true }];
+
+    const result = await handleDriverMutation(
+      makeMessage("Delete driver named Mohammed Ali"),
+      "stored-deactivate-request",
+    );
+
+    expect(result).toBe("handled");
+    expect(state.from).toHaveBeenCalledWith("ops_driver_action_confirmations");
+    expect(state.sendReply).toHaveBeenCalledTimes(1);
+    const body = state.sendReply.mock.calls[0][0].body as string;
+    expect(body).toContain("CONFIRM DRIVER ");
+    expect(body).toContain("5 മിനിറ്റിനുള്ളിൽ");
+  });
+
+  it("fails closed when the durable confirmation cannot be stored", async () => {
+    state.driverMatches = [{ id: "driver-1", name: "Mohammed Ali", active: true }];
+    state.confirmationInsertError = { message: "simulated insert error" };
+
+    await expect(
+      handleDriverMutation(makeMessage("Delete driver named Mohammed Ali"), "stored-deactivate-insert-error"),
+    ).rejects.toThrow("Driver deactivation confirmation could not be created");
+    expect(state.sendReply).not.toHaveBeenCalled();
+  });
+
+  it("sends the token hash and sender identity to the atomic confirmation RPC", async () => {
+    const token = "a".repeat(48);
+    const result = await handleDriverMutation(
+      makeMessage("CONFIRM DRIVER " + token),
+      "stored-deactivate-confirm",
+    );
+
+    expect(result).toBe("handled");
+    expect(state.rpc).toHaveBeenCalledWith("confirm_ops_driver_deactivation", {
+      p_token_hash: expect.any(String),
+      p_sender_phone: "15550001111",
+    });
+    expect(state.sendReply.mock.calls[0][0].body).toContain("deactivate ചെയ്തു");
+  });
+
+  it("does not claim deactivation success for an invalid or expired token", async () => {
+    state.rpcResult = { data: { status: "invalid" }, error: null };
+
+    const result = await handleDriverMutation(
+      makeMessage("CONFIRM DRIVER " + "b".repeat(48)),
+      "stored-deactivate-invalid",
+    );
+
+    expect(result).toBe("handled");
+    expect(state.sendReply.mock.calls[0][0].body).toContain("മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല");
+    expect(state.sendReply.mock.calls[0][0].body).not.toContain("deactivate ചെയ്തു");
   });
 
 });
