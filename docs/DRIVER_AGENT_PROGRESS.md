@@ -74,3 +74,12 @@ Finish driver operations as a reliable, tested capability before treating the wi
 - GitHub Actions run [39130929497](https://github.com/Shijastk/solar-ops-whatsapp/actions/runs/39130929497) completed with **success** on exact head SHA `1b99ca6b8f6c9b8ec16a9bd1262a3773d3ac431b`.
 - All required steps passed: dependency install, TypeScript typecheck, lint, unit tests, and production build.
 - This result applies to that exact SHA only. The next commit will require its own CI verification. PR #60 remains draft/unmerged; no production data or WhatsApp messages were changed; production feature flag remains disabled.
+
+## Sender-scoped deactivation confirmation implementation — 2026-10-18
+
+- Added reproducible bootstrap migration `supabase/migrations/20261018115900_ops_drivers_catalog.sql` for fresh environments. The existing live catalog was previously present in database metadata but had no matching repository migration.
+- Added `supabase/migrations/20261018120000_ops_driver_deactivation_confirmation.sql`: confirmation records store only SHA-256 token hashes, bind the request to the originating WhatsApp sender and driver, expire after the requested five-minute window, and can be consumed once.
+- Added atomic `confirm_ops_driver_deactivation(text,text)` database function. It locks the confirmation row, checks sender/action/expiry/consumption, deactivates only the referenced active driver, and consumes the token in the same transaction. Function execution is granted only to `service_role`; table access is revoked from `public`, `anon`, and `authenticated`.
+- Updated `lib/driver-agent.ts` to issue a cryptographically random 192-bit one-time token for a uniquely matched active driver and accept only the explicit `CONFIRM DRIVER <token>` form. Confirmation tokens are hashed before storage and never stored in plaintext. Invalid, expired, reused, or wrong-sender tokens cannot deactivate a driver.
+- Expanded isolated handler tests for confirmation creation, hashed-token storage, sender binding, database insert failures, atomic RPC success/error, and invalid/expired token responses. Tests mock Supabase and WhatsApp reply transport.
+- **Not yet production-ready:** migrations have not been applied to any database; no production rows or WhatsApp messages were changed. Verify these migrations in an isolated Supabase branch/database and confirm catalog compatibility before any rollout. Production feature flag remains disabled and PR #60 remains draft/unmerged.
