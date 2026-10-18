@@ -1,4 +1,5 @@
 import { deterministicUuid } from "@/lib/idempotency";
+import { classifyOperationalQueryWithGroq } from "@/lib/whatsapp-query-intent";
 import { sendOpsList, sendOpsReply } from "@/lib/replies";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
@@ -147,6 +148,32 @@ function normalizeText(value: string): string {
     .trim();
 }
 
+export function classifyNaturalTripStartCommand(value: string): boolean {
+  const text = normalizeText(value);
+  const naturalStartPatterns = [
+    /^(?:please )?(?:create|start|open|begin|make) (?:a )?(?:new )?trip(?: now)?$/,
+    /^(?:i )?(?:want|need) to (?:create|start|open|begin) (?:a )?(?:new )?trip$/,
+    /^(?:i )?(?:want|need) (?:a )?(?:new )?trip$/,
+    /^(?:trip|oru trip|oru puthiya trip|puthiya trip) (?:create|start) (?:cheyyu|cheyyanam|cheyyoo|cheyyuka)$/,
+    /^(?:oru )?(?:puthiya )?trip (?:thudangu|thudangam|thudanganam|thudangoo|venam)$/,
+    /^(?:oru )?(?:puthiya )?trip (?:create|start) (?:cheyyu|cheyyanam)$/,
+    /^(?:ഒരു )?(?:പുതിയ )?ട്രിപ്പ് (?:തുടങ്ങൂ|തുടങ്ങണം|തുടങ്ങാം|ഉണ്ടാക്കൂ|ഉണ്ടാക്കണം|വേണം)$/u,
+  ];
+  return naturalStartPatterns.some((pattern) => pattern.test(text));
+}
+
+function isNaturalTripStartEnabled(): boolean {
+  return process.env.SOLAR_OPS_NATURAL_TRIP_START_ENABLED === "true";
+}
+
+function hasTripMention(normalizedText: string): boolean {
+  return (
+    /\btrips?\b/.test(normalizedText) ||
+    normalizedText.includes("ട്രിപ്പ്") ||
+    normalizedText.includes("ട്രിപ്പുകൾ")
+  );
+}
+
 export function classifyTripTextCommand(value: string): TripTextCommand {
   const text = normalizeText(value);
   if (!text) return null;
@@ -212,6 +239,32 @@ export function classifyTripTextCommand(value: string): TripTextCommand {
   return null;
 }
 
+export function looksLikePotentialTripStartRequest(value: string): boolean {
+  const text = normalizeText(value);
+  if (!hasTripMention(text)) return false;
+
+  const informationalTerms = [
+    "latest", "last", "today", "yesterday", "tomorrow", "tonight", "week", "month", "year", "summary", "details", "status",
+    "history", "report", "count", "list", "which", "what", "show", "tell",
+    "want to know", "need to know", "how many", "how", "when", "where", "who",
+    "pending", "bill", "bills", "stock", "products", "product", "data",
+    "information", "info", "about", "available", "ഇന്നത്തെ", "ഇന്നലെ",
+    "അവസാന", "വിശദാംശ", "വിവരം", "സ്റ്റാറ്റസ്", "ചരിത്രം", "റിപ്പോർട്ട്",
+    "സമ്മറി", "ആഴ്ച", "മാസം", "വർഷം", "നാളെ", "ഇന്ന്", "ഇന്നലെ", "എത്ര", "കഴിഞ്ഞ", "പോയി", "കാണിക്കൂ", "പറയൂ", "അറിയണം",
+  ];
+  if (informationalTerms.some((term) => text.includes(term))) return false;
+
+  const actionTerms = [
+    "create", "start", "open", "begin", "make", "please", "new",
+    "want to create", "need to create", "want to start", "need to start",
+    "want a trip", "need a trip", "want trip", "need trip",
+    "cheyyu", "cheyyanam", "cheyyoo", "thudangu", "thudangam",
+    "thudanganam", "thudangoo", "venam", "undakku", "undakkanam",
+    "പുതിയ", "തുടങ്ങ", "ഉണ്ടാക്ക", "വേണം", "ആരംഭ",
+  ];
+  return actionTerms.some((term) => text.includes(term));
+}
+
 export function extractTripStartDriverQuery(value: string): string | null {
   const text = normalizeText(value);
   const prefixes = [
@@ -230,6 +283,10 @@ export function extractTripStartDriverQuery(value: string): string | null {
     "latest", "last", "today", "summary", "details", "status", "bill",
     "bills", "stock", "products", "product", "count", "pending", "cancel",
     "done", "driver", "history", "list", "report", "trips", "trip",
+    "create", "start", "open", "begin", "make", "new", "please", "need",
+    "want", "for", "with", "cheyyu", "cheyyanam", "thudangu", "thudangam",
+    "thudanganam", "thudangoo", "venam", "undakku", "undakkanam",
+    "പുതിയ", "തുടങ്ങ", "ഉണ്ടാക്ക", "വേണം", "ആരംഭ",
   ];
 
   for (const prefix of prefixes) {
@@ -594,11 +651,44 @@ async function sendHomeMenu(
   });
 }
 
+async function loadTripStartedByMessage(
+  senderPhone: string,
+  storedMessageId: string,
+): Promise<TripRow | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("delivery_trips")
+    .select(
+      "id, sender_phone, status, display_name, primary_destination, destination_pincode, destination_district, destination_state, vehicle_number, driver_id",
+    )
+    .eq("sender_phone", senderPhone)
+    .eq("started_by_message_id", storedMessageId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Failed to verify trip start message: " + error.message);
+  }
+  return (data as TripRow | null) ?? null;
+}
+
 async function startTrip(
   message: NormalizedWhatsAppMessage,
   storedMessageId: string,
   driver?: { id: string; name: string },
 ) {
+  const priorFromMessage = await loadTripStartedByMessage(
+    message.senderPhone,
+    storedMessageId,
+  );
+  if (priorFromMessage) {
+    await sendOpsReply({
+      requestId: deterministicUuid("trip-start-replay:" + storedMessageId),
+      replyToMessageId: storedMessageId,
+      body: "ഈ message ഉപയോഗിച്ച് ഒരു trip ഇതിനകം process ചെയ്തിട്ടുണ്ട്. Duplicate trip create ചെയ്തിട്ടില്ല.",
+      knownInboundAt: message.timestamp,
+    });
+    return;
+  }
+
   const existing = await loadActiveTrip(message.senderPhone);
   if (existing) {
     const stateText =
@@ -632,7 +722,50 @@ async function startTrip(
     started_by_message_id: storedMessageId,
   });
 
+  if (error?.code === "23505") {
+    const concurrentTrip = await loadActiveTrip(message.senderPhone);
+    if (concurrentTrip) {
+      await sendOpsReply({
+        requestId: deterministicUuid("trip-already-open-race:" + storedMessageId),
+        replyToMessageId: storedMessageId,
+        body: "🚚 ഒരു trip ഇതിനകം open ആണ്. അതേ trip-ലേക്ക് bills അയക്കൂ; duplicate trip create ചെയ്തിട്ടില്ല.",
+        knownInboundAt: message.timestamp,
+      });
+      return;
+    }
+  }
+
   if (error) throw new Error("Failed to create trip: " + error.message);
+
+  let verifiedTrip: TripRow | null = null;
+  try {
+    verifiedTrip = await loadTripStartedByMessage(
+      message.senderPhone,
+      storedMessageId,
+    );
+  } catch (readbackError) {
+    console.error("Trip creation read-back failed", {
+      reason:
+        readbackError instanceof Error
+          ? readbackError.message.slice(0, 180)
+          : "Unknown read-back error",
+    });
+  }
+
+  if (
+    !verifiedTrip ||
+    verifiedTrip.sender_phone !== message.senderPhone ||
+    verifiedTrip.status !== "collecting" ||
+    verifiedTrip.driver_id !== (driver?.id ?? null)
+  ) {
+    await sendOpsReply({
+      requestId: deterministicUuid("trip-open-unverified:" + storedMessageId),
+      replyToMessageId: storedMessageId,
+      knownInboundAt: message.timestamp,
+      body: "Trip create request process ചെയ്തു, പക്ഷേ database-ൽ save ആയെന്ന് verify ചെയ്യാൻ കഴിഞ്ഞില്ല. അതിനാൽ success confirm ചെയ്യാനാവില്ല. വീണ്ടും ശ്രമിക്കുന്നതിന് മുമ്പ് open trip പരിശോധിക്കൂ.",
+    });
+    return;
+  }
 
   await sendOpsReply({
     requestId: deterministicUuid("trip-opened:" + storedMessageId),
@@ -1339,8 +1472,21 @@ export async function handleTripWorkflowInbound(
   const active = await loadActiveTrip(message.senderPhone);
   const command = classifyTripTextCommand(message.textBody);
 
-  if (active?.status === "awaiting_driver_name" && command !== "cancel") {
+  if (
+    active?.status === "awaiting_driver_name" &&
+    command === null &&
+    !hasTripMention(normalizeText(message.textBody)) &&
+    !looksLikePotentialTripStartRequest(message.textBody)
+  ) {
     await createAndAssignDriver(active, message.textBody, storedMessageId);
+    return "handled";
+  }
+
+  if (
+    isNaturalTripStartEnabled() &&
+    classifyNaturalTripStartCommand(message.textBody)
+  ) {
+    await startTrip(message, storedMessageId);
     return "handled";
   }
 
@@ -1435,6 +1581,55 @@ export async function handleTripWorkflowInbound(
       });
     }
     return "handled";
+  }
+
+  if (looksLikePotentialTripStartRequest(message.textBody)) {
+    if (!isNaturalTripStartEnabled()) {
+      await sendOpsReply({
+        requestId: deterministicUuid("trip-natural-start-disabled:" + storedMessageId),
+        replyToMessageId: storedMessageId,
+        knownInboundAt: message.timestamp,
+        body: "Natural-language trip start ഇപ്പോൾ enabled അല്ല. Trip തുടങ്ങാൻ 'trip' അല്ലെങ്കിൽ 'New Trip' അയക്കൂ.",
+      });
+      return "handled";
+    }
+
+    let classification: Awaited<ReturnType<typeof classifyOperationalQueryWithGroq>> = null;
+    try {
+      classification = await classifyOperationalQueryWithGroq(message.textBody);
+    } catch (error) {
+      console.warn("Trip-start intent classification failed", {
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown classification error",
+      });
+      return "ignored";
+    }
+
+    if (classification?.intent === "start_trip") {
+      const requestedDriverName = classification.driver_name?.trim() || null;
+      if (requestedDriverName) {
+        const match = await findActiveDriverExact(requestedDriverName);
+        if (match.status === "matched") {
+          await startTrip(message, storedMessageId, match.driver);
+        } else {
+          await sendOpsReply({
+            requestId: deterministicUuid("trip-natural-driver-no-match:" + storedMessageId),
+            replyToMessageId: storedMessageId,
+            knownInboundAt: message.timestamp,
+            body:
+              (match.status === "ambiguous"
+                ? "ഒന്നിലധികം active drivers match ചെയ്യുന്നു. "
+                : "പറഞ്ഞ driver-നെ saved active list-ൽ exact ആയി കണ്ടെത്തിയില്ല. ") +
+              "Trip create ചെയ്തിട്ടില്ല. Driver-ന്റെ saved name കൃത്യമായി അയക്കൂ; അല്ലെങ്കിൽ driver name പറയാതെ trip തുടങ്ങാം.",
+          });
+        }
+      } else {
+        await startTrip(message, storedMessageId);
+      }
+      return "handled";
+    }
   }
 
   if (active?.status === "awaiting_driver") {

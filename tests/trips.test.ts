@@ -5,7 +5,9 @@ import {
   combineTripItems,
   choosePrimaryDestination,
   classifyTripTextCommand,
+  classifyNaturalTripStartCommand,
   extractTripStartDriverQuery,
+  looksLikePotentialTripStartRequest,
   normalizeDriverName,
   parseIndiaPostPincodeCsv,
 } from "../lib/trips";
@@ -14,6 +16,14 @@ describe("WhatsApp trip capture helpers", () => {
   it("recognizes fast trip commands without AI", () => {
     expect(classifyTripTextCommand("trip")).toBe("start");
     expect(classifyTripTextCommand("New Trip")).toBe("start");
+    expect(classifyTripTextCommand("Create a new trip")).toBeNull();
+    expect(classifyTripTextCommand("I want to start a new trip")).toBeNull();
+    expect(classifyTripTextCommand("trip create cheyyu")).toBeNull();
+    expect(classifyTripTextCommand("പുതിയ ട്രിപ്പ് തുടങ്ങൂ")).toBeNull();
+    expect(classifyNaturalTripStartCommand("Create a new trip")).toBe(true);
+    expect(classifyNaturalTripStartCommand("I want to start a new trip")).toBe(true);
+    expect(classifyNaturalTripStartCommand("trip create cheyyu")).toBe(true);
+    expect(classifyNaturalTripStartCommand("പുതിയ ട്രിപ്പ് തുടങ്ങൂ")).toBe(true);
     expect(classifyTripTextCommand("varum trip")).toBe("start");
     expect(classifyTripTextCommand("വരും ട്രിപ്പ്")).toBe("start");
     expect(classifyTripTextCommand("ട്രിപ്പ്")).toBe("start");
@@ -21,6 +31,14 @@ describe("WhatsApp trip capture helpers", () => {
     expect(extractTripStartDriverQuery("varum trip Rasheed")).toBe("rasheed");
     expect(extractTripStartDriverQuery("ട്രിപ്പ് റഷീദ്")).toBe("റഷീദ്");
     expect(extractTripStartDriverQuery("trip latest")).toBeNull();
+    expect(extractTripStartDriverQuery("trip create cheyyanam")).toBeNull();
+    expect(extractTripStartDriverQuery("new trip with Rasheed")).toBeNull();
+    expect(looksLikePotentialTripStartRequest("I need a new trip for Rasheed")).toBe(true);
+    expect(looksLikePotentialTripStartRequest("Please open a new trip with Unknown Driver")).toBe(true);
+    expect(looksLikePotentialTripStartRequest("I want to know today's trip details")).toBe(false);
+    expect(looksLikePotentialTripStartRequest("show latest trip")).toBe(false);
+    expect(looksLikePotentialTripStartRequest("I need trip data")).toBe(false);
+    expect(looksLikePotentialTripStartRequest("I need a trip for tomorrow")).toBe(false);
     expect(classifyTripTextCommand("done")).toBe("done");
     expect(classifyTripTextCommand("ശരി")).toBe("done");
     expect(classifyTripTextCommand("complete")).toBe("done");

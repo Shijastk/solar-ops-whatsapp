@@ -486,3 +486,12 @@ Use a maximum 96 KiB private PNG field for a handful of company profile photos, 
 PDF selection is local until Save. This avoids empty trip creation and stock processing before explicit operator intent without introducing a preparation table or a new queue. Save can partially persist independent bills before the atomic group transaction; preserve those records and disclose the state rather than reversing valid movements. Reuse upload/group UUIDs for retry. Do not claim full upload+stock+group atomicity across external Storage and Postgres.
 
 Move company switch back to the top by the latest approved workflow; keep three work tabs. Hide site/owner/name complexity together, not behind a wizard. Stock cards and chart use explicit physical-trip completion timestamps, not ready timestamps, goods units or monetary totals. The graph is operational activity, not sales accounting. No extra payments fields are added.
+
+
+## D053 - Natural-language trip creation is classified but server-validated
+
+Decision: the bounded operational intent classifier may identify an explicit request to create/open a trip. The current message alone is used for classification; no SQL, database history, or stock data is sent to the model. A named driver is accepted only after exact normalized matching against the active driver directory. If that match fails, the trip is not created. If no driver is named, the existing trip collection flow starts without one.
+
+The application remains responsible for checking the sender's active trip and inserting through the existing trip workflow. The partial unique index on active trips per sender remains the database-level duplicate guard; uniqueness conflicts are treated as an already-open trip. The model cannot invent destinations, bills, driver IDs, or completion state.
+
+Reason: natural-language input should reduce command memorization without giving an LLM authority to mutate operational records directly.

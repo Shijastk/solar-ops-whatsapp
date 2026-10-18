@@ -325,6 +325,51 @@ describe("WhatsApp AI intent fallback", () => {
     );
   });
 
+  it("classifies an explicit natural-language trip start and extracts only a named driver", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  intent: "start_trip",
+                  product_query: null,
+                  driver_name: "Rasheed",
+                  yesterday: false,
+                  period: null,
+                  reply: null,
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      classifyOperationalQueryWithGroq("Please open a new trip with Rasheed"),
+    ).resolves.toEqual({
+      intent: "start_trip",
+      product_query: null,
+      driver_name: "Rasheed",
+      yesterday: false,
+      period: null,
+      reply: null,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body.response_format.json_schema.schema.properties.intent.enum).toContain(
+      "start_trip",
+    );
+  });
+
   it("returns null when Groq-backed automation is disabled", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "false";
     delete process.env.GROQ_API_KEY;
