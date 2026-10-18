@@ -69,6 +69,13 @@ describe("fast WhatsApp operational query parsing", () => {
     });
   });
 
+  it("routes driver wording to semantic classification instead of positional name parsing", () => {
+    expect(parseFastWhatsAppQuery("റഷീദ് എന്ന ഡ്രൈവർ ഇന്ന് എത്ര ട്രിപ്പ് പോയിട്ടുണ്ട്?")).toBeNull();
+    expect(parseFastWhatsAppQuery("ഡ്രൈവർ റഷീദിന് എത്ര ട്രിപ്പ്?")).toBeNull();
+    expect(parseFastWhatsAppQuery("ഇന്നലെ രാത്രി പോയ ഡ്രൈവർ റഷീദ് ആയിരുന്നോ?")).toBeNull();
+    expect(parseFastWhatsAppQuery("എത്ര ഡ്രൈവർമാരുണ്ട്?")).toBeNull();
+  });
+
   it("detects driver questions so they cannot fall through to unrelated bill replies", () => {
     expect(isDriverRelatedQuestion("Innu poya driver Rasheed ariyamo?")).toBe(true);
     expect(isDriverRelatedQuestion("ഇന്ന് പോയത് ഡ്രൈവർ റഷീദായിരുന്നു")).toBe(true);
