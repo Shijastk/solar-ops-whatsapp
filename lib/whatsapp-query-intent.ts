@@ -152,6 +152,35 @@ export type AiOperationalQueryClassification = z.infer<
   typeof classificationSchema
 >;
 
+function normalizeNameTokens(value: string): string[] {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("en")
+    .match(/[\\p{L}\\p{N}]+/gu) ?? [];
+}
+
+function findExactDriverNameInQuery(
+  query: string,
+  driverNames: string[],
+): string | null {
+  const queryTokens = normalizeNameTokens(query);
+  const matches = driverNames.filter((driverName) => {
+    const nameTokens = normalizeNameTokens(driverName);
+    if (nameTokens.length === 0 || nameTokens.length > queryTokens.length) return false;
+    return queryTokens.some((_, index) =>
+      nameTokens.every((token, offset) => queryTokens[index + offset] === token),
+    );
+  });
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function explicitlyMentionsYesterday(value: string): boolean {
+  const tokens = normalizeNameTokens(value);
+  return ["yesterday", "innale", "ഇന്നലെ", "കഴിഞ്ഞ", "ദിവസം"].some((term) =>
+    term.includes(" ") ? value.normalize("NFKC").toLocaleLowerCase("en").includes(term) : tokens.includes(term),
+  );
+}
+
 function normalizeQueryText(value: string): string {
   return value
     .normalize("NFKC")
@@ -284,11 +313,28 @@ export async function classifyOperationalQueryWithGroq(
   }
 
   const productQuery = parsed.data.product_query?.trim() || null;
+  const normalizedQuery = boundedText.normalize("NFKC").toLocaleLowerCase("en");
+  const exactDriverName = findExactDriverNameInQuery(boundedText, driverNames);
+  const hasTripTerm = /(?:^|[^\\p{L}\\p{N}])(?:trip|trips|ട്രിപ്പ്|ട്രിപ്പുകൾ)(?:$|[^\\p{L}\\p{N}])/iu.test(boundedText);
+  const hasYesterdayTerm = /(?:^|[^\\p{L}\\p{N}])(?:yesterday|innale)(?:$|[^\\p{L}\\p{N}])/iu.test(normalizedQuery) ||
+    boundedText.includes("ഇന്നലെ");
+
+  // Keep this correction narrow: the observed failure was a named-driver query
+  // classified as a general yesterday summary. Resolve an exact directory-name
+  // match deterministically rather than asking the model to reproduce spelling.
+  const correctNamedYesterdayTrip =
+    parsed.data.intent === "yesterday_trip_summary" &&
+    hasTripTerm &&
+    hasYesterdayTerm &&
+    exactDriverName !== null;
+
   return {
-    intent: parsed.data.intent,
+    intent: correctNamedYesterdayTrip ? "driver_trip_summary" : parsed.data.intent,
     product_query: productQuery,
-    driver_name: parsed.data.driver_name?.normalize("NFKC").trim() || null,
-    yesterday: parsed.data.yesterday,
+    driver_name: correctNamedYesterdayTrip
+      ? exactDriverName
+      : parsed.data.driver_name?.normalize("NFKC").trim() || null,
+    yesterday: correctNamedYesterdayTrip ? true : parsed.data.yesterday,
     period: parsed.data.period,
     reply: parsed.data.reply?.normalize("NFKC").trim() || null,
   };
