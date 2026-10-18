@@ -161,4 +161,29 @@ describe("driver agent isolated create handler", () => {
     expect(state.insertPayload).toBeNull();
     expect(state.sendReply.mock.calls[0][0].body).toContain("വീണ്ടും active ആക്കണോ");
   });
+
+  it("does not claim success when the verification query returns a database error", async () => {
+    state.verifyError = { message: "simulated verification failure" };
+
+    await expect(
+      handleDriverMutation(makeMessage("Add new driver named Mohammed Ali"), "stored-create-verify-query-error"),
+    ).rejects.toThrow("Driver creation could not be verified");
+    expect(state.sendReply).not.toHaveBeenCalled();
+  });
+
+  it("handles a concurrent duplicate insert only after verifying the active saved record", async () => {
+    state.insertError = { message: "duplicate key", code: "23505" };
+    state.verified = { id: "driver-existing", name: "Mohammed Ali", active: true };
+
+    const result = await handleDriverMutation(
+      makeMessage("Add new driver named Mohammed Ali"),
+      "stored-create-race",
+    );
+
+    expect(result).toBe("handled");
+    expect(state.from).toHaveBeenCalledTimes(3);
+    expect(state.sendReply).toHaveBeenCalledTimes(1);
+    expect(state.sendReply.mock.calls[0][0].body).toContain("Duplicate ചേർത്തിട്ടില്ല");
+  });
+
 });
