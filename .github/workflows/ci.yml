@@ -40,3 +40,105 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+  driver-migrations:
+    name: driver-migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: solar_ops_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d solar_ops_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+      - name: Apply driver migrations to an isolated database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d solar_ops_test -v ON_ERROR_STOP=1 \\
+            -c "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;"
+          psql -h localhost -U postgres -d solar_ops_test -v ON_ERROR_STOP=1 \\
+            -f supabase/migrations/20261018115900_ops_drivers_catalog.sql \\
+            -f supabase/migrations/20261018120000_ops_driver_deactivation_confirmation.sql
+
+      - name: Verify sender binding, expiry, and one-time consumption
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d solar_ops_test -v ON_ERROR_STOP=1 <<'SQL'
+          do $test$
+          declare
+            v_driver_success uuid;
+            v_driver_wrong_sender uuid;
+            v_driver_expired uuid;
+            v_result jsonb;
+          begin
+            insert into public.ops_drivers (name, normalized_name, active)
+            values ('Success Driver', 'success driver', true)
+            returning id into v_driver_success;
+            insert into public.ops_driver_action_confirmations
+              (token_hash, sender_phone, driver_id, action, expires_at)
+            values (repeat('a', 64), '15550001111', v_driver_success, 'deactivate', now() + interval '5 minutes');
+
+            v_result := public.confirm_ops_driver_deactivation(repeat('a', 64), '15550001111');
+            if v_result->>'status' <> 'deactivated' then
+              raise exception 'Expected deactivated, got %', v_result;
+            end if;
+            if (select active from public.ops_drivers where id = v_driver_success) then
+              raise exception 'Successful confirmation did not deactivate the driver';
+            end if;
+            v_result := public.confirm_ops_driver_deactivation(repeat('a', 64), '15550001111');
+            if v_result->>'status' <> 'invalid' then
+              raise exception 'Replay was not rejected: %', v_result;
+            end if;
+
+            insert into public.ops_drivers (name, normalized_name, active)
+            values ('Wrong Sender Driver', 'wrong sender driver', true)
+            returning id into v_driver_wrong_sender;
+            insert into public.ops_driver_action_confirmations
+              (token_hash, sender_phone, driver_id, action, expires_at)
+            values (repeat('b', 64), '15550002222', v_driver_wrong_sender, 'deactivate', now() + interval '5 minutes');
+            v_result := public.confirm_ops_driver_deactivation(repeat('b', 64), '15550003333');
+            if v_result->>'status' <> 'invalid' then
+              raise exception 'Wrong sender was not rejected: %', v_result;
+            end if;
+            if not (select active from public.ops_drivers where id = v_driver_wrong_sender) then
+              raise exception 'Wrong sender changed driver state';
+            end if;
+
+            insert into public.ops_drivers (name, normalized_name, active)
+            values ('Expired Driver', 'expired driver', true)
+            returning id into v_driver_expired;
+            insert into public.ops_driver_action_confirmations
+              (token_hash, sender_phone, driver_id, action, created_at, expires_at)
+            values (repeat('c', 64), '15550004444', v_driver_expired, 'deactivate',
+              now() - interval '10 minutes', now() - interval '5 minutes');
+            v_result := public.confirm_ops_driver_deactivation(repeat('c', 64), '15550004444');
+            if v_result->>'status' <> 'invalid' then
+              raise exception 'Expired token was not rejected: %', v_result;
+            end if;
+            if not (select active from public.ops_drivers where id = v_driver_expired) then
+              raise exception 'Expired token changed driver state';
+            end if;
+          end;
+          $test$;
+          SQL
