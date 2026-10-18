@@ -1,4 +1,5 @@
 import { deterministicUuid } from "@/lib/idempotency";
+import { classifyOperationalQueryWithGroq } from "@/lib/whatsapp-query-intent";
 import { sendOpsList, sendOpsReply } from "@/lib/replies";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
@@ -176,6 +177,17 @@ export function classifyTripTextCommand(value: string): TripTextCommand {
   ]);
   if (startWords.has(text)) return "start";
 
+  const naturalStartPatterns = [
+    /^(?:please )?(?:create|start|open|begin|make) (?:a )?(?:new )?trip(?: now)?$/,
+    /^(?:i )?(?:want|need) to (?:create|start|open|begin) (?:a )?(?:new )?trip$/,
+    /^(?:i )?(?:want|need) (?:a )?(?:new )?trip$/,
+    /^(?:trip|oru trip|oru puthiya trip|puthiya trip) (?:create|start) (?:cheyyu|cheyyanam|cheyyoo|cheyyuka)$/,
+    /^(?:oru )?(?:puthiya )?trip (?:thudangu|thudangam|thudanganam|thudangoo|venam)$/,
+    /^(?:oru )?(?:puthiya )?trip (?:create|start) (?:cheyyu|cheyyanam)$/,
+    /^(?:ഒരു )?(?:പുതിയ )?ട്രിപ്പ് (?:തുടങ്ങൂ|തുടങ്ങണം|തുടങ്ങാം|ഉണ്ടാക്കൂ|ഉണ്ടാക്കണം|വേണം)$/u,
+  ];
+  if (naturalStartPatterns.some((pattern) => pattern.test(text))) return "start";
+
   const cancelWords = new Set([
     "cancel",
     "cancel trip",
@@ -212,6 +224,32 @@ export function classifyTripTextCommand(value: string): TripTextCommand {
   return null;
 }
 
+export function looksLikePotentialTripStartRequest(value: string): boolean {
+  const text = normalizeText(value);
+  const mentionsTrip =
+    /\btrips?\b/.test(text) ||
+    text.includes("ട്രിപ്പ്") ||
+    text.includes("ട്രിപ്പുകൾ");
+  if (!mentionsTrip) return false;
+
+  const informationalTerms = [
+    "latest", "last", "today", "yesterday", "summary", "details", "status",
+    "history", "report", "count", "list", "which", "what", "show", "tell",
+    "know", "how many", "pending", "bill", "bills", "stock", "products",
+    "product", "ഇന്നത്തെ", "ഇന്നലെ", "അവസാന", "വിശദാംശ", "സ്റ്റാറ്റസ്",
+    "ചരിത്രം", "റിപ്പോർട്ട്", "എത്ര", "കഴിഞ്ഞ", "പോയി", "കാണിക്കൂ",
+  ];
+  if (informationalTerms.some((term) => text.includes(term))) return false;
+
+  const actionTerms = [
+    "create", "start", "open", "begin", "make", "need", "want", "please",
+    "new", "cheyyu", "cheyyanam", "cheyyoo", "thudangu", "thudangam",
+    "thudanganam", "thudangoo", "venam", "undakku", "undakkanam",
+    "പുതിയ", "തുടങ്ങ", "ഉണ്ടാക്ക", "വേണം", "ആരംഭ",
+  ];
+  return actionTerms.some((term) => text.includes(term));
+}
+
 export function extractTripStartDriverQuery(value: string): string | null {
   const text = normalizeText(value);
   const prefixes = [
@@ -230,6 +268,10 @@ export function extractTripStartDriverQuery(value: string): string | null {
     "latest", "last", "today", "summary", "details", "status", "bill",
     "bills", "stock", "products", "product", "count", "pending", "cancel",
     "done", "driver", "history", "list", "report", "trips", "trip",
+    "create", "start", "open", "begin", "make", "new", "please", "need",
+    "want", "for", "with", "cheyyu", "cheyyanam", "thudangu", "thudangam",
+    "thudanganam", "thudangoo", "venam", "undakku", "undakkanam",
+    "പുതിയ", "തുടങ്ങ", "ഉണ്ടാക്ക", "വേണം", "ആരംഭ",
   ];
 
   for (const prefix of prefixes) {
@@ -1339,7 +1381,11 @@ export async function handleTripWorkflowInbound(
   const active = await loadActiveTrip(message.senderPhone);
   const command = classifyTripTextCommand(message.textBody);
 
-  if (active?.status === "awaiting_driver_name" && command !== "cancel") {
+  if (
+    active?.status === "awaiting_driver_name" &&
+    command === null &&
+    !looksLikePotentialTripStartRequest(message.textBody)
+  ) {
     await createAndAssignDriver(active, message.textBody, storedMessageId);
     return "handled";
   }
@@ -1435,6 +1481,45 @@ export async function handleTripWorkflowInbound(
       });
     }
     return "handled";
+  }
+
+  if (looksLikePotentialTripStartRequest(message.textBody)) {
+    let classification;
+    try {
+      classification = await classifyOperationalQueryWithGroq(message.textBody);
+    } catch (error) {
+      console.warn("Trip-start intent classification failed", {
+        reason:
+          error instanceof Error
+            ? error.message.slice(0, 180)
+            : "Unknown classification error",
+      });
+      return "ignored";
+    }
+
+    if (classification?.intent === "start_trip") {
+      const requestedDriverName = classification.driver_name?.trim() || null;
+      if (requestedDriverName) {
+        const match = await findActiveDriverExact(requestedDriverName);
+        if (match.status === "matched") {
+          await startTrip(message, storedMessageId, match.driver);
+        } else {
+          await sendOpsReply({
+            requestId: deterministicUuid("trip-natural-driver-no-match:" + storedMessageId),
+            replyToMessageId: storedMessageId,
+            knownInboundAt: message.timestamp,
+            body:
+              (match.status === "ambiguous"
+                ? "ഒന്നിലധികം active drivers match ചെയ്യുന്നു. "
+                : "പറഞ്ഞ driver-നെ saved active list-ൽ exact ആയി കണ്ടെത്തിയില്ല. ") +
+              "Trip create ചെയ്തിട്ടില്ല. Driver-ന്റെ saved name കൃത്യമായി അയക്കൂ; അല്ലെങ്കിൽ driver name പറയാതെ trip തുടങ്ങാം.",
+          });
+        }
+      } else {
+        await startTrip(message, storedMessageId);
+      }
+      return "handled";
+    }
   }
 
   if (active?.status === "awaiting_driver") {
