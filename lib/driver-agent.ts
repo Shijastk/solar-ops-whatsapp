@@ -97,15 +97,19 @@ export async function handleDriverMutation(
     const { data: drivers, error } = await supabase
       .from("ops_drivers")
       .select("name, active")
+      .eq("active", true)
       .order("name", { ascending: true })
-      .limit(50);
+      .limit(51);
 
     if (error) throw new Error("Driver list lookup failed: " + error.message);
 
-    const activeDrivers = (drivers ?? []).filter((driver) => driver.active);
+    const activeDrivers = (drivers ?? []).slice(0, 50);
+    const hasMore = (drivers ?? []).length > 50;
+    const heading = hasMore
+      ? "🚚 Active drivers (first 50; more exist):"
+      : "🚚 Active drivers (" + activeDrivers.length + "):";
     const body = activeDrivers.length
-      ? "🚚 Active drivers (" + activeDrivers.length + "):\n" +
-        activeDrivers.map((driver, index) => String(index + 1) + ". " + driver.name).join("\n")
+      ? heading + "\n" + activeDrivers.map((driver, index) => String(index + 1) + ". " + driver.name).join("\n")
       : "ℹ️ ഇപ്പോൾ active drivers ഒന്നുമില്ല.";
 
     await sendOpsReply({
