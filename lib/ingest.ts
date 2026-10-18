@@ -16,6 +16,7 @@ import {
   reserveTripDocument,
 } from "@/lib/trips";
 import { transcribeOperationalVoice } from "@/lib/voice-transcription";
+import { handleDriverMutation } from "@/lib/driver-agent";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
 const MEDIA_TYPES = new Set(["document", "image", "audio", "video", "sticker"]);
@@ -194,10 +195,13 @@ export async function ingestWhatsAppMessage(
   if (!message.media || !MEDIA_TYPES.has(message.type)) {
     let workflowResult: "handled" | "ignored" = "ignored";
     try {
-      workflowResult = await handleDocumentWorkflowInbound(
-        message,
-        persistedMessage.id,
-      );
+      workflowResult = await handleDriverMutation(message, persistedMessage.id);
+      if (workflowResult === "ignored") {
+        workflowResult = await handleDocumentWorkflowInbound(
+          message,
+          persistedMessage.id,
+        );
+      }
     } catch (error) {
       console.warn("WhatsApp document workflow interaction did not complete", {
         messageStored: true,
@@ -429,11 +433,14 @@ export async function ingestWhatsAppMessage(
           media: undefined,
         };
 
-        const voiceResult = await handleDocumentWorkflowInbound(
-          voiceAsText,
-          persistedMessage.id,
-          { fromVoice: true },
-        );
+        let voiceResult = await handleDriverMutation(voiceAsText, persistedMessage.id);
+        if (voiceResult === "ignored") {
+          voiceResult = await handleDocumentWorkflowInbound(
+            voiceAsText,
+            persistedMessage.id,
+            { fromVoice: true },
+          );
+        }
 
         if (voiceResult === "ignored") {
           await sendOpsReply({
