@@ -165,6 +165,21 @@ describe("natural-language trip start", () => {
     });
   });
 
+  it("does not create a trip when the requested driver is not an exact active match", async () => {
+    mockIntent("start_trip", "Unknown Driver");
+
+    const result = await handleTripWorkflowInbound(
+      makeMessage("Please open a new trip with Unknown Driver"),
+      "stored-trip-message-unknown-driver",
+    );
+
+    expect(result).toBe("handled");
+    expect(state.from).toHaveBeenCalledWith("ops_drivers");
+    expect(state.insertedTrips).toHaveLength(0);
+    expect(state.sendReply).toHaveBeenCalledTimes(1);
+    expect(state.sendReply.mock.calls[0][0].body).toContain("Trip create ചെയ്തിട്ടില്ല");
+  });
+
   it("does not create a trip when the model classifies the message as a read query", async () => {
     mockIntent("latest_trip");
 
