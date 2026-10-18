@@ -2,6 +2,12 @@ name: Live Agent Intent Evaluation
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or commit to evaluate (use the PR head branch to validate a pull request)"
+        required: true
+        default: "main"
+        type: string
 
 permissions:
   contents: read
@@ -23,8 +29,10 @@ jobs:
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 
     steps:
-      - name: Checkout
+      - name: Checkout selected ref
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
