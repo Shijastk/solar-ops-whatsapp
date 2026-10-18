@@ -148,6 +148,24 @@ function normalizeText(value: string): string {
     .trim();
 }
 
+export function classifyNaturalTripStartCommand(value: string): boolean {
+  const text = normalizeText(value);
+  const naturalStartPatterns = [
+    /^(?:please )?(?:create|start|open|begin|make) (?:a )?(?:new )?trip(?: now)?$/,
+    /^(?:i )?(?:want|need) to (?:create|start|open|begin) (?:a )?(?:new )?trip$/,
+    /^(?:i )?(?:want|need) (?:a )?(?:new )?trip$/,
+    /^(?:trip|oru trip|oru puthiya trip|puthiya trip) (?:create|start) (?:cheyyu|cheyyanam|cheyyoo|cheyyuka)$/,
+    /^(?:oru )?(?:puthiya )?trip (?:thudangu|thudangam|thudanganam|thudangoo|venam)$/,
+    /^(?:oru )?(?:puthiya )?trip (?:create|start) (?:cheyyu|cheyyanam)$/,
+    /^(?:ഒരു )?(?:പുതിയ )?ട്രിപ്പ് (?:തുടങ്ങൂ|തുടങ്ങണം|തുടങ്ങാം|ഉണ്ടാക്കൂ|ഉണ്ടാക്കണം|വേണം)$/u,
+  ];
+  return naturalStartPatterns.some((pattern) => pattern.test(text));
+}
+
+function isNaturalTripStartEnabled(): boolean {
+  return process.env.SOLAR_OPS_NATURAL_TRIP_START_ENABLED === "true";
+}
+
 function hasTripMention(normalizedText: string): boolean {
   return (
     /\btrips?\b/.test(normalizedText) ||
@@ -184,17 +202,6 @@ export function classifyTripTextCommand(value: string): TripTextCommand {
     "പുതിയ ട്രിപ്പ്",
   ]);
   if (startWords.has(text)) return "start";
-
-  const naturalStartPatterns = [
-    /^(?:please )?(?:create|start|open|begin|make) (?:a )?(?:new )?trip(?: now)?$/,
-    /^(?:i )?(?:want|need) to (?:create|start|open|begin) (?:a )?(?:new )?trip$/,
-    /^(?:i )?(?:want|need) (?:a )?(?:new )?trip$/,
-    /^(?:trip|oru trip|oru puthiya trip|puthiya trip) (?:create|start) (?:cheyyu|cheyyanam|cheyyoo|cheyyuka)$/,
-    /^(?:oru )?(?:puthiya )?trip (?:thudangu|thudangam|thudanganam|thudangoo|venam)$/,
-    /^(?:oru )?(?:puthiya )?trip (?:create|start) (?:cheyyu|cheyyanam)$/,
-    /^(?:ഒരു )?(?:പുതിയ )?ട്രിപ്പ് (?:തുടങ്ങൂ|തുടങ്ങണം|തുടങ്ങാം|ഉണ്ടാക്കൂ|ഉണ്ടാക്കണം|വേണം)$/u,
-  ];
-  if (naturalStartPatterns.some((pattern) => pattern.test(text))) return "start";
 
   const cancelWords = new Set([
     "cancel",
@@ -1412,6 +1419,14 @@ export async function handleTripWorkflowInbound(
     return "handled";
   }
 
+  if (
+    isNaturalTripStartEnabled() &&
+    classifyNaturalTripStartCommand(message.textBody)
+  ) {
+    await startTrip(message, storedMessageId);
+    return "handled";
+  }
+
   if (command === "menu") {
     await sendHomeMenu(storedMessageId, message.timestamp);
     return "handled";
@@ -1506,6 +1521,16 @@ export async function handleTripWorkflowInbound(
   }
 
   if (looksLikePotentialTripStartRequest(message.textBody)) {
+    if (!isNaturalTripStartEnabled()) {
+      await sendOpsReply({
+        requestId: deterministicUuid("trip-natural-start-disabled:" + storedMessageId),
+        replyToMessageId: storedMessageId,
+        knownInboundAt: message.timestamp,
+        body: "Natural-language trip start ഇപ്പോൾ enabled അല്ല. Trip തുടങ്ങാൻ 'trip' അല്ലെങ്കിൽ 'New Trip' അയക്കൂ.",
+      });
+      return "handled";
+    }
+
     let classification: Awaited<ReturnType<typeof classifyOperationalQueryWithGroq>> = null;
     try {
       classification = await classifyOperationalQueryWithGroq(message.textBody);
