@@ -40,6 +40,8 @@ describe("WhatsApp AI intent fallback", () => {
                 content: JSON.stringify({
                   intent: "unsupported",
                   product_query: null,
+                  driver_name: null,
+                  yesterday: false,
                   period: null,
                   reply: "ഹായ്! എന്താണ് അറിയേണ്ടത്?",
                 }),
@@ -61,6 +63,8 @@ describe("WhatsApp AI intent fallback", () => {
     ).resolves.toEqual({
       intent: "unsupported",
       product_query: null,
+      driver_name: null,
+      yesterday: false,
       period: null,
       reply: "ഹായ്! എന്താണ് അറിയേണ്ടത്?",
     });
@@ -82,6 +86,8 @@ describe("WhatsApp AI intent fallback", () => {
                 content: JSON.stringify({
                   intent: "today_products_summary",
                   product_query: null,
+                  driver_name: null,
+                  yesterday: false,
                   period: null,
                   reply: null,
                 }),
@@ -101,6 +107,8 @@ describe("WhatsApp AI intent fallback", () => {
     expect(result).toEqual({
       intent: "today_products_summary",
       product_query: null,
+      driver_name: null,
+      yesterday: false,
       period: null,
       reply: null,
     });
@@ -133,6 +141,8 @@ describe("WhatsApp AI intent fallback", () => {
                 content: JSON.stringify({
                   intent: "unsupported",
                   product_query: null,
+                  driver_name: null,
+                  yesterday: false,
                   period: null,
                   reply: "അത് ഇപ്പോൾ സ്ഥിരീകരിക്കാൻ കഴിയില്ല.",
                 }),
