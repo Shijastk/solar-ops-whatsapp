@@ -62,7 +62,7 @@ export function parseDriverMutation(text: string): DriverIntent | null {
     const match = value.match(entry.regex);
     const candidate = match?.[1] ?? "";
     if (candidate) {
-      const name = normalizeDriverName(candidate.replace(/(?:നെ|യെ|യെ?)+$/u, "").replace(/ine$/i, ""));
+      const name = normalizeDriverName(candidate.replace(/(?:ിനെ|നെ|യെ|യെ?)+$/u, "").replace(/ine$/i, ""));
       if (isValidDriverName(name)) return { action: entry.action, name };
     }
   }
