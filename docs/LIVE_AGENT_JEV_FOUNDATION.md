@@ -37,12 +37,33 @@ This is the target capability set, not a statement that every action is implemen
 
 Keep a short, expiring, sender-scoped context containing only what is needed to resolve follow-ups (for example, the previous intent, canonical entity IDs/names returned by the database, date/company scope, pending required fields, and a pending confirmation payload). Do not resend the full database or the full conversation to the model on every message. Load small relevant state and query only the required rows. A phrase such as "അവർ ആരൊക്കെയാണ്?" may inherit the immediately preceding driver-count intent only when that context is still valid and belongs to the same sender/business scope; otherwise ask a clarifying question. Never infer a record ID from a name alone when multiple matches exist.
 
+## Voice-first agent UX: infer intent, minimize unnecessary turns
+
+The user should not have to follow a rigid form-like sequence ("add a driver" → "enter name" → confirm the name) when one voice message already contains a clear, authorized instruction. Voice and text should share the same intent/action pipeline after transcription; voice is not a separate, less capable workflow.
+
+Example: "മുഹമ്മദ് എന്ന് പേരുള്ള പുതിയൊരു ഡ്രൈവർ വന്നിട്ടുണ്ട്. ആ പേര് നിലവിൽ ഇല്ലെങ്കിൽ പുതിയ ഡ്രൈവറായി add ചെയ്യണം."
+
+Expected behavior:
+1. Transcribe the message and extract the intended action (create driver), the candidate name (Muhammad/Mohammed/മുഹമ്മദ്, retaining the original transcript for audit), and the explicit condition (only create if no matching driver exists).
+2. Check current authorized business scope and query the live driver directory. Do not ask the user to type the name again.
+3. Match names conservatively: normalize Unicode/spacing and known safe transliterations, but do not treat broad fuzzy similarity as proof of identity. If a unique existing record clearly matches, do not create a duplicate; report that the driver already exists. If no credible match exists, create the driver with a server-validated, idempotent operation, then read back the committed row.
+4. If several existing records are plausible matches, or the transcript/name is too uncertain to safely identify the person, ask one concise clarification. Do not guess.
+5. Reply briefly with the verified outcome. Do not narrate internal steps or ask for confirmation of a low-risk, explicitly requested create-if-absent action when the target name is clear and the sender is authorized.
+6. If the message only says "new driver Muhammad has joined" without an explicit action request, the agent may use the product's established operational convention only if that convention is explicitly approved and documented; otherwise ask one short intent question. Never turn mere mention into permission to write.
+
+### Risk-based confirmation, not confirmation for every step
+
+- **May execute without an extra confirmation:** explicit, unambiguous, low-impact create-if-absent or reversible edit when the sender is authorized, the target is unique, all required values are present, and the action is covered by the approved policy.
+- **Ask one clarification:** missing required data, uncertain speech-to-text, ambiguous entity match, conflicting instruction, or unclear intended operation.
+- **Require explicit confirmation:** hard-delete, bill approval, payments, trip finalization, consequential reassignment, bulk changes, or other high-impact/irreversible actions. Confirmation must bind to the exact action, target, payload, sender, and expiry.
+- **Never do:** invent missing values, create a record from a mere mention unless explicitly allowed by product policy, silently hard-delete referenced records, or claim success without verifying the database commit.
+
 ## First implementation slices
 
-1. **Read-only follow-up context:** resolve short follow-ups such as "who are they?", "show their names", and "അതിൽ ആരൊക്കെയാണ്?" from a recent driver-count response. Fetch current active drivers from Supabase; do not use stale model memory as the source of truth.
-2. **Create driver:** only after checking every existing driver-creation path and schema constraint. Ask for a name if missing; normalize and validate it; safely prevent duplicate names under concurrent requests; use an idempotency key; read the row back after commit; then confirm.
-3. **Edit/deactivate driver:** resolve a unique target first, show the proposed change, ask for confirmation where needed, preserve references, commit via a narrow server-side operation, and verify.
-4. **Delete and other domain actions:** implement only after a per-action impact review and tests. Use soft delete/deactivation when records are referenced. Never expose general-purpose SQL or generic table/column mutation.
+1. **Voice-first create-if-absent driver:** after inspecting existing creation paths and database constraints, extract intent + name from a single voice/text message, query live records, avoid duplicates, create only when clearly requested and no credible match exists, use idempotency/concurrency protection, read back after commit, and return a concise result. Do not force a separate name-entry step.
+2. **Read-only follow-up context:** resolve short follow-ups such as "who are they?", "show their names", and "അതിൽ ആരൊക്കെയാണ്?" from a recent driver-count response. Fetch current active drivers from Supabase; do not use stale model memory as the source of truth.
+3. **Edit/deactivate driver:** accept a complete natural-language instruction in one message; resolve a unique target and apply low-risk, reversible changes without unnecessary confirmation where policy permits. Ask one clarification only when necessary; preserve references and verify.
+4. **Delete and other domain actions:** implement only after a per-action impact review and tests. Require confirmation for hard-delete and high-impact actions. Prefer deactivation for referenced records. Never expose general-purpose SQL or generic table/column mutation.
 5. **Broader operational tools:** add trip, bill, stock, and payment actions one by one by reusing current business workflows; do not bypass stock ledgers, bill approval rules, trip grouping, or payment audit trails.
 
 No new write action should be enabled in production until its tests cover sender authorization, company scoping, duplicate targets, malformed inputs, retries/replayed webhooks, concurrent requests, expired/forged confirmation, prompt injection, database failure, and failed/uncertain read-back.
