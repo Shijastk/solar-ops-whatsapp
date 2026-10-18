@@ -148,6 +148,14 @@ function normalizeText(value: string): string {
     .trim();
 }
 
+function hasTripMention(normalizedText: string): boolean {
+  return (
+    /\btrips?\b/.test(normalizedText) ||
+    normalizedText.includes("ട്രിപ്പ്") ||
+    normalizedText.includes("ട്രിപ്പുകൾ")
+  );
+}
+
 export function classifyTripTextCommand(value: string): TripTextCommand {
   const text = normalizeText(value);
   if (!text) return null;
@@ -226,11 +234,7 @@ export function classifyTripTextCommand(value: string): TripTextCommand {
 
 export function looksLikePotentialTripStartRequest(value: string): boolean {
   const text = normalizeText(value);
-  const mentionsTrip =
-    /\btrips?\b/.test(text) ||
-    text.includes("ട്രിപ്പ്") ||
-    text.includes("ട്രിപ്പുകൾ");
-  if (!mentionsTrip) return false;
+  if (!hasTripMention(text)) return false;
 
   const informationalTerms = [
     "latest", "last", "today", "yesterday", "tomorrow", "tonight", "week", "month", "year", "summary", "details", "status",
@@ -1401,6 +1405,7 @@ export async function handleTripWorkflowInbound(
   if (
     active?.status === "awaiting_driver_name" &&
     command === null &&
+    !hasTripMention(normalizeText(message.textBody)) &&
     !looksLikePotentialTripStartRequest(message.textBody)
   ) {
     await createAndAssignDriver(active, message.textBody, storedMessageId);
