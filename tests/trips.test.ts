@@ -5,6 +5,7 @@ import {
   combineTripItems,
   choosePrimaryDestination,
   classifyTripTextCommand,
+  classifyNaturalTripStartCommand,
   extractTripStartDriverQuery,
   looksLikePotentialTripStartRequest,
   normalizeDriverName,
@@ -15,10 +16,14 @@ describe("WhatsApp trip capture helpers", () => {
   it("recognizes fast trip commands without AI", () => {
     expect(classifyTripTextCommand("trip")).toBe("start");
     expect(classifyTripTextCommand("New Trip")).toBe("start");
-    expect(classifyTripTextCommand("Create a new trip")).toBe("start");
-    expect(classifyTripTextCommand("I want to start a new trip")).toBe("start");
-    expect(classifyTripTextCommand("trip create cheyyu")).toBe("start");
-    expect(classifyTripTextCommand("പുതിയ ട്രിപ്പ് തുടങ്ങൂ")).toBe("start");
+    expect(classifyTripTextCommand("Create a new trip")).toBeNull();
+    expect(classifyTripTextCommand("I want to start a new trip")).toBeNull();
+    expect(classifyTripTextCommand("trip create cheyyu")).toBeNull();
+    expect(classifyTripTextCommand("പുതിയ ട്രിപ്പ് തുടങ്ങൂ")).toBeNull();
+    expect(classifyNaturalTripStartCommand("Create a new trip")).toBe(true);
+    expect(classifyNaturalTripStartCommand("I want to start a new trip")).toBe(true);
+    expect(classifyNaturalTripStartCommand("trip create cheyyu")).toBe(true);
+    expect(classifyNaturalTripStartCommand("പുതിയ ട്രിപ്പ് തുടങ്ങൂ")).toBe(true);
     expect(classifyTripTextCommand("varum trip")).toBe("start");
     expect(classifyTripTextCommand("വരും ട്രിപ്പ്")).toBe("start");
     expect(classifyTripTextCommand("ട്രിപ്പ്")).toBe("start");
