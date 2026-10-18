@@ -232,7 +232,7 @@ describe("natural-language trip start", () => {
     expect(state.insertedTrips).toHaveLength(0);
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(String(init.body));
-    expect(body.messages[0].content).toContain("Never generate SQL");
+    expect(body.messages[0].content).toContain("never generate SQL");
     expect(body.messages[0].content).toContain("never for trip status/history");
   });
 
