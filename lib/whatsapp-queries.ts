@@ -227,15 +227,22 @@ export function isDriverRelatedQuestion(text: string): boolean {
 export function parseFastWhatsAppQuery(
   text: string,
 ): FastWhatsAppQuery | null {
-  const driverMatch = text.normalize("NFKC").match(/(?:driver|ഡ്രൈവർ)\s+([\p{L}][\p{L} .'-]{1,30})/iu);
+  const rawText = text.normalize("NFKC").trim();
+  const driverAfterName = rawText.match(
+    /([\\p{L}][\\p{L} .'-]{1,30}?)\\s+എന്ന\\s+ഡ്രൈവർ/iu,
+  );
+  const driverBeforeName = rawText.match(
+    /(?:\\bdriver\\b|ഡ്രൈവർ)\\s+([\\p{L}][\\p{L} .'-]{1,30})/iu,
+  );
+  const driverMatch = driverAfterName ?? driverBeforeName;
   const asksDriverTrips = includesAny(normalizeQueryText(text), TRIP_TERMS) ||
-    /\b(driver|rash?eed|rasheed)\b/i.test(text) ||
+    /\\b(driver|rash?eed|rasheed)\\b/i.test(text) ||
     ["ഡ്രൈവർ", "റഷീദ്", "റഷീദിന്റെ", "റഷീദിനെ"].some((term) => text.includes(term));
   if (asksDriverTrips && driverMatch) {
     const name = driverMatch[1]
       .trim()
-      .replace(/\b(?:today|yesterday|innu|innale|trip|trips|poya|poyi|ariyamo|ariyumo|ano|aayirunnu|ayirunnu)\b.*$/i, "")
-      .replace(/(?:ആയിരുന്നു|ആണോ|അറിയാമോ|ഇന്ന്|ഇന്നലെ|ട്രിപ്പുകൾ|ട്രിപ്പ്|ട്രിപ്പുകളും).*$/u, "")
+      .replace(/\\b(?:today|yesterday|innu|innale|trip|trips|poya|poyi|ariyamo|ariyumo|ano|aayirunnu|ayirunnu)\\b.*$/i, "")
+      .replace(/(?:ആയിരുന്നു|ആണോ|അറിയാമോ|ഇന്ന്|ഇന്നലെ|ട്രിപ്പുകൾ|ട്രിപ്പ്|ട്രിപ്പുകളും|എത്ര|പോയിട്ടുണ്ട്|പോയി).*$/u, "")
       .replace(/[?!,.;:]+$/g, "")
       .trim();
     if (name) {
@@ -1213,7 +1220,17 @@ export async function handleFastWhatsAppQuery(
   const sendDurationMs = Math.round(performance.now() - sendStartedAt);
 
   console.info("Fast WhatsApp operational query completed", {
+    correlationId: storedMessageId,
+    sourceMessageId: message.messageId,
+    inputType: options.fromVoice ? "voice_transcript" : "text",
+    inputChars: message.textBody.length,
     intent: query?.type ?? "universal_fallback",
+    driverFilterApplied: query?.type === "driver_trip_summary",
+    driverNameExtracted: query?.type === "driver_trip_summary" ? query.driverName : null,
+    dateFilter: query?.type === "driver_trip_summary"
+      ? query.yesterday ? "yesterday" : "today"
+      : query?.type === "today_trip_summary" ? "today"
+      : query?.type === "yesterday_trip_summary" ? "yesterday" : null,
     resolver,
     likelyOperational,
     deterministicMatch: resolver === "deterministic",
