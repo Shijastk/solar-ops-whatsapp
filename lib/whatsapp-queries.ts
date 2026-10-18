@@ -538,7 +538,7 @@ async function activeDriverListSummary(): Promise<string> {
     "നിലവിലെ active drivers" + (hasMore ? " (ആദ്യത്തെ 30):" : " (" + String(visible.length) + "):"),
     ...visible.map((name, index) => String(index + 1) + ". " + name),
     ...(hasMore ? ["മറ്റു drivers ഉണ്ട്; കൃത്യമായ പേര് പറഞ്ഞാൽ ആ driver-ന്റെ വിവരങ്ങൾ നോക്കാം."] : []),
-  ].join("\\n");
+  ].join("\n");
 }
 
 async function todayBillCount(now = new Date()): Promise<number> {
