@@ -103,7 +103,7 @@ Feature-flag the new path. Run offline tests, then shadow decisions without writ
 - A named driver is resolved by exact normalized match against active `ops_drivers`. If the requested driver is missing/ambiguous, no trip is created. If no driver is named, the existing `collecting` workflow starts and waits for PDFs plus the existing done/driver-selection steps.
 - The existing partial unique index on active trips per sender is the duplicate guard; a concurrent uniqueness conflict is handled as “trip already open,” not as a second trip.
 - This reuses the existing `delivery_trips` schema and requires no new migration. The existing trip workflow, not the model, performs the database write.
-- Handler tests cover successful start, exact driver matching, unknown-driver rejection, read-query rejection, prompt injection, malformed names, replayed start messages, read-back failure, database failure, concurrent duplicate prevention, and the default-off rollout flag. Successful writes are read back by sender + inbound message ID before the agent claims success. CI is pending for this branch; production WhatsApp behavior is not yet claimed as verified.
+- Handler tests cover successful start, exact driver matching, unknown-driver rejection, read-query rejection, prompt injection, malformed names, replayed start messages, read-back failure, database failure, concurrent duplicate prevention, and the default-off rollout flag. Successful writes are read back by sender + inbound message ID before the agent claims success. The exact PR head must pass CI before merge; production WhatsApp behavior is not claimed as verified.
 
 
 ### Rollout boundary for natural-language trip creation
