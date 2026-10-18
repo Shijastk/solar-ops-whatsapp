@@ -4,7 +4,7 @@ import { classifyOperationalQueryWithGroq } from "../lib/whatsapp-query-intent";
 
 const runLiveEvaluation = process.env.SOLAR_OPS_RUN_LIVE_AGENT_EVAL === "true";
 
-const cases: Array<{\n  id: string;\n  input: string;\n  expected: string;\n  namedDriver?: string;\n  yesterday?: boolean;\n  requiresReply?: boolean;\n  neverStartTrip?: boolean;\n}> = [
+const cases: Array<{\n  id: string;\n  input: string;\n  expected: string;\n  namedDriver?: string;\n  yesterday?: boolean;\n  neverStartTrip?: boolean;\n}> = [
   { id: "stock-summary-en", input: "show me the stock we have", expected: "stock_inventory_summary" },
   { id: "stock-summary-ml", input: "നമ്മുടെ സ്റ്റോക്ക് ലിസ്റ്റ് കാണിക്കൂ", expected: "stock_inventory_summary" },
   { id: "driver-count-ml", input: "എത്ര ഡ്രൈവർമാരുണ്ട്?", expected: "driver_count" },
@@ -17,7 +17,7 @@ const cases: Array<{\n  id: string;\n  input: string;\n  expected: string;\n  na
   { id: "trip-start-manglish", input: "Rasheed inte koode puthiya trip thudangikko", expected: "start_trip", namedDriver: "Rasheed" },
   { id: "trip-start-ml", input: "പുതിയ ട്രിപ്പ് തുടങ്ങണം", expected: "start_trip" },
   { id: "driver-trip-yesterday", input: "Rasheed innale ethra trip poyi?", expected: "driver_trip_summary", namedDriver: "Rasheed", yesterday: true },
-  { id: "greeting", input: "Hello, how are you?", expected: "unsupported", requiresReply: true },
+  { id: "greeting", input: "Hello, how are you?", expected: "unsupported" },
   { id: "today-trip-status", input: "ഇന്ന് എത്ര ട്രിപ്പ് പൂർത്തിയായി?", expected: "today_trip_summary" },
   { id: "future-trip-not-start", input: "Trip tomorrow plan cheyyam", expected: "unsupported", neverStartTrip: true },
   { id: "latest-trip", input: "latest trip details", expected: "latest_trip" },
@@ -42,7 +42,7 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           passed: actual?.intent === testCase.expected,
           driverPassed: !testCase.namedDriver || actual?.driver_name === testCase.namedDriver,
           yesterdayPassed: testCase.yesterday !== true || actual?.yesterday === true,
-          replyPassed: testCase.requiresReply !== true || Boolean(actual?.reply?.trim()),
+          replyPassed: testCase.expected !== "unsupported" || Boolean(actual?.reply?.trim()),
           supportedReplyPassed: testCase.expected === "unsupported" || actual?.reply === null,
           tripWriteSafetyPassed: testCase.neverStartTrip !== true || actual?.intent !== "start_trip",
           providerError: false,
@@ -55,7 +55,7 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           passed: false,
           driverPassed: !testCase.namedDriver,
           yesterdayPassed: testCase.yesterday !== true,
-          replyPassed: testCase.requiresReply !== true,
+          replyPassed: testCase.expected !== "unsupported",
           supportedReplyPassed: testCase.expected === "unsupported",
           tripWriteSafetyPassed: testCase.neverStartTrip === true,
           providerError: true,
