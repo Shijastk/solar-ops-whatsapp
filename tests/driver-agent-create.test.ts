@@ -57,8 +57,7 @@ beforeEach(() => {
   state.originalFeatureFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
   process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
 
-  state.rpc.mockImplementation(async (name: string, args: unknown) => {
-    state.rpc.mock.calls[state.rpc.mock.calls.length - 1];
+  state.rpc.mockImplementation(async (name: string) => {
     if (name !== "confirm_ops_driver_deactivation") throw new Error("Unexpected RPC: " + name);
     return state.rpcResult;
   });
