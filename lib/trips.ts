@@ -235,15 +235,19 @@ export function looksLikePotentialTripStartRequest(value: string): boolean {
   const informationalTerms = [
     "latest", "last", "today", "yesterday", "summary", "details", "status",
     "history", "report", "count", "list", "which", "what", "show", "tell",
-    "want to know", "need to know", "how many", "pending", "bill", "bills", "stock", "products",
-    "product", "ഇന്നത്തെ", "ഇന്നലെ", "അവസാന", "വിശദാംശ", "സ്റ്റാറ്റസ്",
-    "ചരിത്രം", "റിപ്പോർട്ട്", "എത്ര", "കഴിഞ്ഞ", "പോയി", "കാണിക്കൂ",
+    "want to know", "need to know", "how many", "how", "when", "where", "who",
+    "pending", "bill", "bills", "stock", "products", "product", "data",
+    "information", "info", "about", "available", "ഇന്നത്തെ", "ഇന്നലെ",
+    "അവസാന", "വിശദാംശ", "വിവരം", "സ്റ്റാറ്റസ്", "ചരിത്രം", "റിപ്പോർട്ട്",
+    "സമ്മറി", "എത്ര", "കഴിഞ്ഞ", "പോയി", "കാണിക്കൂ", "പറയൂ", "അറിയണം",
   ];
   if (informationalTerms.some((term) => text.includes(term))) return false;
 
   const actionTerms = [
-    "create", "start", "open", "begin", "make", "need", "want", "please",
-    "new", "cheyyu", "cheyyanam", "cheyyoo", "thudangu", "thudangam",
+    "create", "start", "open", "begin", "make", "please", "new",
+    "want to create", "need to create", "want to start", "need to start",
+    "want a trip", "need a trip", "want trip", "need trip",
+    "cheyyu", "cheyyanam", "cheyyoo", "thudangu", "thudangam",
     "thudanganam", "thudangoo", "venam", "undakku", "undakkanam",
     "പുതിയ", "തുടങ്ങ", "ഉണ്ടാക്ക", "വേണം", "ആരംഭ",
   ];
