@@ -6,6 +6,11 @@ const state = vi.hoisted(() => ({
   sendReply: vi.fn(),
   queryError: null as { message: string } | null,
   activeOnly: false,
+  lastEqColumn: "",
+  existingDriver: null as { id: string; name: string; active: boolean } | null,
+  insertedDriver: null as { id: string; name: string; active: boolean } | null,
+  insertError: null as { message: string; code?: string } | null,
+  verifyError: null as { message: string } | null,
 }));
 
 vi.mock("@/lib/supabase-admin", () => ({
@@ -31,6 +36,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.queryError = null;
   state.activeOnly = false;
+  state.lastEqColumn = "";
+  state.existingDriver = null;
+  state.insertedDriver = { id: "driver-new-id", name: "QA Driver", active: true };
+  state.insertError = null;
+  state.verifyError = null;
   state.drivers = [
     { name: "Rasheed", active: true },
     { name: "Old Driver", active: false },
@@ -41,9 +51,18 @@ beforeEach(() => {
     eq: vi.fn(),
     order: vi.fn(),
     limit: vi.fn(),
+    maybeSingle: vi.fn(),
+    insert: vi.fn(),
+    single: vi.fn(),
   };
   chain.select.mockReturnValue(chain);
-  chain.eq.mockImplementation((column: string, value: unknown) => { if (column === "active" && value === true) state.activeOnly = true; return chain; });
+  chain.eq.mockImplementation((column: string, value: unknown) => { state.lastEqColumn = column; if (column === "active" && value === true) state.activeOnly = true; return chain; });
+  chain.maybeSingle.mockImplementation(async () => ({
+    data: state.lastEqColumn === "id" ? state.insertedDriver : state.existingDriver,
+    error: state.verifyError,
+  }));
+  chain.insert.mockReturnValue(chain);
+  chain.single.mockImplementation(async () => ({ data: state.insertedDriver, error: state.insertError }));
   chain.order.mockReturnValue(chain);
   chain.limit.mockImplementation(async () => ({
     data: state.queryError ? null : [...state.drivers].filter((driver) => !state.activeOnly || driver.active).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 51),
@@ -141,6 +160,38 @@ describe("driver agent isolated read-only handler", () => {
       expect(body).toContain("first 50; more exist");
       expect(body).toContain("50. Driver 50");
       expect(body).not.toContain("51. Driver 51");
+    } finally {
+      if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+      else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
+    }
+  });
+
+
+  it("does not insert a duplicate active driver", async () => {
+    const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+    process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
+    state.existingDriver = { id: "driver-existing-id", name: "QA Driver", active: true };
+    try {
+      const result = await handleDriverMutation(makeMessage("Add new driver named QA Driver"), "stored-create-duplicate");
+      expect(result).toBe("handled");
+      expect(state.from).toHaveBeenCalledWith("ops_drivers");
+      expect(state.sendReply.mock.calls[0][0].body).toContain("നിലവിലുണ്ട്");
+      expect(state.from.mock.results).toBeDefined();
+    } finally {
+      if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+      else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
+    }
+  });
+
+  it("fails closed when driver creation reports an insert error", async () => {
+    const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+    process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
+    state.insertError = { message: "simulated insert failure" };
+    try {
+      await expect(
+        handleDriverMutation(makeMessage("Add new driver named QA Driver"), "stored-create-error"),
+      ).rejects.toThrow("Driver creation failed");
+      expect(state.sendReply).not.toHaveBeenCalled();
     } finally {
       if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
       else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
