@@ -36,6 +36,7 @@ export type FastWhatsAppQuery =
   | { type: "today_trip_summary" }
   | { type: "yesterday_trip_summary" }
   | { type: "driver_trip_summary"; driverName: string; yesterday: boolean }
+  | { type: "driver_count" }
   | { type: "today_products_summary" }
   | { type: "yesterday_products_summary" }
   | { type: "latest_trip" }
@@ -452,6 +453,20 @@ export function indiaDayBounds(now = new Date()): {
       startShiftedUtc + 24 * 60 * 60 * 1000 - IST_OFFSET_MS,
     ).toISOString(),
   };
+}
+
+async function activeDriverCount(): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const { count, error } = await supabase
+    .from("ops_drivers")
+    .select("id", { count: "exact", head: true })
+    .eq("active", true);
+
+  if (error) {
+    throw new Error("Failed to count active drivers: " + error.message);
+  }
+
+  return count ?? 0;
 }
 
 async function todayBillCount(now = new Date()): Promise<number> {
@@ -1084,6 +1099,11 @@ async function operationalPeriodSummary(
 async function answerFastQuery(
   query: FastWhatsAppQuery,
 ): Promise<string> {
+  if (query.type === "driver_count") {
+    const count = await activeDriverCount();
+    return "നിലവിൽ active ആയ ഡ്രൈവർമാർ: " + String(count) + ".";
+  }
+
   if (query.type === "today_bill_count") {
     const count = await todayBillCount();
     return "ഇന്ന് ലഭിച്ച PDF ബില്ലുകൾ: " + String(count) + ".";
@@ -1143,7 +1163,10 @@ export async function handleFastWhatsAppQuery(
   const startedAt = performance.now();
   let resolver: "deterministic" | "ai_intent" | "ai_fallback" | "fixed_fallback" =
     "deterministic";
-  let query = parseFastWhatsAppQuery(message.textBody);
+  // Resolve driver questions semantically; positional name regexes can mistake question/date words for a driver name.
+  let query = isDriverRelatedQuestion(message.textBody)
+    ? null
+    : parseFastWhatsAppQuery(message.textBody);
   const driverQuestion = !query && isDriverRelatedQuestion(message.textBody);
   const likelyOperational = !query && !driverQuestion && looksLikeOperationalQuery(message.textBody);
   let classificationReply: string | null = null;
