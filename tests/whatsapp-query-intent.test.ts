@@ -202,6 +202,45 @@ describe("WhatsApp AI intent fallback", () => {
     });
   });
 
+  it("classifies active driver count questions", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  intent: "driver_count",
+                  product_query: null,
+                  driver_name: null,
+                  yesterday: false,
+                  period: null,
+                  reply: null,
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      classifyOperationalQueryWithGroq("എത്ര ഡ്രൈവർമാരുണ്ട്?"),
+    ).resolves.toEqual({
+      intent: "driver_count",
+      product_query: null,
+      driver_name: null,
+      yesterday: false,
+      period: null,
+      reply: null,
+    });
+  });
+
   it("returns null when Groq-backed automation is disabled", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "false";
     delete process.env.GROQ_API_KEY;
