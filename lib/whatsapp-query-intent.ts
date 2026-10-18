@@ -156,7 +156,7 @@ function normalizeNameTokens(value: string): string[] {
   return value
     .normalize("NFKC")
     .toLocaleLowerCase("en")
-    .match(/[\\p{L}\\p{N}]+/gu) ?? [];
+    .match(/[\p{L}\p{N}]+/gu) ?? [];
 }
 
 function findExactDriverNameInQuery(
@@ -308,8 +308,8 @@ export async function classifyOperationalQueryWithGroq(
   const productQuery = parsed.data.product_query?.trim() || null;
   const normalizedQuery = boundedText.normalize("NFKC").toLocaleLowerCase("en");
   const exactDriverName = findExactDriverNameInQuery(boundedText, driverNames);
-  const hasTripTerm = /(?:^|[^\\p{L}\\p{N}])(?:trip|trips|ട്രിപ്പ്|ട്രിപ്പുകൾ)(?:$|[^\\p{L}\\p{N}])/iu.test(boundedText);
-  const hasYesterdayTerm = /(?:^|[^\\p{L}\\p{N}])(?:yesterday|innale)(?:$|[^\\p{L}\\p{N}])/iu.test(normalizedQuery) ||
+  const hasTripTerm = /(?:^|[^\p{L}\p{N}])(?:trip|trips|ട്രിപ്പ്|ട്രിപ്പുകൾ)(?:$|[^\p{L}\p{N}])/iu.test(boundedText);
+  const hasYesterdayTerm = /(?:^|[^\p{L}\p{N}])(?:yesterday|innale)(?:$|[^\p{L}\p{N}])/iu.test(normalizedQuery) ||
     boundedText.includes("ഇന്നലെ");
 
   // Keep this correction narrow: the observed failure was a named-driver query
