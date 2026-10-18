@@ -20,6 +20,9 @@ const keys = [
   "GROQ_API_KEY",
   "GROQ_MODEL",
   "GROQ_TIMEOUT_MS",
+  "AZURE_SPEECH_KEY",
+  "AZURE_SPEECH_REGION",
+  "AZURE_SPEECH_TIMEOUT_MS",
 ] as const;
 
 const originalValues = Object.fromEntries(
@@ -49,6 +52,8 @@ function setValidEnvironment() {
   process.env.SUPABASE_STORAGE_BUCKET = "whatsapp-media";
   process.env.MAX_MEDIA_BYTES = "15728640";
   process.env.DOCUMENT_AUTOMATION_ENABLED = "false";
+  process.env.AZURE_SPEECH_KEY = "azure-test-key";
+  process.env.AZURE_SPEECH_REGION = "centralindia";
 }
 
 describe("getIngestionEnv", () => {
@@ -85,6 +90,10 @@ describe("getHealthConfiguration", () => {
       ingestion: true,
       automation: {
         enabled: false,
+        ready: true,
+        invalidFields: [],
+      },
+      voiceTranscription: {
         ready: true,
         invalidFields: [],
       },
