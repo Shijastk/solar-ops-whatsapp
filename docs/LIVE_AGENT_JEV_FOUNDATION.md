@@ -95,3 +95,12 @@ Feature-flag the new path. Run offline tests, then shadow decisions without writ
 - Unknown/un-counted balances remain explicitly labelled; the model does not supply quantities or invent products.
 - This slice does not write stock, create aliases, approve bills, or bypass the immutable stock ledger.
 - Automated verification is pending until the branch's actual CI run completes. Production/live WhatsApp behavior is not claimed as verified by unit tests.
+
+
+### Natural-language trip start slice — branch `agent/natural-language-trip-start` (2026-10-18)
+
+- Clear English, Manglish, and Malayalam start phrases are handled deterministically first. Other likely trip-start requests are sent to the existing strict, token-bounded Groq intent classifier; the classifier returns only `start_trip` plus an optional explicitly named driver, never SQL or business facts.
+- A named driver is resolved by exact normalized match against active `ops_drivers`. If the requested driver is missing/ambiguous, no trip is created. If no driver is named, the existing `collecting` workflow starts and waits for PDFs plus the existing done/driver-selection steps.
+- The existing partial unique index on active trips per sender is the duplicate guard; a concurrent uniqueness conflict is handled as “trip already open,” not as a second trip.
+- This reuses the existing `delivery_trips` schema and requires no new migration. The existing trip workflow, not the model, performs the database write.
+- Handler tests cover successful start, exact driver matching, unknown-driver rejection, read-query rejection, and concurrent duplicate prevention. CI is pending for this branch; production WhatsApp behavior is not yet claimed as verified.
