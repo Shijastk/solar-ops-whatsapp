@@ -1,62 +1,62 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { transcribeOperationalVoice } from "../lib/voice-transcription";
+import { transcribeOperationalVoice } from "@/lib/voice-transcription";
 
-const originals = {
-  enabled: process.env.DOCUMENT_AUTOMATION_ENABLED,
-  key: process.env.GROQ_API_KEY,
-  model: process.env.GROQ_MODEL,
-  timeout: process.env.GROQ_TIMEOUT_MS,
-};
+const keys = ["AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION", "AZURE_SPEECH_TIMEOUT_MS"] as const;
+const originals = Object.fromEntries(keys.map((key) => [key, process.env[key]])) as Record<(typeof keys)[number], string | undefined>;
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  const restore = (key: string, value: string | undefined) => {
+  for (const key of keys) {
+    const value = originals[key];
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
-  };
-  restore("DOCUMENT_AUTOMATION_ENABLED", originals.enabled);
-  restore("GROQ_API_KEY", originals.key);
-  restore("GROQ_MODEL", originals.model);
-  restore("GROQ_TIMEOUT_MS", originals.timeout);
+  }
 });
 
 describe("operational voice transcription", () => {
-  it("uses Groq Whisper Turbo with the audio file only", async () => {
-    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
-    process.env.GROQ_API_KEY = "groq-test-secret";
-    process.env.GROQ_MODEL = "openai/gpt-oss-20b";
-    process.env.GROQ_TIMEOUT_MS = "7000";
-
+  it("uses Azure Speech with the Malayalam locale", async () => {
+    process.env.AZURE_SPEECH_KEY = "azure-test-secret";
+    process.env.AZURE_SPEECH_REGION = "centralindia";
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ text: "ഇന്നത്തെ trip ഏതാണ്" }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
+      Response.json({ RecognitionStatus: "Success", DisplayText: "ഇന്നത്തെ trip ഏതാണ്" }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      transcribeOperationalVoice({
-        bytes: new Uint8Array([1, 2, 3, 4]),
-        mimeType: "audio/ogg; codecs=opus",
-      }),
-    ).resolves.toBe("ഇന്നത്തെ trip ഏതാണ്");
+    await expect(transcribeOperationalVoice({
+      bytes: new Uint8Array([1, 2, 3, 4]),
+      mimeType: "audio/ogg; codecs=opus",
+    })).resolves.toBe("ഇന്നത്തെ trip ഏതാണ്");
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.groq.com/openai/v1/audio/transcriptions");
+    const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
+    expect(String(url)).toContain("https://centralindia.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1");
+    expect(String(url)).toContain("language=ml-IN");
+    expect(String(url)).toContain("format=simple");
     expect(init.headers).toMatchObject({
-      Authorization: "Bearer groq-test-secret",
+      "Ocp-Apim-Subscription-Key": "azure-test-secret",
+      "Content-Type": "audio/ogg; codecs=opus",
     });
-    expect(init.body).toBeInstanceOf(FormData);
-    const form = init.body as FormData;
-    expect(form.get("model")).toBe("whisper-large-v3-turbo");
-    expect(form.get("language")).toBe("ml");
-    expect(String(form.get("prompt"))).toContain("സോളാർ");
-    expect(String(form.get("prompt"))).not.toContain("560");
-    expect(form.get("response_format")).toBe("json");
-    expect(form.get("temperature")).toBe("0");
-    expect(form.get("file")).toBeInstanceOf(Blob);
+    expect(init.body).toBeInstanceOf(ArrayBuffer);
+  });
+
+  it("fails clearly when the Azure Speech key is missing", async () => {
+    delete process.env.AZURE_SPEECH_KEY;
+    await expect(transcribeOperationalVoice({
+      bytes: new Uint8Array([1]),
+      mimeType: "audio/ogg",
+    })).rejects.toThrow("Azure Speech key is not configured");
+  });
+
+  it("rejects a no-match response", async () => {
+    process.env.AZURE_SPEECH_KEY = "azure-test-secret";
+    process.env.AZURE_SPEECH_REGION = "centralindia";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      Response.json({ RecognitionStatus: "NoMatch", DisplayText: "" }),
+    ));
+    await expect(transcribeOperationalVoice({
+      bytes: new Uint8Array([1]),
+      mimeType: "audio/ogg",
+    })).rejects.toThrow("Azure Speech transcription returned no recognized speech");
   });
 });
