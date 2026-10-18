@@ -54,11 +54,7 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(parseFastWhatsAppQuery("Yesterday how much trip")).toEqual({
       type: "yesterday_trip_summary",
     });
-    expect(parseFastWhatsAppQuery("today driver Rasheed trips")).toEqual({
-      type: "driver_trip_summary",
-      driverName: "Rasheed",
-      yesterday: false,
-    });
+    expect(parseFastWhatsAppQuery("today driver Rasheed trips")).toBeNull();
     expect(parseFastWhatsAppQuery("ഈ മാസം summary")).toEqual({
       type: "ops_period_summary",
       period: "this_month",
