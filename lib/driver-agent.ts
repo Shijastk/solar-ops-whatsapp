@@ -45,7 +45,7 @@ export function parseDriverMutation(text: string): DriverIntent | null {
 
   // Malayalam/Manglish patterns are intentionally conservative. Names are
   // captured only from explicit action phrases; general mentions never write.
-  const malayalamPatterns: Array<{ action: DriverIntent["action"]; regex: RegExp }> = [
+  const malayalamPatterns: Array<{ action: "create" | "deactivate"; regex: RegExp }> = [
     { action: "create", regex: /^(.+?)\s+(?:പുതിയ\s+)?ഡ്രൈവറായി\s+(?:ആഡ്\s+ചെയ്യണം|ചേർക്കണം|ചേർക്കൂ)$/u },
     { action: "create", regex: /^(.+?)\s+(?:new\s+)?driver\s+(?:ആയി|ayi)\s+add\s+(?:ചെയ്യണം|cheyyanam|cheyyu)$/iu },
     { action: "deactivate", regex: /^(.+?)യെ?\s+(?:ഡ്രൈവർ\s+ലിസ്റ്റിൽ\s+നിന്ന്\s+)?(?:ഡിലീറ്റ്\s+ചെയ്യണം|ഡിലീറ്റ്|ഒഴിവാക്കണം|നീക്കം\s+ചെയ്യണം)$/u },
