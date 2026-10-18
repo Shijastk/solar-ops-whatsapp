@@ -84,3 +84,10 @@ This narrows the schema gap but does not identify the original table-creation mi
 - GitHub Actions run [39130929497](https://github.com/Shijastk/solar-ops-whatsapp/actions/runs/39130929497) completed with conclusion **success** on that exact head SHA.
 - Verified workflow steps: `npm ci --no-audit --no-fund`, `npm run typecheck`, `npm run lint`, `npm run test`, and `npm run build` all completed successfully.
 - This verifies repository CI on the current test-branch commit only. It does not establish production deployment or isolated live-database persistence. PR #60 remains draft/unmerged; production feature flag remains disabled.
+
+## Driver list handler tests — 2026-10-18
+
+- Expanded `tests/driver-agent-create.test.ts` on PR #60 head commit `73a31e0b218b859a50038109de65f749a9e2b648` with isolated list-handler coverage: bounded 50-row response (query limit 51), empty list response, and database error fail-closed behavior.
+- Exact-head GitHub Actions run [39131203720](https://github.com/Shijastk/solar-ops-whatsapp/actions/runs/39131203720) completed with **success** on `73a31e0b218b859a50038109de65f749a9e2b648`. Dependency install, typecheck, lint, unit tests, and production build all passed.
+- Tests use mocked Supabase and reply transport only. No production driver rows were read or mutated and no WhatsApp messages were sent.
+- PR #60 remains draft/unmerged. Deactivation is still fail-closed pending a reviewed durable sender-scoped confirmation implementation and isolated persistence verification.
