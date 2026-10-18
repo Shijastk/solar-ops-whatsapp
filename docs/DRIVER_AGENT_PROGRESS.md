@@ -48,3 +48,20 @@ Finish driver operations as a reliable, tested capability before treating the wi
 | 2026-10-18 | Added list-intent parser tests | `0f802d3449a9fe7aca264c394a46e9db542f0da5` | Tests committed; superseded by final branch head |
 | 2026-10-18 | Narrowed Malayalam/Manglish parser action type after adding `list` | `ed50364381571a407234db7a464dcf10e827a290`; CI run `39126913313` | PASS: typecheck, lint, unit tests, production build |
 | 2026-10-18 | Read-only inspection of live `ops_drivers` columns and public table list | Supabase `information_schema` queries (read-only) | PASS: schema metadata verified; no business rows read or modified |
+
+
+## Continuation verification — 2026-10-18 evening
+
+- GitHub Actions run [39127751846](https://github.com/Shijastk/solar-ops-whatsapp/actions/runs/39127751846) was inspected through its job details. The `quality` job completed with conclusion **success**; dependency install, Typecheck, Lint, Unit tests, and Production build steps all completed successfully.
+- The run-jobs endpoint did not expose the workflow run's head SHA. Do not infer that run `39127751846` tested `ed50364381571a407234db7a464dcf10e827a290`; that SHA is independently confirmed as the code commit for the earlier successful run `39126913313`. The exact head SHA for run `39127751846` remains to be verified from the run page/API.
+- The progress file exists on `agent/driver-automation-continuation` and `test/driver-agent-handler-isolation`. Fetching `docs/ENGINEERING_ROADMAP.md` from the default branch and continuation branch returned 404, so the roadmap's current existence/location is not verified. Do not assume it exists at that path.
+- Supabase migration history was inspected read-only. The listed migrations end at `20261004153650 mobile_save_only_trip_ux`; none names or obviously represents creation of `ops_drivers`.
+- Additional read-only catalog inspection confirmed constraints on `public.ops_drivers`: primary key on `id`, unique constraint on `normalized_name`, and checks requiring trimmed `name` and `normalized_name` lengths from 1 to 120 characters. No rows were read or modified.
+- The schema source gap is still open. Do not create a guessed migration or apply DDL to production. Next, inspect indexes, RLS enablement/policies, grants, and triggers read-only; then create a checked-in migration only when its full intended schema and safe rollout are grounded in repository history or authoritative database metadata.
+
+## Next concrete step
+
+1. Verify run `39127751846` head SHA from GitHub's run metadata/page and inspect PRs #57–#60 individually for state, head SHA, and branch.
+2. Finish read-only `ops_drivers` metadata audit (indexes, RLS/policies, grants, triggers), then document the schema source gap and add a reproducible migration on a non-main branch only when supported by evidence.
+3. Extend isolated mocked handler tests for create/list/error/duplicate/verification behavior. Keep deactivation fail-closed until sender-scoped, expiring, one-time confirmation is implemented and tested.
+4. Keep production feature gate disabled; do not merge any PR without explicit approval.
