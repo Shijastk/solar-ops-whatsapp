@@ -109,3 +109,15 @@ This section supersedes the earlier "Remaining driver completion criteria" and i
 - No production rows were changed and no WhatsApp messages were sent.
 - Migrations have **not** been applied to Supabase. `SOLAR_OPS_DRIVER_AGENT_ENABLED` remains disabled.
 - This PR targets `agent/driver-automation-continuation`, not `main`. Integration remains subject to the conflict-resolution commit and a fresh mergeability/CI check.
+
+
+## Superseding repository/database status — 2026-10-18
+
+This section supersedes earlier statements above that PR #60 was unmerged and its migrations were not applied.
+
+- PR #60 is closed/merged into `agent/driver-automation-continuation` (merge commit `2a82f52eb7ebbaa3bffb21ae8c5debfff3d6aca2`). The current `main` branch is one commit ahead of that continuation branch and already contains the driver implementation.
+- Vercel's latest production deployment observed during this audit is `READY` for main commit `640400ce2c1a879e39e0e3cbf0705a59365a4e48`; the commit's reported Vercel status is success.
+- Supabase migration history now includes `20261018140554 ops_drivers_catalog` and `20261018140604 ops_driver_deactivation_confirmation`. Read-only table metadata confirms `public.ops_drivers` and `public.ops_driver_action_confirmations` exist. No driver rows were read, and no production rows were changed during this audit.
+- The user reports that `SOLAR_OPS_DRIVER_AGENT_ENABLED=true` is already set. This value was not independently inspected through environment settings, and no secrets or `.env` files were read.
+- The latest 30-minute Vercel production runtime-log query returned no matching warning/error entries. The 24-hour grouped error view showed two historical error groups on older deployment `dpl_7wy1qAa8FrVUScFdPf7U2UD4o1dx`; direct 24-hour runtime logs are unavailable on the current Hobby retention window. Supabase Postgres error query for the last 24 hours returned no rows.
+- Next slice is branch `agent/stock-query-agent`: bounded, read-only natural-language stock inventory summary from the live `stock_balances` view. CI and PR review are pending; no production deployment or WhatsApp message is claimed for this branch.
