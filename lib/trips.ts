@@ -651,11 +651,44 @@ async function sendHomeMenu(
   });
 }
 
+async function loadTripStartedByMessage(
+  senderPhone: string,
+  storedMessageId: string,
+): Promise<TripRow | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("delivery_trips")
+    .select(
+      "id, sender_phone, status, display_name, primary_destination, destination_pincode, destination_district, destination_state, vehicle_number, driver_id",
+    )
+    .eq("sender_phone", senderPhone)
+    .eq("started_by_message_id", storedMessageId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Failed to verify trip start message: " + error.message);
+  }
+  return (data as TripRow | null) ?? null;
+}
+
 async function startTrip(
   message: NormalizedWhatsAppMessage,
   storedMessageId: string,
   driver?: { id: string; name: string },
 ) {
+  const priorFromMessage = await loadTripStartedByMessage(
+    message.senderPhone,
+    storedMessageId,
+  );
+  if (priorFromMessage) {
+    await sendOpsReply({
+      requestId: deterministicUuid("trip-start-replay:" + storedMessageId),
+      replyToMessageId: storedMessageId,
+      body: "ഈ message ഉപയോഗിച്ച് ഒരു trip ഇതിനകം process ചെയ്തിട്ടുണ്ട്. Duplicate trip create ചെയ്തിട്ടില്ല.",
+      knownInboundAt: message.timestamp,
+    });
+    return;
+  }
+
   const existing = await loadActiveTrip(message.senderPhone);
   if (existing) {
     const stateText =
@@ -703,6 +736,36 @@ async function startTrip(
   }
 
   if (error) throw new Error("Failed to create trip: " + error.message);
+
+  let verifiedTrip: TripRow | null = null;
+  try {
+    verifiedTrip = await loadTripStartedByMessage(
+      message.senderPhone,
+      storedMessageId,
+    );
+  } catch (readbackError) {
+    console.error("Trip creation read-back failed", {
+      reason:
+        readbackError instanceof Error
+          ? readbackError.message.slice(0, 180)
+          : "Unknown read-back error",
+    });
+  }
+
+  if (
+    !verifiedTrip ||
+    verifiedTrip.sender_phone !== message.senderPhone ||
+    verifiedTrip.status !== "collecting" ||
+    verifiedTrip.driver_id !== (driver?.id ?? null)
+  ) {
+    await sendOpsReply({
+      requestId: deterministicUuid("trip-open-unverified:" + storedMessageId),
+      replyToMessageId: storedMessageId,
+      knownInboundAt: message.timestamp,
+      body: "Trip create request process ചെയ്തു, പക്ഷേ database-ൽ save ആയെന്ന് verify ചെയ്യാൻ കഴിഞ്ഞില്ല. അതിനാൽ success confirm ചെയ്യാനാവില്ല. വീണ്ടും ശ്രമിക്കുന്നതിന് മുമ്പ് open trip പരിശോധിക്കൂ.",
+    });
+    return;
+  }
 
   await sendOpsReply({
     requestId: deterministicUuid("trip-opened:" + storedMessageId),
