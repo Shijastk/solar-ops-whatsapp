@@ -1,4 +1,5 @@
 import { normalizeProductDescription } from "@/lib/document-parser";
+import { loadAgentContext, saveAgentContext } from "@/lib/agent-context";
 import { deterministicUuid } from "@/lib/idempotency";
 import {
   classifyOperationalQueryWithGroq,
@@ -39,6 +40,7 @@ export type FastWhatsAppQuery =
   | { type: "yesterday_trip_summary" }
   | { type: "driver_trip_summary"; driverName: string; yesterday: boolean }
   | { type: "driver_count" }
+  | { type: "driver_list" }
   | { type: "today_products_summary" }
   | { type: "yesterday_products_summary" }
   | { type: "latest_trip" }
@@ -140,6 +142,24 @@ const TODAY_PRODUCT_MOVEMENT_TERMS = [
   "പുറത്തുപോയ",
 ];
 const TRIP_LATEST_TERMS = ["latest", "last", "recent", "അവസാന", "ലാസ്റ്റ്"];
+const DRIVER_COUNT_FOLLOWUP_TERMS = [
+  "who are they",
+  "who are those",
+  "show their names",
+  "list them",
+  "their names",
+  "who are these drivers",
+  "avar aarokkeyanu",
+  "avar aarokke",
+  "athil aarokkeyanu",
+  "athil aarokke",
+  "അവർ ആരൊക്കെയാണ്",
+  "അവരാരൊക്കെയാണ്",
+  "അവരുടെ പേരുകൾ",
+  "പേരുകൾ കാണിക്കൂ",
+  "അതിൽ ആരൊക്കെയാണ്",
+  "അതിൽ ആരൊക്കെയുണ്ട്",
+];
 
 const PERIOD_TERMS: Array<{ period: OpsPeriod; terms: string[] }> = [
   {
@@ -254,6 +274,13 @@ function extractStockProductQuery(value: string): string | null {
 
   const normalized = normalizeProductDescription(cleaned);
   return normalized ? cleaned : null;
+}
+
+export function isDriverCountFollowUp(text: string): boolean {
+  return includesAny(
+    normalizeQueryText(text),
+    DRIVER_COUNT_FOLLOWUP_TERMS.map((term) => normalizeQueryText(term)),
+  );
 }
 
 export function isDriverRelatedQuestion(text: string): boolean {
@@ -487,6 +514,31 @@ async function activeDriverCount(): Promise<number> {
   }
 
   return count ?? 0;
+}
+
+async function activeDriverListSummary(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("ops_drivers")
+    .select("name")
+    .eq("active", true)
+    .order("name", { ascending: true })
+    .limit(31);
+
+  if (error) {
+    throw new Error("Failed to load active driver list: " + error.message);
+  }
+
+  const rows = data ?? [];
+  if (rows.length === 0) return "നിലവിൽ active drivers ഒന്നുമില്ല.";
+
+  const hasMore = rows.length > 30;
+  const visible = rows.slice(0, 30).map((row) => String(row.name ?? "").slice(0, 80));
+  return [
+    "നിലവിലെ active drivers" + (hasMore ? " (ആദ്യത്തെ 30):" : " (" + String(visible.length) + "):"),
+    ...visible.map((name, index) => String(index + 1) + ". " + name),
+    ...(hasMore ? ["മറ്റു drivers ഉണ്ട്; കൃത്യമായ പേര് പറഞ്ഞാൽ ആ driver-ന്റെ വിവരങ്ങൾ നോക്കാം."] : []),
+  ].join("\\n");
 }
 
 async function todayBillCount(now = new Date()): Promise<number> {
@@ -1177,6 +1229,10 @@ async function answerFastQuery(
     return "നിലവിൽ active ആയ ഡ്രൈവർമാർ: " + String(count) + ".";
   }
 
+  if (query.type === "driver_list") {
+    return activeDriverListSummary();
+  }
+
   if (query.type === "today_bill_count") {
     const count = await todayBillCount();
     return "ഇന്ന് ലഭിച്ച PDF ബില്ലുകൾ: " + String(count) + ".";
@@ -1240,11 +1296,38 @@ export async function handleFastWhatsAppQuery(
   const startedAt = performance.now();
   let resolver: "deterministic" | "ai_intent" | "ai_fallback" | "fixed_fallback" =
     "deterministic";
-  // Resolve driver questions semantically; positional name regexes can mistake question/date words for a driver name.
-  let query = isDriverRelatedQuestion(message.textBody)
-    ? null
-    : parseFastWhatsAppQuery(message.textBody);
-  const driverQuestion = !query && isDriverRelatedQuestion(message.textBody);
+  const isDriverFollowUp = isDriverCountFollowUp(message.textBody);
+  let query: FastWhatsAppQuery | null = null;
+
+  if (isDriverFollowUp) {
+    try {
+      const context = await loadAgentContext(message.senderPhone);
+      if (context && (context.lastIntent === "driver_count" || context.lastIntent === "driver_list")) {
+        query = { type: "driver_list" };
+        resolver = "deterministic";
+      }
+    } catch (error) {
+      console.warn("Agent follow-up context lookup failed", {
+        reason: error instanceof Error ? error.message.slice(0, 180) : "Unknown context lookup error",
+      });
+    }
+
+    if (!query) {
+      await sendOpsReply({
+        requestId: deterministicUuid("agent-context-clarification:" + message.messageId),
+        replyToMessageId: storedMessageId,
+        knownInboundAt: message.timestamp,
+        body: "ആരെയാണ് ഉദ്ദേശിക്കുന്നത്? Driver-മാരെയാണോ, അല്ലെങ്കിൽ trip/bill details ആണോ?",
+      });
+      return "handled";
+    }
+  } else {
+    // Resolve driver questions semantically; positional name regexes can mistake question/date words for a driver name.
+    query = isDriverRelatedQuestion(message.textBody)
+      ? null
+      : parseFastWhatsAppQuery(message.textBody);
+  }
+  const driverQuestion = !query && !isDriverFollowUp && isDriverRelatedQuestion(message.textBody);
   const likelyOperational = !query && !driverQuestion && looksLikeOperationalQuery(message.textBody);
   let classificationReply: string | null = null;
   let operationalClassifierFailed = false;
@@ -1297,6 +1380,18 @@ export async function handleFastWhatsAppQuery(
 
   if (query) {
     body = await answerFastQuery(query);
+    if (query.type === "driver_count" || query.type === "driver_list") {
+      try {
+        await saveAgentContext({
+          senderPhone: message.senderPhone,
+          lastIntent: query.type,
+        });
+      } catch (error) {
+        console.warn("Agent follow-up context save failed", {
+          reason: error instanceof Error ? error.message.slice(0, 180) : "Unknown context save error",
+        });
+      }
+    }
   } else if (driverQuestion) {
     resolver = "fixed_fallback";
     body = "ഏത് driver-ന്റെ trips ആണ് വേണ്ടത്? Driver-ന്റെ പേര്, ഇന്ന്/ഇന്നലെ എന്ന് അയക്കൂ.";
