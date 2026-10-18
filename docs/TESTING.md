@@ -651,3 +651,8 @@ Existing-product stock receipt tests additionally reject a product from another 
 ## Malayalam voice STT benchmark
 
 The local-only benchmark in `scripts/benchmark/voice-stt.mjs` compares `whisper-large-v3-turbo` with `whisper-large-v3` on the exact same locally recorded clips. Setup, privacy constraints, manifest format, and interpretation are documented in `docs/VOICE_STT_BENCHMARK.md`. Audio and reference transcripts are gitignored. This benchmark has not produced measured results until a local run is performed with a non-sensitive sample set and a valid Groq key. It does not change the production model or test the WhatsApp webhook.
+
+
+## Agent intent and action regression coverage — 2026-10-18
+
+The current CI suite now includes regression coverage for bounded live stock inventory summaries, strict `stock_inventory_summary` classification, natural-language trip-start classification, exact active-driver matching, rejection of unknown requested drivers, and the active-trip uniqueness conflict path. These tests use synthetic inputs and mocked Supabase/provider calls; they do not send WhatsApp messages or mutate production data. Exact branch CI must pass before these changes are accepted, and real WhatsApp phrasing remains a separate operator-controlled acceptance test.
