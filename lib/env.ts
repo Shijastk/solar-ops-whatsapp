@@ -43,7 +43,7 @@ export function getIngestionEnv() {
   const allowedSenders = new Set(
     (parsed.ALLOWED_WHATSAPP_SENDERS ?? "")
       .split(",")
-      .map((value) => value.replace(/\\D/g, ""))
+      .map((value) => value.replace(/\D/g, ""))
       .filter(Boolean),
   );
 
