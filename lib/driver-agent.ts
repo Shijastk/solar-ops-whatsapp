@@ -74,7 +74,7 @@ function isValidDriverName(name: string): boolean {
   return name.length >= 2 &&
     name.length <= 120 &&
     !/[\n\r]/.test(name) &&
-    !/^(?:please|a new driver|new driver|ഡ്രൈവറായി|driver)$/i.test(name);
+    !/^(?:please|named|a new driver|new driver|ഡ്രൈവറായി|driver)$/i.test(name);
 }
 
 export async function handleDriverMutation(
