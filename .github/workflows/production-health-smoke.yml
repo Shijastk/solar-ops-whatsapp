@@ -67,7 +67,7 @@ jobs:
             }
 
             const serialized = JSON.stringify(configuration);
-            if (/(apiKey|accessToken|secretKey|verifyToken|password)\s*:/i.test(serialized)) {
+            if (/(apiKey|accessToken|secretKey|verifyToken|password)"\s*:/i.test(serialized)) {
               fail("health diagnostics appear to expose a secret-bearing field");
             }
           }
