@@ -68,7 +68,7 @@ export async function transcribeOperationalVoice(input: {
 
   return (parsed.data.DisplayText ?? "")
     .normalize("NFKC")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim()
     .slice(0, 1200);
 }
