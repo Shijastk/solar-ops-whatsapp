@@ -29,6 +29,18 @@ const cases: Array<{
   { id: "latest-trip", input: "latest trip details", expected: "latest_trip" },
 ];
 
+function sanitizeProviderError(error: unknown): { errorType: string; errorMessage: string } {
+  const errorType = error instanceof Error ? error.name : "UnknownError";
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const errorMessage = rawMessage
+    .replace(/Bearer\s+[^\s,;]+/gi, "Bearer [redacted]")
+    .replace(/\b(?:gsk_|sk-)[A-Za-z0-9_-]{8,}\b/g, "[redacted]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 180);
+  return { errorType, errorMessage: errorMessage || "No error message provided" };
+}
+
 describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evaluation", () => {
   it("meets intent accuracy and trip-write safety gates", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
@@ -65,7 +77,7 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           supportedReplyPassed: testCase.expected === "unsupported",
           tripWriteSafetyPassed: testCase.expected === "start_trip",
           providerError: true,
-          errorType: error instanceof Error ? error.name : "UnknownError",
+          ...sanitizeProviderError(error),
         });
       }
     }
