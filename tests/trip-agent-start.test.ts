@@ -284,6 +284,7 @@ describe("natural-language trip start", () => {
       destination_state: null,
       vehicle_number: null,
       driver_id: null,
+      started_by_message_id: "stored-trip-message-1",
     };
 
     const result = await handleTripWorkflowInbound(
