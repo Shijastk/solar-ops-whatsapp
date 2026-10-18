@@ -40,7 +40,7 @@ describe("production health response quality gate", () => {
 
   it("rejects non-boolean environment presence diagnostics", () => {
     const body = healthyResponse();
-    body.configuration.presence.WHATSAPP_ACCESS_TOKEN = "actual-token-value";
+    Reflect.set(body.configuration.presence, "WHATSAPP_ACCESS_TOKEN", "actual-token-value");
 
     expect(validateHealthResponse(body, safeHeaders)).toContain(
       "configuration presence values must be booleans",
@@ -49,7 +49,7 @@ describe("production health response quality gate", () => {
 
   it("rejects secret-bearing diagnostic field names", () => {
     const body = healthyResponse();
-    body.configuration.apiKey = "must-never-be-returned";
+    Reflect.set(body.configuration, "apiKey", "must-never-be-returned");
 
     expect(validateHealthResponse(body, safeHeaders)).toContain(
       "health diagnostics appear to expose a secret-bearing field",
