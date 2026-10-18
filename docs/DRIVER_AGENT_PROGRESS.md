@@ -83,3 +83,9 @@ Finish driver operations as a reliable, tested capability before treating the wi
 - Updated `lib/driver-agent.ts` to issue a cryptographically random 192-bit one-time token for a uniquely matched active driver and accept only the explicit `CONFIRM DRIVER <token>` form. Confirmation tokens are hashed before storage and never stored in plaintext. Invalid, expired, reused, or wrong-sender tokens cannot deactivate a driver.
 - Expanded isolated handler tests for confirmation creation, hashed-token storage, sender binding, database insert failures, atomic RPC success/error, and invalid/expired token responses. Tests mock Supabase and WhatsApp reply transport.
 - **Not yet production-ready:** migrations have not been applied to any database; no production rows or WhatsApp messages were changed. Verify these migrations in an isolated Supabase branch/database and confirm catalog compatibility before any rollout. Production feature flag remains disabled and PR #60 remains draft/unmerged.
+
+## Latest confirmation-flow CI evidence — 2026-10-18
+
+- Commit `452531b18006f726e33d937206d17167bacd4638` corrected the confirmation-token parser and reply newline.
+- GitHub Actions run [39131693789](https://github.com/Shijastk/solar-ops-whatsapp/actions/runs/39131693789) completed successfully on that exact SHA. Dependency install, TypeScript typecheck, lint, all unit tests, and production build passed.
+- SQL migrations are still un-applied and have not been exercised against an isolated Postgres/Supabase instance. Do not merge or enable the production flag until the migration is validated in an isolated database and reviewed.
