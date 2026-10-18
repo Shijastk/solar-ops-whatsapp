@@ -57,3 +57,10 @@ Finish driver operations as a reliable, tested capability before treating the wi
 - CI for the latest head commit is **not yet confirmed**. The commit workflow/status queries returned no associated runs/statuses at inspection time; do not treat the previous successful run as evidence for this latest test change.
 - PR #60 remains open and draft, head SHA `315238234f90f3810925a01b4eb9179086649bdc`; PR #57, #58, and #59 were also observed open, unmerged, and draft. No PR was merged.
 - Next: wait for/inspect CI for the exact latest head; if it fails, diagnose and fix before proceeding to mocked create-handler coverage. Continue to avoid production mutations and leave deactivation fail-closed.
+
+## Verification follow-up — 2026-10-18
+
+- Added isolated create-handler tests in commit `265eee22c4a3f7ef87f6178b37e282c3452d01b7` for verification-query failure and concurrent unique-key insert conflict. The tests mock Supabase and reply transport; they do not access production rows or send WhatsApp messages.
+- Latest known PR #60 head is being rechecked after this commit. The repository CI workflow `.github/workflows/ci.yml` runs on pushes and on pull requests targeting `main`; PR #60 currently targets `agent/driver-automation-continuation`, so its pull-request event does not match that branch filter.
+- The available commit-workflow query only returns pull-request-triggered runs and does not expose push-triggered runs; combined commit status returned no status entries for the prior head. Therefore CI for the latest commit cannot be claimed as passing from the currently available evidence.
+- Do not treat earlier successful run `39126913313` as verification for the newer tests. Do not merge or enable the production feature gate. Driver completion is still blocked on exact-head CI evidence, isolated persistence verification, authoritative schema provenance, and a durable sender-scoped expiring one-time deactivation confirmation flow.
