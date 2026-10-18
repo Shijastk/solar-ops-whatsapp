@@ -92,6 +92,22 @@ describe("fast WhatsApp operational query parsing", () => {
     });
   });
 
+  it("recognizes broad stock inventory list requests without guessing a product", () => {
+    expect(parseFastWhatsAppQuery("show all stock")).toEqual({
+      type: "stock_inventory_summary",
+    });
+    expect(parseFastWhatsAppQuery("stock list kaanikku")).toEqual({
+      type: "stock_inventory_summary",
+    });
+    expect(parseFastWhatsAppQuery("എല്ലാ സ്റ്റോക്കും കാണിക്കൂ")).toEqual({
+      type: "stock_inventory_summary",
+    });
+    expect(parseFastWhatsAppQuery("Emmvee 560 panel stock ethra")).toEqual({
+      type: "stock_balance",
+      productQuery: "Emmvee 560 panel",
+    });
+  });
+
   it("asks for a product instead of guessing when a stock question is incomplete", () => {
     expect(parseFastWhatsAppQuery("സ്റ്റോക്ക് എത്ര?")).toEqual({
       type: "stock_product_required",
