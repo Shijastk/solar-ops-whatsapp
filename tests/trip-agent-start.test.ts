@@ -5,6 +5,10 @@ const state = vi.hoisted(() => ({
   sendReply: vi.fn(),
   insertedTrips: [] as Array<Record<string, unknown>>,
   activeTrip: null as Record<string, unknown> | null,
+  startedTrip: null as Record<string, unknown> | null,
+  readbackError: null as { message: string } | null,
+  failReadbackAfterInsert: false,
+  insertError: null as { code: string; message: string } | null,
   driverRows: [] as Array<{ id: string; name: string; normalized_name: string; active: boolean }>,
   duplicateInsert: false,
 }));
@@ -22,13 +26,23 @@ import { handleTripWorkflowInbound } from "@/lib/trips";
 
 function makeChain(table: string) {
   const chain: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "in", "order", "limit"]) {
+  let looksUpStartedMessage = false;
+  for (const method of ["select", "in", "order", "limit"]) {
     chain[method] = vi.fn(() => chain);
   }
-  chain.maybeSingle = vi.fn(async () => ({
-    data: state.activeTrip,
-    error: null,
-  }));
+  chain.eq = vi.fn((column: string) => {
+    if (column === "started_by_message_id") looksUpStartedMessage = true;
+    return chain;
+  });
+  chain.maybeSingle = vi.fn(async () => {
+    if (looksUpStartedMessage) {
+      return {
+        data: state.readbackError ? null : state.startedTrip,
+        error: state.readbackError,
+      };
+    }
+    return { data: state.activeTrip, error: null };
+  });
   chain.insert = vi.fn(async (row: Record<string, unknown>) => {
     state.insertedTrips.push(row);
     if (state.duplicateInsert) {
@@ -45,6 +59,24 @@ function makeChain(table: string) {
         driver_id: null,
       };
       return { error: { code: "23505", message: "duplicate active sender" } };
+    }
+    if (state.insertError) return { error: state.insertError };
+    if (state.failReadbackAfterInsert) {
+      state.readbackError = { message: "simulated read-back failure" };
+    } else {
+      state.startedTrip = {
+        id: "created-trip",
+        sender_phone: row.sender_phone,
+        status: "collecting",
+        display_name: null,
+        primary_destination: null,
+        destination_pincode: null,
+        destination_district: null,
+        destination_state: null,
+        vehicle_number: null,
+        driver_id: row.driver_id,
+        started_by_message_id: row.started_by_message_id,
+      };
     }
     return { error: null };
   });
@@ -104,6 +136,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.insertedTrips = [];
   state.activeTrip = null;
+  state.startedTrip = null;
+  state.readbackError = null;
+  state.failReadbackAfterInsert = false;
+  state.insertError = null;
   state.driverRows = [];
   state.duplicateInsert = false;
   state.from.mockImplementation((table: string) => makeChain(table));
@@ -233,6 +269,54 @@ describe("natural-language trip start", () => {
     expect(result).toBe("ignored");
     expect(state.from).not.toHaveBeenCalledWith("ops_drivers");
     expect(state.insertedTrips).toHaveLength(0);
+    expect(state.sendReply).not.toHaveBeenCalled();
+  });
+
+  it("does not create a second trip when the same inbound message is replayed", async () => {
+    state.startedTrip = {
+      id: "previous-trip",
+      sender_phone: "15550001111",
+      status: "ready",
+      display_name: null,
+      primary_destination: null,
+      destination_pincode: null,
+      destination_district: null,
+      destination_state: null,
+      vehicle_number: null,
+      driver_id: null,
+    };
+
+    const result = await handleTripWorkflowInbound(
+      makeMessage("trip"),
+      "stored-trip-message-1",
+    );
+
+    expect(result).toBe("handled");
+    expect(state.insertedTrips).toHaveLength(0);
+    expect(state.sendReply.mock.calls[0][0].body).toContain("Duplicate trip create ചെയ്തിട്ടില്ല");
+  });
+
+  it("does not claim success when the inserted trip cannot be read back", async () => {
+    state.failReadbackAfterInsert = true;
+
+    const result = await handleTripWorkflowInbound(
+      makeMessage("trip"),
+      "stored-trip-message-readback",
+    );
+
+    expect(result).toBe("handled");
+    expect(state.insertedTrips).toHaveLength(1);
+    expect(state.sendReply).toHaveBeenCalledTimes(1);
+    expect(state.sendReply.mock.calls[0][0].body).toContain("verify ചെയ്യാൻ കഴിഞ്ഞില്ല");
+    expect(state.sendReply.mock.calls[0][0].body).not.toContain("New Trip തുറന്നു");
+  });
+
+  it("fails closed when the trip insert itself fails", async () => {
+    state.insertError = { code: "XX000", message: "simulated database failure" };
+
+    await expect(
+      handleTripWorkflowInbound(makeMessage("trip"), "stored-trip-message-db-error"),
+    ).rejects.toThrow("Failed to create trip");
     expect(state.sendReply).not.toHaveBeenCalled();
   });
 
