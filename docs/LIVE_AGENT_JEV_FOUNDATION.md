@@ -104,3 +104,8 @@ Feature-flag the new path. Run offline tests, then shadow decisions without writ
 - The existing partial unique index on active trips per sender is the duplicate guard; a concurrent uniqueness conflict is handled as “trip already open,” not as a second trip.
 - This reuses the existing `delivery_trips` schema and requires no new migration. The existing trip workflow, not the model, performs the database write.
 - Handler tests cover successful start, exact driver matching, unknown-driver rejection, read-query rejection, and concurrent duplicate prevention. CI is pending for this branch; production WhatsApp behavior is not yet claimed as verified.
+
+
+### Rollout boundary for natural-language trip creation
+
+`SOLAR_OPS_NATURAL_TRIP_START_ENABLED` must remain off by default. Existing exact `trip` / `New Trip` commands are unchanged. The new phrase classifier and semantic `start_trip` path run only when this dedicated flag is the literal string `true`. Do not turn it on merely because CI passes; first verify the production deployment, then run a restricted operator-controlled WhatsApp acceptance test. No production environment setting is changed by this code PR.
