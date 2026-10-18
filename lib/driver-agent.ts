@@ -90,7 +90,7 @@ export async function handleDriverMutation(
   if (process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED !== "true") return "ignored";
 
   const supabase = getSupabaseAdmin();
-  const confirmationMatch = message.textBody.trim().match(/^confirm\\s+driver\\s+([a-f0-9]{48})$/i);
+  const confirmationMatch = message.textBody.trim().match(/^confirm\s+driver\s+([a-f0-9]{48})$/i);
 
   if (confirmationMatch) {
     const tokenHash = createHash("sha256").update(confirmationMatch[1].toLowerCase()).digest("hex");
@@ -277,7 +277,7 @@ export async function handleDriverMutation(
     requestId: deterministicUuid("driver-deactivate-confirmation:" + message.messageId),
     replyToMessageId: storedMessageId,
     knownInboundAt: message.timestamp,
-    body: "⚠️ " + matches[0].name + " എന്ന driver-നെ deactivate ചെയ്യാൻ 5 മിനിറ്റിനുള്ളിൽ ഇതേ WhatsApp നമ്പറിൽ നിന്ന് കൃത്യമായി ഈ സന്ദേശം reply ചെയ്യുക: CONFIRM DRIVER " + token + "\\nToken ഒരിക്കൽ മാത്രം ഉപയോഗിക്കാം. നിങ്ങൾ ആവശ്യപ്പെട്ടിട്ടില്ലെങ്കിൽ അവഗണിക്കുക.",
+    body: "⚠️ " + matches[0].name + " എന്ന driver-നെ deactivate ചെയ്യാൻ 5 മിനിറ്റിനുള്ളിൽ ഇതേ WhatsApp നമ്പറിൽ നിന്ന് കൃത്യമായി ഈ സന്ദേശം reply ചെയ്യുക: CONFIRM DRIVER " + token + "\nToken ഒരിക്കൽ മാത്രം ഉപയോഗിക്കാം. നിങ്ങൾ ആവശ്യപ്പെട്ടിട്ടില്ലെങ്കിൽ അവഗണിക്കുക.",
   });
   return "handled";
 }
