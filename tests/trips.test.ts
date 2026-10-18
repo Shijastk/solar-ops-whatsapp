@@ -29,6 +29,7 @@ describe("WhatsApp trip capture helpers", () => {
     expect(extractTripStartDriverQuery("trip create cheyyanam")).toBeNull();
     expect(extractTripStartDriverQuery("new trip with Rasheed")).toBeNull();
     expect(looksLikePotentialTripStartRequest("I need a new trip for Rasheed")).toBe(true);
+    expect(looksLikePotentialTripStartRequest("Please open a new trip with Unknown Driver")).toBe(true);
     expect(looksLikePotentialTripStartRequest("I want to know today's trip details")).toBe(false);
     expect(looksLikePotentialTripStartRequest("show latest trip")).toBe(false);
     expect(classifyTripTextCommand("done")).toBe("done");
