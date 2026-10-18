@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   verifyError: null as { message: string } | null,
   insertPayload: null as { name: string; normalized_name: string; active: boolean } | null,
   maybeSingleCount: 0,
+  originalFeatureFlag: undefined as string | undefined,
 }));
 
 vi.mock("@/lib/supabase-admin", () => ({
@@ -42,6 +43,7 @@ beforeEach(() => {
   state.verifyError = null;
   state.insertPayload = null;
   state.maybeSingleCount = 0;
+  state.originalFeatureFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
   process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";
 
   state.from.mockImplementation((table: string) => {
@@ -82,8 +84,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
-  delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+  if (state.originalFeatureFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
+  else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = state.originalFeatureFlag;
 });
 
 describe("driver agent isolated create handler", () => {
