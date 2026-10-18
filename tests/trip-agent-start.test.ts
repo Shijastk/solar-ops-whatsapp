@@ -97,6 +97,7 @@ const originalEnv = {
   key: process.env.GROQ_API_KEY,
   model: process.env.GROQ_MODEL,
   timeout: process.env.GROQ_TIMEOUT_MS,
+  naturalTripStart: process.env.SOLAR_OPS_NATURAL_TRIP_START_ENABLED,
 };
 
 beforeEach(() => {
@@ -109,6 +110,7 @@ beforeEach(() => {
   state.sendReply.mockResolvedValue(undefined);
   process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
   process.env.GROQ_API_KEY = "groq-test-secret";
+  process.env.SOLAR_OPS_NATURAL_TRIP_START_ENABLED = "true";
 });
 
 afterEach(() => {
@@ -122,6 +124,7 @@ afterEach(() => {
   restore("GROQ_API_KEY", originalEnv.key);
   restore("GROQ_MODEL", originalEnv.model);
   restore("GROQ_TIMEOUT_MS", originalEnv.timeout);
+  restore("SOLAR_OPS_NATURAL_TRIP_START_ENABLED", originalEnv.naturalTripStart);
 });
 
 describe("natural-language trip start", () => {
@@ -143,6 +146,22 @@ describe("natural-language trip start", () => {
     });
     expect(state.sendReply).toHaveBeenCalledTimes(1);
     expect(state.sendReply.mock.calls[0][0].body).toContain("New Trip തുറന്നു");
+  });
+
+  it("keeps natural-language trip creation disabled unless the rollout flag is true", async () => {
+    delete process.env.SOLAR_OPS_NATURAL_TRIP_START_ENABLED;
+    const fetchMock = mockIntent("start_trip");
+
+    const result = await handleTripWorkflowInbound(
+      makeMessage("Please open a delivery trip"),
+      "stored-trip-message-flag-off",
+    );
+
+    expect(result).toBe("handled");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(state.insertedTrips).toHaveLength(0);
+    expect(state.sendReply).toHaveBeenCalledTimes(1);
+    expect(state.sendReply.mock.calls[0][0].body).toContain("enabled അല്ല");
   });
 
   it("assigns a named driver only after exact active-directory matching", async () => {
