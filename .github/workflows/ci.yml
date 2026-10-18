@@ -5,6 +5,7 @@ on:
   pull_request:
     branches:
       - main
+      - agent/driver-automation-continuation
   merge_group:
 
 permissions:
