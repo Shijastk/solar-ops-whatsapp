@@ -9,6 +9,17 @@ describe("driver mutation intent parser", () => {
     });
   });
 
+  it("parses English create variants and trims punctuation", () => {
+    expect(parseDriverMutation("Please register driver Rasheed.")).toEqual({
+      action: "create",
+      name: "Rasheed",
+    });
+    expect(parseDriverMutation("Add Rasheed as a new driver")).toEqual({
+      action: "create",
+      name: "Rasheed",
+    });
+  });
+
   it("parses Malayalam create requests", () => {
     expect(parseDriverMutation("മുഹമ്മദിനെ പുതിയ ഡ്രൈവറായി ആഡ് ചെയ്യണം")).toEqual({
       action: "create",
@@ -28,11 +39,24 @@ describe("driver mutation intent parser", () => {
       action: "deactivate",
       name: "Mohammed",
     });
+    expect(parseDriverMutation("Remove Rasheed from driver list")).toEqual({
+      action: "deactivate",
+      name: "Rasheed",
+    });
   });
 
-  it("does not mutate when a driver is merely mentioned", () => {
+  it("does not treat ordinary mentions or questions as mutations", () => {
+    expect(parseDriverMutation("Rasheed driver aanu")).toBeNull();
     expect(parseDriverMutation("Mohammed is a new driver")).toBeNull();
     expect(parseDriverMutation("What do you know about Mohammed?")).toBeNull();
+    expect(parseDriverMutation("Please tell me about driver Rasheed")).toBeNull();
+  });
+
+  it("rejects incomplete create/delete commands", () => {
+    expect(parseDriverMutation("Add new driver")).toBeNull();
+    expect(parseDriverMutation("Add new driver named")).toBeNull();
+    expect(parseDriverMutation("Delete driver")).toBeNull();
+    expect(parseDriverMutation("Remove driver")).toBeNull();
   });
 
   it("normalizes Unicode and whitespace consistently", () => {
