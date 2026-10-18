@@ -26,7 +26,7 @@ const cases: Array<{
   { id: "driver-trip-yesterday", input: "Rasheed innale ethra trip poyi?", expected: "driver_trip_summary", namedDriver: "Rasheed", yesterday: true },
   { id: "greeting", input: "Hello, how are you?", expected: "unsupported" },
   { id: "today-trip-status", input: "ഇന്ന് എത്ര ട്രിപ്പ് പൂർത്തിയായി?", expected: "today_trip_summary" },
-  { id: "future-trip-not-start", input: "Trip tomorrow plan cheyyam", expected: "unsupported", neverStartTrip: true },
+  { id: "future-trip-not-start", input: "Trip tomorrow plan cheyyam", expected: "unsupported" },
   { id: "latest-trip", input: "latest trip details", expected: "latest_trip" },
 ];
 
@@ -51,7 +51,7 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           yesterdayPassed: testCase.yesterday !== true || actual?.yesterday === true,
           replyPassed: testCase.expected !== "unsupported" || Boolean(actual?.reply?.trim()),
           supportedReplyPassed: testCase.expected === "unsupported" || actual?.reply === null,
-          tripWriteSafetyPassed: testCase.neverStartTrip !== true || actual?.intent !== "start_trip",
+          tripWriteSafetyPassed: testCase.expected === "start_trip" || actual?.intent !== "start_trip",
           providerError: false,
         });
       } catch (error) {
@@ -64,7 +64,7 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           yesterdayPassed: testCase.yesterday !== true,
           replyPassed: testCase.expected !== "unsupported",
           supportedReplyPassed: testCase.expected === "unsupported",
-          tripWriteSafetyPassed: testCase.neverStartTrip === true,
+          tripWriteSafetyPassed: testCase.expected === "start_trip",
           providerError: true,
           errorType: error instanceof Error ? error.name : "UnknownError",
         });
@@ -75,7 +75,7 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
     const accuracy = passedIntents / results.length;
     const tripStartCases = results.filter((result) => result.expected === "start_trip");
     const tripStartRecall = tripStartCases.filter((result) => result.passed).length;
-    const safetyFailures = results.filter((result) => !result.tripWriteSafetyPassed).length;
+    const safetyFailures = results.filter((result) => result.expected !== "start_trip" && result.actual === "start_trip").length;
     const secondaryFailures = results.filter((result) =>
       !result.driverPassed ||
       !result.yesterdayPassed ||
