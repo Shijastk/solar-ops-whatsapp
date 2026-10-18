@@ -1,0 +1,57 @@
+name: Live Agent Intent Evaluation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-agent-intent-evaluation
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    name: intent-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: integration
+    env:
+      DOCUMENT_AUTOMATION_ENABLED: "true"
+      GROQ_MODEL: openai/gpt-oss-20b
+      SOLAR_OPS_RUN_LIVE_AGENT_EVAL: "true"
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify evaluation credential is configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GROQ_API_KEY:-}" ]]; then
+            echo "GROQ_API_KEY is not configured in the integration GitHub Actions environment."
+            exit 1
+          fi
+
+      - name: Evaluate live operational intent quality
+        run: npx vitest run tests/agent-intent-eval.live.test.ts
+
+      - name: Upload sanitized evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: solar-ops-agent-intent-evaluation
+          path: artifacts/agent-evaluation/report.json
+          if-no-files-found: warn
+          retention-days: 14
