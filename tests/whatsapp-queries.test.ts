@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterSafeFuzzyStockCandidates,
+  formatStockInventorySummary,
   isDriverRelatedQuestion,
   indiaDayBounds,
   opsPeriodBounds,
@@ -92,10 +93,70 @@ describe("fast WhatsApp operational query parsing", () => {
     });
   });
 
+  it("recognizes broad stock inventory list requests without guessing a product", () => {
+    expect(parseFastWhatsAppQuery("show all stock")).toEqual({
+      type: "stock_inventory_summary",
+    });
+    expect(parseFastWhatsAppQuery("stock list kaanikku")).toEqual({
+      type: "stock_inventory_summary",
+    });
+    expect(parseFastWhatsAppQuery("എല്ലാ സ്റ്റോക്കും കാണിക്കൂ")).toEqual({
+      type: "stock_inventory_summary",
+    });
+    expect(parseFastWhatsAppQuery("Emmvee 560 panel stock ethra")).toEqual({
+      type: "stock_balance",
+      productQuery: "Emmvee 560 panel",
+    });
+  });
+
   it("asks for a product instead of guessing when a stock question is incomplete", () => {
     expect(parseFastWhatsAppQuery("സ്റ്റോക്ക് എത്ര?")).toEqual({
       type: "stock_product_required",
     });
+  });
+
+  it("formats live stock rows without inventing unknown counts and caps the reply", () => {
+    expect(
+      formatStockInventorySummary([
+        {
+          company_name: "Savitr Solar",
+          product_name: "560 Wp Panel",
+          unit: "pcs",
+          current_quantity: 12,
+          balance_known: true,
+        },
+        {
+          company_name: "Savitr Solar",
+          product_name: "Inverter",
+          unit: "pcs",
+          current_quantity: 0,
+          balance_known: false,
+        },
+      ]),
+    ).toContain("560 Wp Panel: 12 pcs");
+    expect(
+      formatStockInventorySummary([
+        {
+          company_name: "Savitr Solar",
+          product_name: "Inverter",
+          unit: "pcs",
+          current_quantity: 0,
+          balance_known: false,
+        },
+      ]),
+    ).toContain("Inverter: count ഇനിയും add ചെയ്തിട്ടില്ല");
+
+    const manyRows = Array.from({ length: 21 }, (_, index) => ({
+      company_name: "Company",
+      product_name: "Product " + String(index + 1),
+      unit: "pcs",
+      current_quantity: 5,
+      balance_known: true,
+    }));
+    const summary = formatStockInventorySummary(manyRows);
+    expect(summary).toContain("ആദ്യത്തെ 20 entries");
+    expect(summary).toContain("മറ്റു entries ഉണ്ട്");
+    expect(summary).not.toContain("Product 21:");
   });
 
   it("does not intercept arbitrary text or correction-only values", () => {

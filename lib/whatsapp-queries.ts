@@ -17,6 +17,7 @@ import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 const MAX_STOCK_MATCHES = 8;
+const MAX_STOCK_SUMMARY_ROWS = 20;
 const MIN_FUZZY_STOCK_SCORE = 0.25;
 
 export type OpsPeriod =
@@ -32,6 +33,7 @@ export type FastWhatsAppQuery =
   | { type: "pending_bill_count" }
   | { type: "latest_bill" }
   | { type: "stock_balance"; productQuery: string }
+  | { type: "stock_inventory_summary" }
   | { type: "stock_product_required" }
   | { type: "today_trip_summary" }
   | { type: "yesterday_trip_summary" }
@@ -105,7 +107,7 @@ const LATEST_TERMS = [
   "ലാസ്റ്റ്",
 ];
 
-const STOCK_TERMS = ["stock", "സ്റ്റോക്ക്"];
+const STOCK_TERMS = ["stock", "സ്റ്റോക്ക"];
 const TRIP_TERMS = ["trip", "trips", "ട്രിപ്പ്", "ട്രിപ്പുകൾ"];
 const PRODUCT_TERMS = [
   "product",
@@ -182,6 +184,41 @@ const STOCK_QUESTION_TERMS = [
   "ഉണ്ടോ",
   "ഉണ്ട്",
   "എണ്ണം",
+];
+
+const STOCK_INVENTORY_LIST_TERMS = [
+  "all stock",
+  "show all stock",
+  "show me all stock",
+  "list stock",
+  "stock list",
+  "current stock list",
+  "stock report",
+  "stock summary",
+  "stock details",
+  "what stock do we have",
+  "what inventory do we have",
+  "list inventory",
+  "all inventory",
+  "inventory report",
+  "stock ellam",
+  "stock kaanikku",
+  "stock kanikku",
+  "stock list kaanikku",
+  "ella stock",
+  "ellam stock",
+  "എല്ലാ സ്റ്റോക്കും",
+  "എല്ലാ സ്റ്റോക്ക്",
+  "സ്റ്റോക്ക് ലിസ്റ്റ്",
+  "സ്റ്റോക്ക് കാണിക്കൂ",
+  "സ്റ്റോക്ക് കാണിക്ക്",
+  "സ്റ്റോക്ക് റിപ്പോർട്ട്",
+  "സ്റ്റോക്ക് സംഗ്രഹം",
+  "സ്റ്റോക്ക് എല്ലാം",
+  "സ്റ്റോക്ക് വിവരങ്ങൾ",
+  "എല്ലാ സാധനങ്ങളും",
+  "എല്ലാ സാധനങ്ങൾ",
+  "നിലവിലെ സ്റ്റോക്ക് ലിസ്റ്റ്",
 ];
 
 function normalizeQueryText(value: string): string {
@@ -292,6 +329,13 @@ export function parseFastWhatsAppQuery(
     includesAny(normalized, TRIP_LATEST_TERMS)
   ) {
     return { type: "latest_trip" };
+  }
+
+  if (
+    includesAny(normalized, STOCK_TERMS) &&
+    includesAny(normalized, STOCK_INVENTORY_LIST_TERMS)
+  ) {
+    return { type: "stock_inventory_summary" };
   }
 
   const periodMatch = PERIOD_TERMS.find((entry) =>
@@ -668,6 +712,59 @@ function formatStockMatches(
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+export type StockInventorySummaryRow = {
+  company_name: string;
+  product_name: string;
+  unit: string;
+  current_quantity: number | string;
+  balance_known: boolean;
+};
+
+export function formatStockInventorySummary(
+  rows: StockInventorySummaryRow[],
+): string {
+  if (rows.length === 0) {
+    return "നിലവിലെ stock catalogue-ൽ products ഒന്നും കണ്ടെത്തിയില്ല.";
+  }
+
+  const hasMore = rows.length > MAX_STOCK_SUMMARY_ROWS;
+  const visibleRows = rows.slice(0, MAX_STOCK_SUMMARY_ROWS);
+  const lines = visibleRows.map((row) => {
+    const company = row.company_name.slice(0, 64);
+    const product = row.product_name.slice(0, 72);
+    const balance = row.balance_known
+      ? String(Number(row.current_quantity)) + (row.unit ? " " + row.unit : "")
+      : "count ഇനിയും add ചെയ്തിട്ടില്ല";
+    return "• " + company + " — " + product + ": " + balance;
+  });
+
+  return [
+    "📦 നിലവിലെ stock (" +
+      (hasMore ? "ആദ്യത്തെ " + String(MAX_STOCK_SUMMARY_ROWS) + " entries" : String(visibleRows.length) + " entries") +
+      "):",
+    ...lines,
+    ...(hasMore
+      ? ["മറ്റു entries ഉണ്ട്. കൃത്യമായ product name പറഞ്ഞാൽ അതിന്റെ balance നോക്കാം."]
+      : []),
+  ].join("\n");
+}
+
+async function stockInventorySummary(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("stock_balances")
+    .select("company_name, product_name, unit, current_quantity, balance_known")
+    .order("company_name", { ascending: true })
+    .order("product_name", { ascending: true })
+    .limit(MAX_STOCK_SUMMARY_ROWS + 1);
+
+  if (error) {
+    throw new Error("Failed to load stock inventory summary: " + error.message);
+  }
+
+  return formatStockInventorySummary(data ?? []);
 }
 
 async function stockBalanceAnswer(productQuery: string): Promise<string> {
@@ -1096,6 +1193,10 @@ async function answerFastQuery(
 
   if (query.type === "stock_product_required") {
     return "ഏത് സാധനത്തിന്റെ സ്റ്റോക്കാണെന്ന് product name കൂടി അയക്കൂ.";
+  }
+
+  if (query.type === "stock_inventory_summary") {
+    return stockInventorySummary();
   }
 
   if (query.type === "today_trip_summary") {

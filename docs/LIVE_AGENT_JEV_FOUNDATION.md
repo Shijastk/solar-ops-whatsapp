@@ -84,3 +84,14 @@ Benchmark the existing Groq flow against deterministic routing + bounded state +
 ## Rollout
 
 Feature-flag the new path. Run offline tests, then shadow decisions without writes, then restricted sender allowlist tests, then expand only after accuracy and safety gates pass. Keep the existing flow as a rollback path. Do not change production data or enable writes merely because a PR exists. Prefer the smallest reliable state-machine/tool loop; adopt LangGraph or another orchestration framework only if a prototype proves the benefit outweighs added complexity.
+
+
+## Implementation log — 2026-10-18
+
+### Stock inventory read slice (branch: `agent/stock-query-agent`)
+
+- Adds a bounded read-only intent for broad stock-list questions in Malayalam, Manglish, and English, alongside the existing product-specific stock-balance lookup.
+- The answer is retrieved from the live `stock_balances` view, ordered by company/product and limited to 20 displayed rows (with one extra row used only to detect truncation).
+- Unknown/un-counted balances remain explicitly labelled; the model does not supply quantities or invent products.
+- This slice does not write stock, create aliases, approve bills, or bypass the immutable stock ledger.
+- Automated verification is pending until the branch's actual CI run completes. Production/live WhatsApp behavior is not claimed as verified by unit tests.
