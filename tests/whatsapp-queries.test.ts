@@ -3,6 +3,7 @@ import {
   filterSafeFuzzyStockCandidates,
   formatStockInventorySummary,
   isDriverRelatedQuestion,
+  isDriverCountFollowUp,
   indiaDayBounds,
   mapAiClassificationToFastQuery,
   opsPeriodBounds,
@@ -171,6 +172,15 @@ describe("fast WhatsApp operational query parsing", () => {
         reply: null,
       }),
     ).toBeNull();
+  });
+
+  it("recognizes short follow-ups only when they refer to a previous driver list/count", () => {
+    expect(isDriverCountFollowUp("Who are they?")).toBe(true);
+    expect(isDriverCountFollowUp("Show their names")).toBe(true);
+    expect(isDriverCountFollowUp("അവർ ആരൊക്കെയാണ്?")).toBe(true);
+    expect(isDriverCountFollowUp("അതിൽ ആരൊക്കെയാണ്")).toBe(true);
+    expect(isDriverCountFollowUp("How many drivers?")).toBe(false);
+    expect(isDriverCountFollowUp("Who is Rasheed?")).toBe(false);
   });
 
   it("does not intercept arbitrary text or correction-only values", () => {
