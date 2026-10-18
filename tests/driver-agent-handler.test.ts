@@ -51,7 +51,7 @@ beforeEach(() => {
   }));
   state.from.mockReturnValue(chain);
   state.sendReply.mockResolvedValue(undefined);
-);
+});
 
 describe("driver agent isolated read-only handler", () => {
   it("lists active drivers only and uses a bounded query", async () => {
