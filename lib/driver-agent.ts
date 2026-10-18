@@ -8,7 +8,7 @@ type DriverIntent =
   | { action: "deactivate"; name: string };
 
 export function normalizeDriverName(value: string): string {
-  return value.normalize("NFKC").trim().replace(/\\s+/g, " ");
+  return value.normalize("NFKC").trim().replace(/\s+/g, " ");
 }
 
 function normalizedKey(value: string): string {
@@ -24,36 +24,36 @@ export function parseDriverMutation(text: string): DriverIntent | null {
   const patterns: Array<{ action: DriverIntent["action"]; regex: RegExp }> = [
     {
       action: "create",
-      regex: /^(?:please\\s+)?(?:add|create|register)\\s+(?:a\\s+)?(?:new\\s+)?driver\\s+(?:named\\s+)?(.+?)(?:\\s+(?:as\\s+a\\s+new\\s+driver))?$/i,
+      regex: /^(?:please\s+)?(?:add|create|register)\s+(?:a\s+)?(?:new\s+)?driver\s+(?:named\s+)?(.+?)(?:\s+(?:as\s+a\s+new\s+driver))?$/i,
     },
     {
       action: "create",
-      regex: /^(?:please\\s+)?(?:add|register)\\s+(.+?)\\s+(?:as\\s+)?(?:a\\s+)?new\\s+driver$/i,
+      regex: /^(?:please\s+)?(?:add|register)\s+(.+?)\s+(?:as\s+)?(?:a\s+)?new\s+driver$/i,
     },
     {
       action: "deactivate",
-      regex: /^(?:please\\s+)?(?:delete|remove|deactivate)\\s+(?:the\\s+)?driver\\s+(?:named\\s+)?(.+)$/i,
+      regex: /^(?:please\s+)?(?:delete|remove|deactivate)\s+(?:the\s+)?driver\s+(?:named\s+)?(.+)$/i,
     },
     {
       action: "deactivate",
-      regex: /^(?:please\\s+)?(?:delete|remove|deactivate)\\s+(.+?)\\s+(?:from\\s+)?(?:the\\s+)?driver(?:\\s+list|\\s+directory)?$/i,
+      regex: /^(?:please\s+)?(?:delete|remove|deactivate)\s+(.+?)\s+(?:from\s+)?(?:the\s+)?driver(?:\s+list|\s+directory)?$/i,
     },
   ];
 
   // Malayalam/Manglish patterns are intentionally conservative. Names are
   // captured only from explicit action phrases; general mentions never write.
   const malayalamPatterns: Array<{ action: DriverIntent["action"]; regex: RegExp }> = [
-    { action: "create", regex: /^(.+?)\\s+(?:പുതിയ\\s+)?ഡ്രൈവറായി\\s+(?:ആഡ്\\s+ചെയ്യണം|ചേർക്കണം|ചേർക്കൂ)$/u },
-    { action: "create", regex: /^(.+?)\\s+(?:new\\s+)?driver\\s+(?:ആയി|ayi)\\s+add\\s+(?:ചെയ്യണം|cheyyanam|cheyyu)$/iu },
-    { action: "deactivate", regex: /^(.+?)യെ?\\s+(?:ഡ്രൈവർ\\s+ലിസ്റ്റിൽ\\s+നിന്ന്\\s+)?(?:ഡിലീറ്റ്\\s+ചെയ്യണം|ഡിലീറ്റ്|ഒഴിവാക്കണം|നീക്കം\\s+ചെയ്യണം)$/u },
-    { action: "deactivate", regex: /^(.+?)\\s+(?:delete|remove|deactivate)\\s+(?:cheyyanam|cheyyu|ചെയ്യണം)$/iu },
-    { action: "deactivate", regex: /^(?:delete|remove)\\s+(.+?)\\s+driver$/i },
+    { action: "create", regex: /^(.+?)\s+(?:പുതിയ\s+)?ഡ്രൈവറായി\s+(?:ആഡ്\s+ചെയ്യണം|ചേർക്കണം|ചേർക്കൂ)$/u },
+    { action: "create", regex: /^(.+?)\s+(?:new\s+)?driver\s+(?:ആയി|ayi)\s+add\s+(?:ചെയ്യണം|cheyyanam|cheyyu)$/iu },
+    { action: "deactivate", regex: /^(.+?)യെ?\s+(?:ഡ്രൈവർ\s+ലിസ്റ്റിൽ\s+നിന്ന്\s+)?(?:ഡിലീറ്റ്\s+ചെയ്യണം|ഡിലീറ്റ്|ഒഴിവാക്കണം|നീക്കം\s+ചെയ്യണം)$/u },
+    { action: "deactivate", regex: /^(.+?)\s+(?:delete|remove|deactivate)\s+(?:cheyyanam|cheyyu|ചെയ്യണം)$/iu },
+    { action: "deactivate", regex: /^(?:delete|remove)\s+(.+?)\s+driver$/i },
   ];
 
   for (const entry of patterns) {
     const match = value.match(entry.regex);
     if (match?.[1]) {
-      const name = normalizeDriverName(match[1].replace(/^(?:the|a|an)\\s+/i, "").replace(/[.!?।]+$/g, ""));
+      const name = normalizeDriverName(match[1].replace(/^(?:the|a|an)\s+/i, "").replace(/[.!?।]+$/g, ""));
       if (isValidDriverName(name)) return { action: entry.action, name };
     }
   }
@@ -73,7 +73,7 @@ export function parseDriverMutation(text: string): DriverIntent | null {
 function isValidDriverName(name: string): boolean {
   return name.length >= 2 &&
     name.length <= 120 &&
-    !/[\\n\\r]/.test(name) &&
+    !/[\n\r]/.test(name) &&
     !/^(?:please|a new driver|new driver|ഡ്രൈവറായി|driver)$/i.test(name);
 }
 
