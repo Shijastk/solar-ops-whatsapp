@@ -40,6 +40,8 @@ describe("WhatsApp AI intent fallback", () => {
                 content: JSON.stringify({
                   intent: "unsupported",
                   product_query: null,
+                  driver_name: null,
+                  yesterday: false,
                   period: null,
                   reply: "ഹായ്! എന്താണ് അറിയേണ്ടത്?",
                 }),
@@ -61,6 +63,8 @@ describe("WhatsApp AI intent fallback", () => {
     ).resolves.toEqual({
       intent: "unsupported",
       product_query: null,
+      driver_name: null,
+      yesterday: false,
       period: null,
       reply: "ഹായ്! എന്താണ് അറിയേണ്ടത്?",
     });
@@ -82,6 +86,8 @@ describe("WhatsApp AI intent fallback", () => {
                 content: JSON.stringify({
                   intent: "today_products_summary",
                   product_query: null,
+                  driver_name: null,
+                  yesterday: false,
                   period: null,
                   reply: null,
                 }),
@@ -101,6 +107,8 @@ describe("WhatsApp AI intent fallback", () => {
     expect(result).toEqual({
       intent: "today_products_summary",
       product_query: null,
+      driver_name: null,
+      yesterday: false,
       period: null,
       reply: null,
     });
@@ -133,6 +141,8 @@ describe("WhatsApp AI intent fallback", () => {
                 content: JSON.stringify({
                   intent: "unsupported",
                   product_query: null,
+                  driver_name: null,
+                  yesterday: false,
                   period: null,
                   reply: "അത് ഇപ്പോൾ സ്ഥിരീകരിക്കാൻ കഴിയില്ല.",
                 }),
@@ -151,6 +161,45 @@ describe("WhatsApp AI intent fallback", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(String(init.body));
     expect(body.messages[1].content.length).toBe(500);
+  });
+
+  it("extracts a clearly named driver and yesterday intent", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  intent: "driver_trip_summary",
+                  product_query: null,
+                  driver_name: "  Rasheed  ",
+                  yesterday: true,
+                  period: null,
+                  reply: null,
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      classifyOperationalQueryWithGroq("Rasheed innale ethra trip poyi?"),
+    ).resolves.toEqual({
+      intent: "driver_trip_summary",
+      product_query: null,
+      driver_name: "Rasheed",
+      yesterday: true,
+      period: null,
+      reply: null,
+    });
   });
 
   it("returns null when Groq-backed automation is disabled", async () => {
