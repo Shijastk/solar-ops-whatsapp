@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   driverMatches: [] as Array<{ id: string; name: string; active: boolean }>,
   listError: null as { message: string } | null,
   confirmationInsertError: null as { message: string } | null,
+  confirmationPayload: null as { token_hash: string; sender_phone: string; driver_id: string; action: string; expires_at: string } | null,
   rpcResult: null as { data: { status: string; driver_name?: string } | null; error: { message: string } | null } | null,
   maybeSingleCount: 0,
   originalFeatureFlag: undefined as string | undefined,
@@ -52,6 +53,7 @@ beforeEach(() => {
   state.driverMatches = [];
   state.listError = null;
   state.confirmationInsertError = null;
+  state.confirmationPayload = null;
   state.rpcResult = { data: { status: "deactivated", driver_name: "Mohammed Ali" }, error: null };
   state.maybeSingleCount = 0;
   state.originalFeatureFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
@@ -101,7 +103,11 @@ beforeEach(() => {
       return Promise.resolve(value).then(resolve, reject);
     });
     query.insert.mockImplementation((payload: typeof state.insertPayload) => {
-      state.insertPayload = payload;
+      if (table === "ops_driver_action_confirmations") {
+        state.confirmationPayload = payload as unknown as typeof state.confirmationPayload;
+      } else {
+        state.insertPayload = payload;
+      }
       return query;
     });
     query.maybeSingle.mockImplementation(async () => {
@@ -280,6 +286,12 @@ describe("driver agent isolated create handler", () => {
     const body = state.sendReply.mock.calls[0][0].body as string;
     expect(body).toContain("CONFIRM DRIVER ");
     expect(body).toContain("5 മിനിറ്റിനുള്ളിൽ");
+    expect(state.confirmationPayload).not.toBeNull();
+    expect(state.confirmationPayload?.token_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(state.confirmationPayload?.sender_phone).toBe("15550001111");
+    expect(state.confirmationPayload?.driver_id).toBe("driver-1");
+    expect(state.confirmationPayload?.action).toBe("deactivate");
+    expect(body).not.toContain(state.confirmationPayload?.token_hash ?? "never-match");
   });
 
   it("fails closed when the durable confirmation cannot be stored", async () => {
@@ -318,6 +330,16 @@ describe("driver agent isolated create handler", () => {
     expect(result).toBe("handled");
     expect(state.sendReply.mock.calls[0][0].body).toContain("മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല");
     expect(state.sendReply.mock.calls[0][0].body).not.toContain("deactivate ചെയ്തു");
+  });
+
+
+  it("does not claim a confirmation result when the atomic RPC fails", async () => {
+    state.rpcResult = { data: null, error: { message: "simulated rpc failure" } };
+
+    await expect(
+      handleDriverMutation(makeMessage("CONFIRM DRIVER " + "c".repeat(48)), "stored-deactivate-rpc-error"),
+    ).rejects.toThrow("Driver deactivation confirmation failed");
+    expect(state.sendReply).not.toHaveBeenCalled();
   });
 
 });
