@@ -10,7 +10,7 @@ const webhookEnvSchema = z.object({
 const ingestionEnvSchema = z.object({
   WHATSAPP_ACCESS_TOKEN: nonEmpty,
   WHATSAPP_PHONE_NUMBER_ID: nonEmpty.optional(),
-  META_GRAPH_API_VERSION: z.string().trim().regex(/^v\d+\.\d+$/).default("v26.0"),
+  META_GRAPH_API_VERSION: z.string().trim().regex(/^v\\d+\\.\\d+$/).default("v26.0"),
   ALLOWED_WHATSAPP_SENDERS: z.string().optional(),
   SUPABASE_URL: z.string().url(),
   SUPABASE_SECRET_KEY: nonEmpty,
@@ -28,6 +28,12 @@ const automationEnvSchema = z.object({
   GROQ_TIMEOUT_MS: z.coerce.number().int().min(1000).max(10000).default(7000),
 });
 
+const voiceTranscriptionEnvSchema = z.object({
+  AZURE_SPEECH_KEY: nonEmpty.optional(),
+  AZURE_SPEECH_REGION: z.string().trim().min(1).default("centralindia"),
+  AZURE_SPEECH_TIMEOUT_MS: z.coerce.number().int().min(1000).max(10000).default(6000),
+});
+
 export function getWebhookEnv() {
   return webhookEnvSchema.parse(process.env);
 }
@@ -37,7 +43,7 @@ export function getIngestionEnv() {
   const allowedSenders = new Set(
     (parsed.ALLOWED_WHATSAPP_SENDERS ?? "")
       .split(",")
-      .map((value) => value.replace(/\D/g, ""))
+      .map((value) => value.replace(/\\D/g, ""))
       .filter(Boolean),
   );
 
@@ -61,6 +67,15 @@ export function getDocumentAutomationEnv() {
     apiKey: parsed.GROQ_API_KEY ?? null,
     model: parsed.GROQ_MODEL,
     timeoutMs: parsed.GROQ_TIMEOUT_MS,
+  };
+}
+
+export function getVoiceTranscriptionEnv() {
+  const parsed = voiceTranscriptionEnvSchema.parse(process.env);
+  return {
+    apiKey: parsed.AZURE_SPEECH_KEY ?? null,
+    region: parsed.AZURE_SPEECH_REGION,
+    timeoutMs: parsed.AZURE_SPEECH_TIMEOUT_MS,
   };
 }
 
@@ -90,6 +105,9 @@ export function getHealthConfiguration() {
     "GROQ_API_KEY",
     "GROQ_MODEL",
     "GROQ_TIMEOUT_MS",
+    "AZURE_SPEECH_KEY",
+    "AZURE_SPEECH_REGION",
+    "AZURE_SPEECH_TIMEOUT_MS",
   ] as const;
 
   const presence = Object.fromEntries(
@@ -99,6 +117,7 @@ export function getHealthConfiguration() {
   const webhookValidation = webhookEnvSchema.safeParse(process.env);
   const ingestionValidation = ingestionEnvSchema.safeParse(process.env);
   const automationValidation = automationEnvSchema.safeParse(process.env);
+  const voiceTranscriptionValidation = voiceTranscriptionEnvSchema.safeParse(process.env);
 
   const automationInvalidFields = automationValidation.success
     ? automationValidation.data.DOCUMENT_AUTOMATION_ENABLED &&
@@ -130,6 +149,14 @@ export function getHealthConfiguration() {
           (!automationValidation.data.DOCUMENT_AUTOMATION_ENABLED ||
             Boolean(automationValidation.data.GROQ_API_KEY)),
         invalidFields: automationInvalidFields,
+      },
+      voiceTranscription: {
+        ready:
+          voiceTranscriptionValidation.success &&
+          Boolean(voiceTranscriptionValidation.data.AZURE_SPEECH_KEY),
+        invalidFields: voiceTranscriptionValidation.success
+          ? []
+          : invalidFieldNames(voiceTranscriptionValidation.error),
       },
       invalidFields: Array.from(new Set(invalidFields)).sort(),
     },
