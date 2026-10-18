@@ -2,10 +2,27 @@ import { describe, expect, it } from "vitest";
 import { normalizeDriverName, parseDriverMutation } from "@/lib/driver-agent";
 
 describe("driver mutation intent parser", () => {
+  it("parses explicit driver-list requests", () => {
+    expect(parseDriverMutation("List drivers")).toEqual({ action: "list" });
+    expect(parseDriverMutation("Show all drivers")).toEqual({ action: "list" });
+    expect(parseDriverMutation("driver list kaanikku")).toEqual({ action: "list" });
+  });
+
   it("parses explicit English create requests", () => {
     expect(parseDriverMutation("Add new driver named Mohammed")).toEqual({
       action: "create",
       name: "Mohammed",
+    });
+  });
+
+  it("parses English create variants and trims punctuation", () => {
+    expect(parseDriverMutation("Please register driver Rasheed.")).toEqual({
+      action: "create",
+      name: "Rasheed",
+    });
+    expect(parseDriverMutation("Add Rasheed as a new driver")).toEqual({
+      action: "create",
+      name: "Rasheed",
     });
   });
 
@@ -28,11 +45,36 @@ describe("driver mutation intent parser", () => {
       action: "deactivate",
       name: "Mohammed",
     });
+    expect(parseDriverMutation("Remove Rasheed from driver list")).toEqual({
+      action: "deactivate",
+      name: "Rasheed",
+    });
   });
 
-  it("does not mutate when a driver is merely mentioned", () => {
+  it("does not treat ordinary mentions or questions as mutations", () => {
+    expect(parseDriverMutation("Rasheed driver aanu")).toBeNull();
     expect(parseDriverMutation("Mohammed is a new driver")).toBeNull();
     expect(parseDriverMutation("What do you know about Mohammed?")).toBeNull();
+    expect(parseDriverMutation("Please tell me about driver Rasheed")).toBeNull();
+  });
+
+  it("rejects incomplete create/delete commands", () => {
+    expect(parseDriverMutation("Add new driver")).toBeNull();
+    expect(parseDriverMutation("Add new driver named")).toBeNull();
+    expect(parseDriverMutation("Delete driver")).toBeNull();
+    expect(parseDriverMutation("Remove driver")).toBeNull();
+  });
+
+  it("rejects placeholder, too-short, and overlong driver names", () => {
+    expect(parseDriverMutation("Add new driver named named")).toBeNull();
+    expect(parseDriverMutation("Add new driver named A")).toBeNull();
+    expect(parseDriverMutation("Add new driver named " + "A".repeat(121))).toBeNull();
+  });
+
+  it("does not infer a driver-list action from general Malayalam/Manglish mentions", () => {
+    expect(parseDriverMutation("driver venam")).toBeNull();
+    expect(parseDriverMutation("Rasheed driver aanu")).toBeNull();
+    expect(parseDriverMutation("driversine kurichu parayu")).toBeNull();
   });
 
   it("normalizes Unicode and whitespace consistently", () => {
