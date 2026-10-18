@@ -220,8 +220,18 @@ function extractStockProductQuery(value: string): string | null {
 
 export function isDriverRelatedQuestion(text: string): boolean {
   const normalized = normalizeQueryText(text);
-  return /\b(driver|drivers|rash?eed|rasheed|rashi|driverude|driverine)\b/.test(normalized) ||
-    ["ഡ്രൈവർ", "ഡ്രൈവര്", "റഷീദ്", "റഷീദിനെ", "ഡ്രൈവറായിരുന്നു"].some((term) => normalized.includes(term));
+  return /\\b(driver|drivers|rash?eed|rasheed|rashi|driverude|driverine)\\b/.test(normalized) ||
+    [
+      "ഡ്രൈവർ",
+      "ഡ്രൈവര്",
+      "ട്രൈവർ",
+      "ട്രൈവര",
+      "ട്രാഇവര",
+      "ട്രാവർ",
+      "റഷീദ്",
+      "റഷീദിനെ",
+      "ഡ്രൈവറായിരുന്നു",
+    ].some((term) => normalized.includes(term));
 }
 
 export function parseFastWhatsAppQuery(
