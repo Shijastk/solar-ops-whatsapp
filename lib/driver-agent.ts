@@ -206,26 +206,4 @@ export async function handleDriverMutation(
     body: "⚠️ " + matches[0].name + " എന്ന driver-നെ deactivate ചെയ്യാൻ confirmation flow ഇനിയും തയ്യാറായിട്ടില്ല. ഇപ്പോൾ മാറ്റമൊന്നും വരുത്തിയിട്ടില്ല.",
   });
   return "handled";
-
-  const target = matches[0];
-  const { data: updated, error: updateError } = await supabase
-    .from("ops_drivers")
-    .update({ active: false, updated_at: new Date().toISOString() })
-    .eq("id", target.id)
-    .eq("active", true)
-    .select("id, name, active")
-    .maybeSingle();
-
-  if (updateError) throw new Error("Driver deactivation failed: " + updateError.message);
-  if (!updated || updated.active) {
-    throw new Error("Driver deactivation could not be verified");
-  }
-
-  await sendOpsReply({
-    requestId: deterministicUuid("driver-deactivated:" + message.messageId),
-    replyToMessageId: storedMessageId,
-    knownInboundAt: message.timestamp,
-    body: "✅ " + updated.name + " എന്ന driver-നെ deactivate ചെയ്തു. പഴയ trip records നിലനിർത്തിയിട്ടുണ്ട്.",
-  });
-  return "handled";
 }
