@@ -194,10 +194,14 @@ jobs:
             idempotency_key text not null unique
           );
           insert into public.stock_products(id, active, canonical_name)
-          values ('33333333-3333-4333-8333-333333333333', true, 'Synthetic panel');
+          values
+            ('33333333-3333-4333-8333-333333333333', true, 'Synthetic panel'),
+            ('99999999-9999-4999-8999-999999999999', true, 'Synthetic inverter');
           SQL
           psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/20261019071044_stock_in_idempotency_lock_order.sql
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/20261019080000_stock_in_idempotency_payload_conflict.sql
 
       - name: Verify concurrent retry returns idempotent status without duplicate receipt
         env:
@@ -206,7 +210,9 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At <<'SQL' > /tmp/stock-first.out &
           begin;
-          select id from public.stock_products where id = '33333333-3333-4333-8333-333333333333' for update;
+          select pg_advisory_xact_lock(hashtextextended(
+            'stock_in:44444444-4444-4444-8444-444444444444', 0
+          ));
           select pg_sleep(2);
           select public.record_stock_in(
             '33333333-3333-4333-8333-333333333333', 7,
@@ -244,6 +250,13 @@ jobs:
             end if;
 
             v_result := public.record_stock_in(
+              '33333333-3333-4333-8333-333333333333', 1, null
+            );
+            if v_result->>'status' <> 'invalid_item' then
+              raise exception 'Missing request ID should be invalid: %', v_result;
+            end if;
+
+            v_result := public.record_stock_in(
               '55555555-5555-4555-8555-555555555555', 1,
               '77777777-7777-4777-8777-777777777777'
             );
@@ -255,7 +268,8 @@ jobs:
               select 1 from public.stock_ledger
               where idempotency_key in (
                 'stock_in:66666666-6666-4666-8666-666666666666',
-                'stock_in:77777777-7777-4777-8777-777777777777'
+                'stock_in:77777777-7777-4777-8777-777777777777',
+                'stock_in:'
               )
             ) then
               raise exception 'Invalid or inactive receipt wrote ledger rows';
@@ -301,6 +315,71 @@ jobs:
 
           psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At \
             -c "select count(*) from public.stock_ledger where idempotency_key = 'stock_in:88888888-8888-4888-8888-888888888888'" \
+            | grep -qx '1'
+
+      - name: Verify payload conflicts and concurrent cross-product key reuse
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 <<'SQL'
+          do $test$
+          declare
+            v_result jsonb;
+          begin
+            v_result := public.record_stock_in(
+              '33333333-3333-4333-8333-333333333333', 8,
+              '44444444-4444-4444-8444-444444444444'
+            );
+            if v_result->>'status' <> 'idempotency_conflict' then
+              raise exception 'Same key with different quantity must conflict: %', v_result;
+            end if;
+
+            v_result := public.record_stock_in(
+              '99999999-9999-4999-8999-999999999999', 7,
+              '44444444-4444-4444-8444-444444444444'
+            );
+            if v_result->>'status' <> 'idempotency_conflict' then
+              raise exception 'Same key with different product must conflict: %', v_result;
+            end if;
+
+            if (select count(*) from public.stock_ledger
+                where idempotency_key = 'stock_in:44444444-4444-4444-8444-444444444444') <> 1
+            then
+              raise exception 'Payload conflict wrote a second ledger row';
+            end if;
+            if (select quantity_delta from public.stock_ledger
+                where idempotency_key = 'stock_in:44444444-4444-4444-8444-444444444444') <> 7
+            then
+              raise exception 'Payload conflict changed the original receipt quantity';
+            end if;
+          end;
+          $test$;
+          SQL
+
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At <<'SQL' > /tmp/cross-product-first.out &
+          begin;
+          select pg_advisory_xact_lock(hashtextextended(
+            'stock_in:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 0
+          ));
+          select pg_sleep(1);
+          select public.record_stock_in(
+            '33333333-3333-4333-8333-333333333333', 5,
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+          )->>'status';
+          commit;
+          SQL
+          first_pid=$!
+          sleep 0.2
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At \
+            -c "select public.record_stock_in('99999999-9999-4999-8999-999999999999', 9, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')->>'status'" \
+            > /tmp/cross-product-second.out
+          wait "$first_pid"
+          cat /tmp/cross-product-first.out /tmp/cross-product-second.out | sort > /tmp/cross-product-statuses.out
+          grep -qx 'stock_in_applied' /tmp/cross-product-statuses.out
+          grep -qx 'idempotency_conflict' /tmp/cross-product-statuses.out
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At \
+            -c "select count(*) from public.stock_ledger where idempotency_key = 'stock_in:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'" \
             | grep -qx '1'
 
   stock-ledger-workflows:
