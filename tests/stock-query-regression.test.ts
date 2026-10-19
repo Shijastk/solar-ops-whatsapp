@@ -104,6 +104,7 @@ describe("stock query database-to-reply integration", () => {
     expect(reply).toContain("Savitr Solar");
     expect(reply).toContain("സ്റ്റോക്ക്: 0 NOS");
     expect(reply).not.toContain("count ഇനിയും add ചെയ്തിട്ടില്ല");
+    expect(reply).not.toMatch(/₹|price|rate|amount|total/i);
   });
 
   it("does not turn an unknown balance into a zero balance", async () => {
