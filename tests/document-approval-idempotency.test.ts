@@ -7,8 +7,8 @@ const state = vi.hoisted(() => ({
     workflow_status: string;
   } | null>,
   updateResult: {
-    data: { id: string } | null;
-    error: { message: string } | null;
+    data: null as { id: string } | null,
+    error: null as { message: string } | null,
   },
   from: vi.fn(),
   updateFilters: [] as Array<Array<[string, unknown]>>,
