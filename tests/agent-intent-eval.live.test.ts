@@ -10,6 +10,7 @@ const cases: Array<{
   expected: string;
   namedDriver?: string;
   yesterday?: boolean;
+  driverNameMustBeNull?: boolean;
 }> = [
   { id: "stock-summary-en", input: "show me the stock we have", expected: "stock_inventory_summary" },
   { id: "stock-summary-ml", input: "നമ്മുടെ സ്റ്റോക്ക് ലിസ്റ്റ് കാണിക്കൂ", expected: "stock_inventory_summary" },
@@ -22,7 +23,13 @@ const cases: Array<{
   { id: "trip-start-en", input: "Please open a new trip with Rasheed", expected: "start_trip", namedDriver: "Rasheed" },
   { id: "trip-start-manglish", input: "Rasheed inte koode puthiya trip thudangikko", expected: "start_trip", namedDriver: "Rasheed" },
   { id: "trip-start-ml", input: "പുതിയ ട്രിപ്പ് തുടങ്ങണം", expected: "start_trip" },
-  { id: "driver-trip-yesterday", input: "Rasheed innale ethra trip poyi?", expected: "driver_trip_summary", namedDriver: "Rasheed", yesterday: true },
+  { id: "driver-trip-yesterday-manglish", input: "Rasheed innale ethra trip poyi?", expected: "driver_trip_summary", namedDriver: "Rasheed", yesterday: true },
+  { id: "driver-trip-yesterday-english", input: "How many trips did Rasheed make yesterday?", expected: "driver_trip_summary", namedDriver: "Rasheed", yesterday: true },
+  { id: "driver-trip-yesterday-malayalam", input: "റഷീദ് ഇന്നലെ എത്ര ട്രിപ്പ് പോയി?", expected: "driver_trip_summary", namedDriver: "Rasheed", yesterday: true },
+  { id: "driver-trip-yesterday-majeed", input: "Majeed innale ethra trip poyi?", expected: "driver_trip_summary", namedDriver: "Majeed", yesterday: true },
+  { id: "general-yesterday-trip-manglish", input: "innale ethra trip poyi?", expected: "yesterday_trip_summary", yesterday: true },
+  { id: "unknown-driver-yesterday", input: "Suhail innale ethra trip poyi?", expected: "unsupported", driverNameMustBeNull: true },
+  { id: "ambiguous-two-driver-yesterday", input: "Rasheed or Majeed innale ethra trip poyi?", expected: "unsupported", driverNameMustBeNull: true },
   { id: "greeting", input: "Hello, how are you?", expected: "unsupported" },
   { id: "today-trip-status", input: "ഇന്ന് എത്ര ട്രിപ്പ് പൂർത്തിയായി?", expected: "today_trip_summary" },
   { id: "future-trip-not-start", input: "Trip tomorrow plan cheyyam", expected: "unsupported" },
@@ -58,7 +65,11 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           expected: testCase.expected,
           actual: actual?.intent ?? null,
           passed: actual?.intent === testCase.expected,
-          driverPassed: !testCase.namedDriver || actual?.driver_name === testCase.namedDriver,
+          driverPassed: testCase.driverNameMustBeNull
+            ? actual?.driver_name == null
+            : !testCase.namedDriver || actual?.driver_name === testCase.namedDriver,
+          expectedDriverName: testCase.namedDriver ?? (testCase.driverNameMustBeNull ? null : undefined),
+          actualDriverName: actual?.driver_name ?? null,
           yesterdayPassed: testCase.yesterday !== true || actual?.yesterday === true,
           replyPassed: testCase.expected !== "unsupported" || Boolean(actual?.reply?.trim()),
           supportedReplyPassed: testCase.expected === "unsupported" || actual?.reply === null,
@@ -71,7 +82,9 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           expected: testCase.expected,
           actual: null,
           passed: false,
-          driverPassed: !testCase.namedDriver,
+          driverPassed: !testCase.namedDriver && !testCase.driverNameMustBeNull,
+          expectedDriverName: testCase.namedDriver ?? (testCase.driverNameMustBeNull ? null : undefined),
+          actualDriverName: null,
           yesterdayPassed: testCase.yesterday !== true,
           replyPassed: testCase.expected !== "unsupported",
           supportedReplyPassed: testCase.expected === "unsupported",
