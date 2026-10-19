@@ -11,6 +11,7 @@ import { downloadWhatsAppMedia } from "@/lib/meta";
 import { sendOpsReply } from "@/lib/replies";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
+  handleTripWorkflowInbound,
   markTripDocumentProcessed,
   finishTripAfterDuplicate,
   reserveTripDocument,
@@ -196,6 +197,12 @@ export async function ingestWhatsAppMessage(
     let workflowResult: "handled" | "ignored" = "ignored";
     try {
       workflowResult = await handleDriverMutation(message, persistedMessage.id);
+      if (workflowResult === "ignored") {
+        workflowResult = await handleTripWorkflowInbound(
+          message,
+          persistedMessage.id,
+        );
+      }
       if (workflowResult === "ignored") {
         workflowResult = await handleDocumentWorkflowInbound(
           message,
