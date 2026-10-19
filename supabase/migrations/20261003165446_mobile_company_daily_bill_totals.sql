@@ -1,0 +1,4 @@
+-- Historical production migration version retained for migration-history parity.
+-- Its schema/function changes are consolidated into
+-- 20261003161402_mobile_simplification_duplicate_guard.sql in this repository.
+-- Keep this no-op unless the original historical SQL can be reconstructed safely.
