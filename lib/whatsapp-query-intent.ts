@@ -199,6 +199,39 @@ function normalizeQueryText(value: string): string {
     .trim();
 }
 
+function explicitIntentFromKnownPhrases(
+  query: string,
+): AiOperationalQueryClassification["intent"] | null {
+  const normalized = normalizeQueryText(query);
+
+  if (
+    /\bactive\s+drivers?\s+count\b/u.test(normalized) ||
+    /\bhow many (?:active )?drivers?\b/u.test(normalized) ||
+    /\bdrivers? count\b/u.test(normalized) ||
+    /\bcount of (?:active )?drivers?\b/u.test(normalized)
+  ) {
+    return "driver_count";
+  }
+
+  const manglishStockList =
+    /\bstockil\b/u.test(normalized) &&
+    /\b(?:ethokke|eethokke|products?|productukal)\b/u.test(normalized) &&
+    /\b(?:undu|undo|kaanikk|kanikku|list|show)\b/u.test(normalized);
+  const malayalamStockList =
+    /സ്റ്റോക്കിൽ/u.test(normalized) &&
+    /(?:ഏതൊക്കെ|എന്തൊക്കെ|പ്രൊഡക്ട്സ്|പ്രൊഡക്റ്റ്സ്|പ്രൊഡക്റ്റുകൾ|പ്രൊഡക്ടുകൾ)/u.test(normalized) &&
+    /(?:ഉണ്ട്|ഉണ്ടോ|കാണിക്കൂ|കാണിക്കുക)/u.test(normalized);
+  const englishStockList =
+    /\b(?:show|list)\b/u.test(normalized) &&
+    /\b(?:our|the|current|available)?\s*stock\b/u.test(normalized);
+
+  if (manglishStockList || malayalamStockList || englishStockList) {
+    return "stock_inventory_summary";
+  }
+
+  return null;
+}
+
 export function looksLikeOperationalQuery(text: string): boolean {
   const normalized = normalizeQueryText(text);
   if (!normalized) return false;
@@ -387,6 +420,18 @@ export async function classifyOperationalQueryWithGroq(
   const parsed = classificationSchema.safeParse(payload);
   if (!parsed.success) {
     throw new Error("Groq query classification output failed local validation");
+  }
+
+  const explicitIntent = explicitIntentFromKnownPhrases(boundedText);
+  if (explicitIntent) {
+    return {
+      intent: explicitIntent,
+      product_query: null,
+      driver_name: null,
+      yesterday: false,
+      period: null,
+      reply: null,
+    };
   }
 
   const productQuery = parsed.data.product_query?.trim() || null;
