@@ -23,6 +23,14 @@ begin
     return jsonb_build_object('status','invalid_item','product_id',p_product_id,'reason','stock_in_quantity');
   end if;
 
+  if p_idempotency_key is null then
+    return jsonb_build_object(
+      'status','invalid_item',
+      'product_id',p_product_id,
+      'reason','stock_in_idempotency_key'
+    );
+  end if;
+
   v_key := 'stock_in:' || p_idempotency_key::text;
   perform pg_advisory_xact_lock(hashtextextended(v_key, 0));
 
