@@ -16,7 +16,6 @@ const keys = [
   "SUPABASE_SECRET_KEY",
   "SUPABASE_STORAGE_BUCKET",
   "MAX_MEDIA_BYTES",
-  "DOCUMENT_AUTOMATION_ENABLED",
   "GROQ_API_KEY",
   "GROQ_MODEL",
   "GROQ_TIMEOUT_MS",
@@ -51,7 +50,6 @@ function setValidEnvironment() {
   process.env.SUPABASE_SECRET_KEY = "test-secret";
   process.env.SUPABASE_STORAGE_BUCKET = "whatsapp-media";
   process.env.MAX_MEDIA_BYTES = "15728640";
-  process.env.DOCUMENT_AUTOMATION_ENABLED = "false";
   process.env.AZURE_SPEECH_KEY = "azure-test-key";
   process.env.AZURE_SPEECH_REGION = "centralindia";
 }
@@ -89,9 +87,9 @@ describe("getHealthConfiguration", () => {
       webhook: true,
       ingestion: true,
       automation: {
-        enabled: false,
-        ready: true,
-        invalidFields: [],
+        configured: false,
+        ready: false,
+        invalidFields: ["GROQ_API_KEY"],
       },
       voiceTranscription: {
         ready: true,
@@ -124,28 +122,25 @@ describe("getHealthConfiguration", () => {
 
 
 describe("getDocumentAutomationEnv", () => {
-  it("is disabled by default and does not require a Groq key", () => {
+  it("reports missing Groq credentials without exposing or inventing an enable flag", () => {
     setValidEnvironment();
-    delete process.env.DOCUMENT_AUTOMATION_ENABLED;
     delete process.env.GROQ_API_KEY;
 
     expect(getDocumentAutomationEnv()).toMatchObject({
-      enabled: false,
       apiKey: null,
       model: "openai/gpt-oss-20b",
       timeoutMs: 7000,
     });
   });
 
-  it("fails closed when automation is enabled without a Groq key", () => {
+  it("reports verifier readiness as false when the Groq key is missing", () => {
     setValidEnvironment();
-    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     delete process.env.GROQ_API_KEY;
 
-    expect(() => getDocumentAutomationEnv()).toThrow("GROQ_API_KEY");
+    expect(getDocumentAutomationEnv().apiKey).toBeNull();
     const health = getHealthConfiguration();
     expect(health.validation.automation).toEqual({
-      enabled: true,
+      configured: false,
       ready: false,
       invalidFields: ["GROQ_API_KEY"],
     });
@@ -153,13 +148,11 @@ describe("getDocumentAutomationEnv", () => {
 
   it("accepts an explicitly configured Groq verifier", () => {
     setValidEnvironment();
-    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-key";
     process.env.GROQ_MODEL = "openai/gpt-oss-20b";
     process.env.GROQ_TIMEOUT_MS = "6000";
 
     expect(getDocumentAutomationEnv()).toMatchObject({
-      enabled: true,
       apiKey: "groq-test-key",
       model: "openai/gpt-oss-20b",
       timeoutMs: 6000,
