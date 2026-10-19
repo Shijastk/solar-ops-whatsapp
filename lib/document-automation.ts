@@ -638,7 +638,7 @@ export async function runDocumentAutomationForDraft(
   "disabled" | "recorded" | "review_required" | "cancelled" | "already_recorded"
 > {
   const env = getDocumentAutomationEnv();
-  if (!(await getAgentEnabled())) return "disabled";
+  if (!(await getAgentEnabled()) || !env.apiKey) return "disabled";
   const suppressReply = Boolean(options.suppressReply);
 
   const draft = await loadDraftContext(draftId);
