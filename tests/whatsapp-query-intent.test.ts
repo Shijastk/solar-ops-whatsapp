@@ -238,6 +238,78 @@ describe("WhatsApp AI intent fallback", () => {
     });
   });
 
+  it("deterministically resolves an exact named driver when AI returns a general today trip intent", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                intent: "today_trip_summary",
+                product_query: null,
+                driver_name: null,
+                yesterday: false,
+                period: null,
+                reply: null,
+              }),
+            },
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      classifyOperationalQueryWithGroq("Rasheed innu ethra trip poyi?", {
+        driverNames: ["Rasheed", "Majeed"],
+      }),
+    ).resolves.toMatchObject({
+      intent: "driver_trip_summary",
+      driver_name: "Rasheed",
+      yesterday: false,
+    });
+  });
+
+  it("does not infer a named driver from a partial directory-name match", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                intent: "today_trip_summary",
+                product_query: null,
+                driver_name: null,
+                yesterday: false,
+                period: null,
+                reply: null,
+              }),
+            },
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      classifyOperationalQueryWithGroq("Rasheed innu ethra trip poyi?", {
+        driverNames: ["Rasheed P", "Majeed"],
+      }),
+    ).resolves.toMatchObject({
+      intent: "today_trip_summary",
+      driver_name: null,
+      yesterday: false,
+    });
+  });
+
   it("supplies canonical driver directory names for Malayalam driver questions", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
