@@ -94,10 +94,7 @@ export async function ingestWhatsAppMessage(
 ): Promise<"stored" | "ignored"> {
   const env = getIngestionEnv();
 
-  if (
-    env.allowedSenders.size > 0 &&
-    !env.allowedSenders.has(message.senderPhone.replace(/\D/g, ""))
-  ) {
+  if (!env.allowedSenders.has(message.senderPhone.replace(/\D/g, ""))) {
     console.info("WhatsApp message ignored", { reason: "sender_allowlist" });
     return "ignored";
   }
