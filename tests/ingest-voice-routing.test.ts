@@ -8,11 +8,14 @@ const state = vi.hoisted(() => ({
   transcribe: vi.fn(),
   download: vi.fn(),
   route: vi.fn(),
+  agentEnabled: vi.fn(),
   sendOpsReply: vi.fn(),
   updates: [] as Array<Record<string, unknown>>,
   transcriptError: null as { message: string } | null,
   allowedSenders: new Set<string>(["919999999999"]),
 }));
+
+vi.mock("@/lib/agent-settings", () => ({ getAgentEnabled: state.agentEnabled }));
 
 vi.mock("@/lib/env", () => ({
   getIngestionEnv: () => ({
@@ -67,6 +70,7 @@ const voiceMessage = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  state.agentEnabled.mockResolvedValue(true);
   state.updates = [];
   state.transcriptError = null;
   state.allowedSenders = new Set(["919999999999"]);
@@ -144,7 +148,7 @@ describe("WhatsApp voice workflow integration", () => {
         media: undefined,
       }),
       "stored-message-1",
-      { fromVoice: true },
+      { fromVoice: true, agentEnabled: true },
     );
     expect(state.sendOpsReply).not.toHaveBeenCalled();
   });
