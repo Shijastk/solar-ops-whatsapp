@@ -1,20 +1,27 @@
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function getAgentEnabled(): Promise<boolean> {
-  const { data, error } = await getSupabaseAdmin()
-    .from("ops_agent_settings")
-    .select("enabled")
-    .eq("singleton", true)
-    .maybeSingle();
+  try {
+    const { data, error } = await getSupabaseAdmin()
+      .from("ops_agent_settings")
+      .select("enabled")
+      .eq("singleton", true)
+      .maybeSingle();
 
-  if (error || !data) {
+    if (error || !data) {
+      console.error("Central agent setting could not be read", {
+        reason: error?.message ?? "setting row missing",
+      });
+      return false;
+    }
+
+    return data.enabled === true;
+  } catch (error) {
     console.error("Central agent setting could not be read", {
-      reason: error?.message ?? "setting row missing",
+      reason: error instanceof Error ? error.message.slice(0, 160) : "unknown error",
     });
     return false;
   }
-
-  return data.enabled === true;
 }
 
 export async function setAgentEnabled(enabled: boolean): Promise<void> {
