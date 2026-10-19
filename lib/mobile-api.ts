@@ -1,5 +1,6 @@
 import { cleanDestination } from "@/lib/trips";
 import { getHealthConfiguration } from "@/lib/env";
+import { getAgentEnabled } from "@/lib/agent-settings";
 import {
   buildOpsConversations,
   listOpsDraftsForMessages,
@@ -267,6 +268,7 @@ export async function buildMobileBootstrap(now = new Date(), compact = false) {
   );
 
   const health = getHealthConfiguration();
+  const agentEnabled = await getAgentEnabled();
   const conversations = buildOpsConversations(messages, outbound).map(
     (conversation) => {
       const latestInbound =
@@ -316,7 +318,7 @@ export async function buildMobileBootstrap(now = new Date(), compact = false) {
     generatedAt: now.toISOString(),
     runtime: {
       healthy: health.validation.webhook && health.validation.ingestion,
-      automationEnabled: health.validation.automation.enabled,
+      automationEnabled: agentEnabled,
       automationReady: health.validation.automation.ready,
     },
     dashboard: {
