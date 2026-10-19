@@ -218,7 +218,7 @@ function explicitIntentFromKnownPhrases(
     /\b(?:ethokke|eethokke|products?|productukal)\b/u.test(normalized) &&
     /\b(?:undu|undo|kaanikk|kanikku|list|show)\b/u.test(normalized);
   const malayalamStockList =
-    /സ്റ്റോക്ക്/u.test(normalized) &&
+    /സ്റ്റോക്ക/u.test(normalized) &&
     /(?:ലിസ്റ്റ്|ഏതൊക്കെ|എന്തൊക്കെ|പ്രൊഡക്ട്സ്|പ്രൊഡക്റ്റ്സ്|പ്രൊഡക്റ്റുകൾ|പ്രൊഡക്ടുകൾ)/u.test(normalized) &&
     /(?:ഉണ്ട്|ഉണ്ടോ|കാണിക്കൂ|കാണിക്കുക|കാണിക്കണം)/u.test(normalized);
   const englishStockList =
