@@ -19,7 +19,10 @@ const bodySchema = z.object({
   productName: z.string(),
   unit: z.string(),
   hsnSac: z.string().nullable().optional(),
-  quantity: z.union([z.string(), z.number()]),
+  quantity: z.union([z.string(), z.number()]).refine((value) => {
+    const quantity = Number(value);
+    return Number.isFinite(quantity) && quantity > 0 && quantity <= 1_000_000_000;
+  }),
   allowSimilarCompany: z.boolean().optional(),
   allowSimilarProduct: z.boolean().optional(),
 }).superRefine((body, context) => {

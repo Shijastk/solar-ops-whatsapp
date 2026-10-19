@@ -59,6 +59,24 @@ describe("existing product stock receipt company scope and idempotency", () => {
     expect(mocks.stockIn).not.toHaveBeenCalled();
   });
 
+  it.each([0, -1, "not-a-number", "1000000001"])(
+    "rejects invalid additive stock quantities before reading the product: %s",
+    async (quantity) => {
+      const response = await POST(request({
+        companyId: company,
+        productId: product,
+        productName: "Synthetic panel",
+        unit: "NOS",
+        quantity,
+        requestId: company,
+      }));
+
+      expect(response.status).toBe(400);
+      expect(mocks.product).not.toHaveBeenCalled();
+      expect(mocks.stockIn).not.toHaveBeenCalled();
+    },
+  );
+
   it("requires a client request id for additive receipts instead of generating a new retry key", async () => {
     const response = await POST(request({
       companyId: company,
