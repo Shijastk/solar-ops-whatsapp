@@ -43,9 +43,9 @@ The migrations change grants only; they do not alter operational rows or stock b
 
 ## Migration history
 
-Live Supabase history contains 32 migrations. Before this report's filename-alignment PR, the two newly applied privilege migrations had equivalent SQL but repository filenames with different timestamps. This PR renames those two repository files to match the versions actually recorded by Supabase; it does not edit live migration history or change migration SQL.
+Live Supabase history contains 32 migrations. Before PR #98, the two newly applied privilege migrations had equivalent SQL but repository filenames with different timestamps. PR #98 renamed those two repository files to match the versions actually recorded by Supabase; it did not edit live migration history or change migration SQL.
 
-After the rename, compare the 32 repository filenames against live migration `version_name` entries again. The expected result is an exact 32/32 version-and-name match.
+**Post-merge verification: PASS — exact 32/32 version-and-name match.** A fresh comparison of all checked-in migration filenames against live Supabase `version_name` entries returned no missing repository migrations and no missing live migrations.
 
 ## Advisor findings requiring follow-up
 
