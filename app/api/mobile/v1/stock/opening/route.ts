@@ -83,6 +83,7 @@ export async function POST(request: Request) {
         "potential_product_duplicate",
         "not_ready",
         "inconsistent",
+        "idempotency_conflict",
       ].includes(result.status)
     )
       return Response.json(
@@ -90,7 +91,9 @@ export async function POST(request: Request) {
           error:
             result.status === "potential_product_duplicate"
               ? "A similar product exists. Choose it or confirm a different product."
-              : "Check the company and product before saving.",
+              : result.status === "idempotency_conflict"
+                ? "This request ID was already used for a different stock change."
+                : "Check the company and product before saving.",
           code: result.status,
         },
         { status: 409 },

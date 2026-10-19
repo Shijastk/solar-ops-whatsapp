@@ -85,6 +85,25 @@ describe("existing product stock receipt company scope and idempotency", () => {
     expect(mocks.stockIn).not.toHaveBeenCalled();
   });
 
+  it("returns a conflict when a receipt key is reused with a different payload", async () => {
+    mocks.product.mockResolvedValue({
+      data: { company_id: company },
+      error: null,
+    });
+    mocks.stockIn.mockResolvedValue({
+      status: "idempotency_conflict",
+      product_id: product,
+      reason: "stock_in_key_reused_with_different_payload",
+    });
+
+    const response = await POST(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("idempotency_conflict");
+    expect(body.error).toContain("request ID");
+  });
+
   it("passes the same idempotency key through a retry of the same receipt", async () => {
     mocks.product.mockResolvedValue({
       data: { company_id: company },

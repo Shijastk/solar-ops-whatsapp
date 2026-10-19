@@ -36,6 +36,7 @@ const stockResultSchema = z.object({
     "opening_exists",
     "stock_in_applied",
     "stock_in_already_applied",
+    "idempotency_conflict",
     "potential_company_duplicate",
     "potential_product_duplicate",
   ]),
