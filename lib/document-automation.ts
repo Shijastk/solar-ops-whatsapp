@@ -103,22 +103,12 @@ function formatQuantity(value: number | null): string {
     : String(value).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-function formatMoney(value: number | null): string | null {
-  if (value === null) return null;
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
 export function buildDocumentSummary(
   input: Pick<
     DraftContext,
     | "supplierName"
     | "documentNumber"
     | "vehicleNumber"
-    | "totalAmount"
     | "items"
   > & { stockStatus?: string },
   heading = "✅ ബിൽ പരിശോധിച്ച് സ്ഥിരീകരിച്ചു",
@@ -156,9 +146,6 @@ export function buildDocumentSummary(
       );
     }
   }
-
-  const total = formatMoney(input.totalAmount);
-  if (total) lines.push("", "ആകെ: " + total);
 
   const stockStatus = input.stockStatus ?? "not_ready";
   if (stockStatus === "applied") {
