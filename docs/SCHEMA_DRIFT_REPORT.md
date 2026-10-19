@@ -45,7 +45,7 @@ The migrations change grants only; they do not alter operational rows or stock b
 
 Live Supabase history contains 33 migrations. PR #98 aligned the two privilege-migration filenames with the versions already recorded by Supabase. The foreign-key index migration was then applied successfully; Supabase recorded version 20261019132855_fk_supporting_indexes. This PR renames the checked-in file to that exact recorded version without changing SQL or editing live migration history.
 
-After this rename, verify an exact 33/33 version-and-name match.
+**Post-merge verification: PASS — exact 33/33 version-and-name match.** A fresh comparison of every checked-in migration filename against live Supabase version/name entries returned no missing repository migrations and no missing live migrations.
 
 ## Advisor findings and remediation
 
