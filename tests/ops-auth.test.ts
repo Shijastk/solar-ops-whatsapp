@@ -13,6 +13,7 @@ const originalValues = {
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN,
   META_APP_SECRET: process.env.META_APP_SECRET,
   OPS_ACCESS_KEY: process.env.OPS_ACCESS_KEY,
+  NODE_ENV: process.env.NODE_ENV,
 };
 
 beforeEach(() => {
