@@ -24,6 +24,8 @@ begin
  if r->>'status'<>'duplicate_document' then raise exception 'cross-draft duplicate escaped: %',r; end if;
  if exists(select 1 from stock_ledger where draft_id=ds[2]) then raise exception 'duplicate mutated ledger'; end if;
  if (select count(*) from stock_ledger where draft_id=ds[1])<>2 then raise exception 'unexpected inferred/out ledger count'; end if;
+ if (select coalesce(sum(quantity_delta),0) from stock_ledger where product_id=p)<>0 then raise exception 'dispatch inference left a nonzero net balance'; end if;
+ if exists(select 1 from stock_balances where product_id=p and balance_known and current_quantity<0) then raise exception 'known stock balance became negative'; end if;
  if (select bill_count from get_mobile_today_totals() where company_id=c)<>1 or (select total_amount from get_mobile_today_totals() where company_id=c)<>100 then raise exception 'daily total duplicated'; end if;
  insert into ops_drivers(id,name,normalized_name) values(driver,'Synthetic driver',key);
  insert into delivery_trips(id,sender_phone,company_id) values(trip,'synthetic:'||trip::text,c);
@@ -46,11 +48,16 @@ begin
  select id into d from document_items where draft_id=ds[1];
  r:=mobile_bill_change(ds[1],'quantity',d,5,null,request_id);
  if (select quantity from document_items where id=d)<>5 then raise exception 'quantity correction failed'; end if;
+ if (select coalesce(sum(quantity_delta),0) from stock_ledger where product_id=p)<>2 then raise exception 'quantity correction ledger delta is wrong'; end if;
  r:=mobile_bill_change(ds[1],'quantity',d,5,null,request_id);
  if r->>'status'<>'already_saved' then raise exception 'correction retry was not idempotent'; end if;
+ if (select coalesce(sum(quantity_delta),0) from stock_ledger where product_id=p)<>2 then raise exception 'correction retry changed stock again'; end if;
  if (select count(*) from document_actions where draft_id=ds[1])<>1 then raise exception 'audit repeated'; end if;
  r:=mobile_bill_change(ds[1],'cancel',null,null,null,gen_random_uuid());
  if (select workflow_status from document_drafts where id=ds[1])<>'cancelled' or (select stock_status from document_drafts where id=ds[1])<>'reversed' then raise exception 'cancel did not restore stock'; end if;
+ if (select coalesce(sum(quantity_delta),0) from stock_ledger where product_id=p)<>0 then raise exception 'cancellation did not restore the net stock ledger balance'; end if;
+ r:=reverse_stock_for_draft(ds[1]);
+ if r->>'status'<>'already_reversed' then raise exception 'reversal retry was not idempotent: %',r; end if;
  if (select count(*) from document_actions where draft_id=ds[1])<>2 then raise exception 'cancel audit missing'; end if;
  r:=claim_stock_document(ds[3]);
  if r->>'status'<>'claimed' then raise exception 'company isolation failed: %',r; end if;
