@@ -96,16 +96,29 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(parseFastWhatsAppQuery("new trip KL11AA1234")).toBeNull();
   });
 
-  it("routes driver wording to semantic classification instead of positional name parsing", () => {
+  it("routes named-driver trip queries to semantic classification rather than a general trip count", () => {
     expect(parseFastWhatsAppQuery("റഷീദ് എന്ന ഡ്രൈവർ ഇന്ന് എത്ര ട്രിപ്പ് പോയിട്ടുണ്ട്?")).toBeNull();
     expect(parseFastWhatsAppQuery("ഡ്രൈവർ റഷീദിന് എത്ര ട്രിപ്പ്?")).toBeNull();
     expect(parseFastWhatsAppQuery("ഇന്നലെ രാത്രി പോയ ഡ്രൈവർ റഷീദ് ആയിരുന്നോ?")).toBeNull();
     expect(parseFastWhatsAppQuery("എത്ര ഡ്രൈവർമാരുണ്ട്?")).toBeNull();
+    expect(parseFastWhatsAppQuery("Rasheed innale ethra trip poyi?")).toBeNull();
+    expect(parseFastWhatsAppQuery("Majeed innale ethra trip poyi?")).toBeNull();
+    expect(parseFastWhatsAppQuery("UnknownTestDriver innale ethra trip poyi?")).toBeNull();
+    expect(parseFastWhatsAppQuery("How many trips did Majeed make yesterday?")).toBeNull();
+    expect(parseFastWhatsAppQuery("Innale ethra trips dispatch cheythu?")).toEqual({
+      type: "yesterday_trip_summary",
+    });
   });
 
-  it("detects driver questions so they cannot fall through to unrelated bill replies", () => {
+  it("detects named-driver trip questions without hardcoding a specific driver", () => {
     expect(isDriverRelatedQuestion("Innu poya driver Rasheed ariyamo?")).toBe(true);
     expect(isDriverRelatedQuestion("ഇന്ന് പോയത് ഡ്രൈവർ റഷീദായിരുന്നു")).toBe(true);
+    expect(isDriverRelatedQuestion("Rasheed innale ethra trip poyi?")).toBe(true);
+    expect(isDriverRelatedQuestion("Majeed innale ethra trip poyi?")).toBe(true);
+    expect(isDriverRelatedQuestion("UnknownTestDriver innale ethra trip poyi?")).toBe(true);
+    expect(isDriverRelatedQuestion("Innale ethra trips dispatch cheythu?")).toBe(false);
+    expect(isDriverRelatedQuestion("How many trips did Majeed make yesterday?")).toBe(true);
+    expect(isDriverRelatedQuestion("How many trips did we make yesterday?")).toBe(false);
     expect(isDriverRelatedQuestion("latest bill")).toBe(false);
   });
 
@@ -140,6 +153,15 @@ describe("fast WhatsApp operational query parsing", () => {
       type: "stock_inventory_summary",
     });
     expect(parseFastWhatsAppQuery("എല്ലാ സ്റ്റോക്കും കാണിക്കൂ")).toEqual({
+      type: "stock_inventory_summary",
+    });
+    expect(parseFastWhatsAppQuery("Which products are in stock?")).toEqual({
+      type: "stock_inventory_summary",
+    });
+    expect(parseFastWhatsAppQuery("Stockil ippo ethokke products undu?")).toEqual({
+      type: "stock_inventory_summary",
+    });
+    expect(parseFastWhatsAppQuery("സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്")).toEqual({
       type: "stock_inventory_summary",
     });
     expect(parseFastWhatsAppQuery("Emmvee 560 panel stock ethra")).toEqual({
