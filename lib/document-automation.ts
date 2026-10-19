@@ -1285,18 +1285,23 @@ async function handleInteractiveAction(
 export async function handleDocumentWorkflowInbound(
   message: NormalizedWhatsAppMessage,
   storedMessageId: string,
-  options: { fromVoice?: boolean } = {},
+  options: {
+    fromVoice?: boolean;
+    skipOperationalWorkflows?: boolean;
+  } = {},
 ): Promise<"handled" | "ignored"> {
-  if (
-    (await handleTripWorkflowInbound(message, storedMessageId)) === "handled"
-  ) {
-    return "handled";
-  }
+  if (!options.skipOperationalWorkflows) {
+    if (
+      (await handleTripWorkflowInbound(message, storedMessageId)) === "handled"
+    ) {
+      return "handled";
+    }
 
-  if (
-    (await handleStockWorkflowInbound(message, storedMessageId)) === "handled"
-  ) {
-    return "handled";
+    if (
+      (await handleStockWorkflowInbound(message, storedMessageId)) === "handled"
+    ) {
+      return "handled";
+    }
   }
 
   if (await handleInteractiveAction(message, storedMessageId)) {
