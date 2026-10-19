@@ -9,6 +9,10 @@ begin
  insert into stock_company_aliases(company_id,alias_text,normalized_alias,source) values(c,'Synthetic alias',key,'document');
  insert into stock_products(id,company_id,canonical_name,normalized_name,unit,normalized_unit) values(p,c,'Synthetic panel','synthetic panel','NOS','NOS');
  insert into stock_product_aliases(company_id,product_id,alias_text,normalized_alias,normalized_unit,source) values(c,p,'Synthetic panel','synthetic panel','NOS','document');
+ -- Start with 3 known units. The approved dispatch proves 7 units left, so
+ -- stock-out must infer only the 4-unit shortfall and preserve the starting balance on reversal.
+ r:=record_stock_in(p,3,gen_random_uuid());
+ if r->>'status'<>'stock_in_applied' then raise exception 'starting stock fixture failed: %',r; end if;
  for n in 1..3 loop
   m:=gen_random_uuid(); d:=gen_random_uuid(); ds:=array_append(ds,d);
   insert into whatsapp_messages(id,whatsapp_message_id,sender_phone,message_type,processing_status,received_at) values(m,'synthetic:'||m::text,'synthetic-audit','document','stored',now());
@@ -24,6 +28,8 @@ begin
  if r->>'status'<>'duplicate_document' then raise exception 'cross-draft duplicate escaped: %',r; end if;
  if exists(select 1 from stock_ledger where draft_id=ds[2]) then raise exception 'duplicate mutated ledger'; end if;
  if (select count(*) from stock_ledger where draft_id=ds[1])<>2 then raise exception 'unexpected inferred/out ledger count'; end if;
+ if (select coalesce(sum(quantity_delta),0) from stock_ledger where draft_id=ds[1] and movement_type='dispatch_inferred')<>4 then raise exception 'known-stock shortfall was not inferred as exactly 4 units'; end if;
+ if (select coalesce(sum(quantity_delta),0) from stock_ledger where draft_id=ds[1] and movement_type='stock_out')<>-7 then raise exception 'dispatch did not deduct the full 7 units'; end if;
  if (select coalesce(sum(quantity_delta),0) from stock_ledger where product_id=p)<>0 then raise exception 'dispatch inference left a nonzero net balance'; end if;
  if exists(select 1 from stock_balances where product_id=p and balance_known and current_quantity<0) then raise exception 'known stock balance became negative'; end if;
  if (select bill_count from get_mobile_today_totals() where company_id=c)<>1 or (select total_amount from get_mobile_today_totals() where company_id=c)<>100 then raise exception 'daily total duplicated'; end if;
@@ -55,7 +61,7 @@ begin
  if (select count(*) from document_actions where draft_id=ds[1])<>1 then raise exception 'audit repeated'; end if;
  r:=mobile_bill_change(ds[1],'cancel',null,null,null,gen_random_uuid());
  if (select workflow_status from document_drafts where id=ds[1])<>'cancelled' or (select stock_status from document_drafts where id=ds[1])<>'reversed' then raise exception 'cancel did not restore stock'; end if;
- if (select coalesce(sum(quantity_delta),0) from stock_ledger where product_id=p)<>0 then raise exception 'cancellation did not restore the net stock ledger balance'; end if;
+ if (select coalesce(sum(quantity_delta),0) from stock_ledger where product_id=p)<>3 then raise exception 'cancellation did not restore the original 3-unit stock balance'; end if;
  r:=reverse_stock_for_draft(ds[1]);
  if r->>'status'<>'already_reversed' then raise exception 'reversal retry was not idempotent: %',r; end if;
  if (select count(*) from document_actions where draft_id=ds[1])<>2 then raise exception 'cancel audit missing'; end if;
@@ -65,5 +71,5 @@ begin
  r:=claim_stock_document(ds[3]);
  if r->>'status'<>'not_ready' then raise exception 'missing identity did not fail closed'; end if;
 end $$;
-select 'PASS: first application, retry, duplicate with missing eway, zero duplicate ledger changes, separate company identity, missing identity, document aliases, atomic quantity/cancel audit, driver gate and closed-trip attachment gate' as result;
+select 'PASS: first application, retry, known-stock shortfall inference, reversal restores original balance, duplicate with missing eway, zero duplicate ledger changes, separate company identity, missing identity, document aliases, atomic quantity/cancel audit, driver gate and closed-trip attachment gate' as result;
 rollback;
