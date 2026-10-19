@@ -399,6 +399,8 @@ export async function ingestWhatsAppMessage(
         }
       }
     } else if (message.type === "audio") {
+      let voiceStage: "transcription" | "persistence" | "routing" =
+        "transcription";
       try {
         const transcript = await transcribeOperationalVoice({
           bytes: media.bytes,
@@ -409,6 +411,7 @@ export async function ingestWhatsAppMessage(
           throw new Error("Voice transcription was empty");
         }
 
+        voiceStage = "persistence";
         const { error: transcriptError } = await supabase
           .from("whatsapp_messages")
           .update({ text_body: transcript })
@@ -420,6 +423,7 @@ export async function ingestWhatsAppMessage(
           );
         }
 
+        voiceStage = "routing";
         const voiceAsText: NormalizedWhatsAppMessage = {
           ...message,
           type: "text",
@@ -427,7 +431,7 @@ export async function ingestWhatsAppMessage(
           media: undefined,
         };
 
-        let voiceResult = await routeOperationalTextMessage(
+        const voiceResult = await routeOperationalTextMessage(
           voiceAsText,
           persistedMessage.id,
           { fromVoice: true },
@@ -452,18 +456,31 @@ export async function ingestWhatsAppMessage(
           transcriptChars: transcript.length,
         });
       } catch (error) {
-        console.warn("WhatsApp voice transcription did not complete", {
-          reason:
-            error instanceof Error
-              ? error.message.slice(0, 180)
-              : "Unknown voice error",
-        });
+        console.warn(
+          voiceStage === "transcription"
+            ? "WhatsApp voice transcription did not complete"
+            : "WhatsApp voice request processing did not complete",
+          {
+            stage: voiceStage,
+            reason:
+              error instanceof Error
+                ? error.message.slice(0, 180)
+                : "Unknown voice error",
+          },
+        );
+
+        const failureBody =
+          voiceStage === "transcription"
+            ? "🎙️ Voice message വ്യക്തമായി transcribe ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ചെറിയ voice note ആയി അയക്കൂ, അല്ലെങ്കിൽ text ആയി അയക്കാം."
+            : voiceStage === "persistence"
+              ? "🎙️ Voice മനസ്സിലായി, പക്ഷേ transcript save ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും അയക്കൂ, അല്ലെങ്കിൽ text ആയി അയക്കാം."
+              : "🎙️ Voice മനസ്സിലായി, പക്ഷേ request process ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കൂ, അല്ലെങ്കിൽ text ആയി അയക്കാം.";
 
         try {
           await sendOpsReply({
             requestId: deterministicUuid("voice-failed:" + message.messageId),
             replyToMessageId: persistedMessage.id,
-            body: "🎙️ Voice message വ്യക്തമായി transcribe ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ചെറിയ voice note ആയി അയക്കൂ, അല്ലെങ്കിൽ text ആയി അയക്കാം.",
+            body: failureBody,
             knownInboundAt: message.timestamp,
           });
         } catch {
