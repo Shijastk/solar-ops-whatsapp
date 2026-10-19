@@ -407,6 +407,9 @@ export default async function OpsDashboardPage({
               <a className="waHeaderAction" href="/ops/stock">
                 Stock
               </a>
+              <a className="waHeaderAction" href="/ops/settings">
+                Settings
+              </a>
               <form action="/api/ops/logout" method="post">
                 <button className="waHeaderAction" type="submit">
                   Sign out
