@@ -345,6 +345,14 @@ describe("WhatsApp AI intent fallback", () => {
     });
 
     await expect(
+      classifyOperationalQueryWithGroq("Majeed ethra trip poyi?", options),
+    ).resolves.toMatchObject({
+      intent: "driver_trip_summary",
+      driver_name: "Majeed",
+      yesterday: false,
+    });
+
+    await expect(
       classifyOperationalQueryWithGroq("UnknownTestDriver innale ethra trip poyi?", options),
     ).resolves.toMatchObject({
       intent: "unsupported",
@@ -355,6 +363,15 @@ describe("WhatsApp AI intent fallback", () => {
 
     await expect(
       classifyOperationalQueryWithGroq("How many trips did UnknownTestDriver make yesterday?", options),
+    ).resolves.toMatchObject({
+      intent: "unsupported",
+      driver_name: null,
+      yesterday: false,
+      reply: expect.stringContaining("Driver directory"),
+    });
+
+    await expect(
+      classifyOperationalQueryWithGroq("UnknownTestDriver ethra trip poyi?", options),
     ).resolves.toMatchObject({
       intent: "unsupported",
       driver_name: null,
