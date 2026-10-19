@@ -38,6 +38,16 @@ const cases: Array<{
   { id: "latest-trip", input: "latest trip details", expected: "latest_trip" },
 ];
 
+function sanitizeModelReply(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value
+    .replace(/Bearer\s+[^\s,;]+/gi, "Bearer [redacted]")
+    .replace(/\b(?:gsk_|sk-)[A-Za-z0-9_-]{8,}\b/g, "[redacted]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 180);
+}
+
 function sanitizeProviderError(error: unknown): { errorType: string; errorMessage: string } {
   const errorType = error instanceof Error ? error.name : "UnknownError";
   const rawMessage = error instanceof Error ? error.message : String(error);
@@ -66,6 +76,9 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           id: testCase.id,
           expected: testCase.expected,
           actual: actual?.intent ?? null,
+          actualDriverName: actual?.driver_name ?? null,
+          actualYesterday: actual?.yesterday ?? null,
+          actualReplyPreview: sanitizeModelReply(actual?.reply),
           passed: actual?.intent === testCase.expected,
           driverPassed: testCase.driverNameMustBeNull
             ? actual?.driver_name == null
@@ -81,6 +94,9 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           id: testCase.id,
           expected: testCase.expected,
           actual: null,
+          actualDriverName: null,
+          actualYesterday: null,
+          actualReplyPreview: null,
           passed: false,
           driverPassed: !testCase.namedDriver && !testCase.driverNameMustBeNull,
           yesterdayPassed: testCase.yesterday !== true,
