@@ -428,6 +428,70 @@ jobs:
             psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 -f "$migration"
           done
 
+      - name: Verify operational RPC and stock-table least privilege
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 <<'SQL'
+          do $test$
+          declare
+            v_signature text;
+            v_signatures text[] := array[
+              'public.record_stock_in(uuid,numeric,uuid)',
+              'public.apply_stock_out_for_draft(uuid)',
+              'public.claim_stock_document(uuid)',
+              'public.get_mobile_today_totals()',
+              'public.get_mobile_trip_activity()',
+              'public.mobile_bill_change(uuid,text,uuid,numeric,text,uuid)',
+              'public.mobile_manual_dispatch(uuid,uuid,text,uuid,integer,text,jsonb)',
+              'public.mobile_save_bill_trip(uuid,uuid,uuid,uuid[],text)',
+              'public.mobile_trip_action(uuid,uuid,text,text)',
+              'public.mobile_update_trip(uuid,uuid,boolean)'
+            ];
+          begin
+            foreach v_signature in array v_signatures loop
+              if has_function_privilege('anon', v_signature, 'EXECUTE') then
+                raise exception 'anon can execute sensitive RPC %', v_signature;
+              end if;
+              if has_function_privilege('authenticated', v_signature, 'EXECUTE') then
+                raise exception 'authenticated can execute sensitive RPC %', v_signature;
+              end if;
+              if not has_function_privilege('service_role', v_signature, 'EXECUTE') then
+                raise exception 'service_role cannot execute required RPC %', v_signature;
+              end if;
+            end loop;
+
+            if has_table_privilege('anon', 'public.stock_ledger', 'SELECT')
+              or has_table_privilege('authenticated', 'public.stock_ledger', 'SELECT')
+              or has_table_privilege('anon', 'public.stock_ledger', 'INSERT')
+              or has_table_privilege('authenticated', 'public.stock_ledger', 'INSERT')
+            then
+              raise exception 'direct stock_ledger access is exposed to client roles';
+            end if;
+
+            if has_table_privilege('anon', 'public.stock_products', 'SELECT')
+              or has_table_privilege('authenticated', 'public.stock_products', 'SELECT')
+              or has_table_privilege('anon', 'public.stock_products', 'UPDATE')
+              or has_table_privilege('authenticated', 'public.stock_products', 'UPDATE')
+            then
+              raise exception 'direct stock_products access is exposed to client roles';
+            end if;
+
+            if has_table_privilege('anon', 'public.stock_balances', 'SELECT')
+              or has_table_privilege('authenticated', 'public.stock_balances', 'SELECT')
+            then
+              raise exception 'direct stock_balances access is exposed to client roles';
+            end if;
+
+            if not has_table_privilege('service_role', 'public.stock_ledger', 'INSERT')
+              or not has_table_privilege('service_role', 'public.stock_products', 'UPDATE')
+            then
+              raise exception 'service_role is missing required stock write privileges';
+            end if;
+          end;
+          $test$;
+          SQL
+
       - name: Verify stock ledger and trip workflow SQL acceptance
         env:
           PGPASSWORD: postgres
