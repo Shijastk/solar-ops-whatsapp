@@ -548,6 +548,51 @@ describe("WhatsApp AI intent fallback", () => {
     );
   });
 
+  it("overrides unsupported model output for explicit driver-count and multilingual stock-list phrases", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                intent: "unsupported",
+                product_query: null,
+                driver_name: null,
+                yesterday: false,
+                period: null,
+                reply: "Please clarify your request.",
+              }),
+            },
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    for (const input of [
+      "active drivers count",
+      "Stockil ippo ethokke products undu?",
+      "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്.",
+    ]) {
+      const expectedIntent = input === "active drivers count"
+        ? "driver_count"
+        : "stock_inventory_summary";
+      await expect(classifyOperationalQueryWithGroq(input)).resolves.toEqual({
+        intent: expectedIntent,
+        product_query: null,
+        driver_name: null,
+        yesterday: false,
+        period: null,
+        reply: null,
+      });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("classifies an explicit natural-language trip start and extracts only a named driver", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
