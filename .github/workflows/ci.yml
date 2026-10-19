@@ -302,3 +302,58 @@ jobs:
           psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At \
             -c "select count(*) from public.stock_ledger where idempotency_key = 'stock_in:88888888-8888-4888-8888-888888888888'" \
             | grep -qx '1'
+
+  stock-ledger-workflows:
+    name: stock-ledger-workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: solar_stock_workflow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d solar_stock_workflow_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+      - name: Bootstrap isolated application schema
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 \
+            -f tests/sql/stock-workflow-base-fixture.sql
+
+      - name: Apply repository migrations to isolated PostgreSQL
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying $migration"
+            psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 -f "$migration"
+          done
+
+      - name: Verify stock deduction, duplicate approval, correction, reversal, and trip gates
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 \
+            -f tests/sql/duplicate-stock-rollback.sql | tee /tmp/stock-workflow-test.out
+          grep -q "PASS: first application" /tmp/stock-workflow-test.out
