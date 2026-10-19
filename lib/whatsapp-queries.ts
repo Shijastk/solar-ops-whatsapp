@@ -206,6 +206,18 @@ const STOCK_INVENTORY_LIST_TERMS = [
   "stock details",
   "what stock do we have",
   "what inventory do we have",
+  "which products are in stock",
+  "what products are in stock",
+  "which products do we have",
+  "what products do we have in stock",
+  "which items are in stock",
+  "stockil ippo ethokke products undu",
+  "stockil ethokke products undu",
+  "stockil ippo ethokke product undu",
+  "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്",
+  "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്റ്റുകൾ ഉണ്ട്",
+  "സ്റ്റോക്കിൽ ഏതൊക്കെ സാധനങ്ങൾ ഉണ്ട്",
+  "സ്റ്റോക്കിൽ എന്തൊക്കെ ഉണ്ട്",
   "list inventory",
   "all inventory",
   "inventory report",
@@ -264,9 +276,47 @@ function extractStockProductQuery(value: string): string | null {
   return normalized ? cleaned : null;
 }
 
+function hasNamedDriverTripPrefix(text: string): boolean {
+  const normalized = normalizeQueryText(text);
+  if (!includesAny(normalized, TRIP_TERMS)) return false;
+
+  const tokens = normalized.split(" ").filter(Boolean);
+  const cueTokens = new Set(
+    [
+      ...TRIP_TERMS,
+      ...COUNT_TERMS,
+      ...TODAY_TERMS,
+      ...YESTERDAY_TERMS,
+      ...TRIP_QUERY_TERMS,
+      ...TODAY_PRODUCT_MOVEMENT_TERMS,
+    ].flatMap((term) => term.split(/\\s+/)),
+  );
+  const firstCueIndex = tokens.findIndex((token) => cueTokens.has(token));
+  if (firstCueIndex > 0) {
+    const prefix = tokens.slice(0, firstCueIndex);
+    const nonNamePrefixes = new Set([
+      "please", "tell", "me", "the", "for", "of", "about", "driver",
+      "ഡ്രൈവർ", "ഡ്രൈവര്", "ട്രൈവർ", "എന്ന", "എന്നുള്ള",
+    ]);
+    if (prefix.some((token) => !nonNamePrefixes.has(token))) return true;
+  }
+
+  // Also cover English forms such as "How many trips did Majeed make
+  // yesterday?" without treating generic pronouns as driver names.
+  const nameAfterCue = normalized.match(
+    /\\b(?:for|of|did|does|has|have)\\s+([\\p{L}\\p{N}]+)(?=\\s|$)/u,
+  )?.[1];
+  const genericSubjects = new Set([
+    "we", "you", "they", "i", "he", "she", "it", "us", "them", "all",
+    "any", "today", "yesterday", "ഇന്ന്", "ഇന്നലെ",
+  ]);
+  return Boolean(nameAfterCue && !genericSubjects.has(nameAfterCue));
+}
+
 export function isDriverRelatedQuestion(text: string): boolean {
   const normalized = normalizeQueryText(text);
-  return /\b(driver|drivers|rash?eed|rasheed|rashi|driverude|driverine)\b/.test(normalized) ||
+  const explicitDriverTerm =
+    /\\b(driver|drivers|driverude|driverine)\\b/.test(normalized) ||
     [
       "ഡ്രൈവർ",
       "ഡ്രൈവര്",
@@ -274,10 +324,11 @@ export function isDriverRelatedQuestion(text: string): boolean {
       "ട്രൈവര",
       "ട്രാഇവര",
       "ട്രാവർ",
-      "റഷീദ്",
-      "റഷീദിനെ",
       "ഡ്രൈവറായിരുന്നു",
     ].some((term) => normalized.includes(term));
+
+  // Use the same route for every name; do not privilege Rasheed in code.
+  return explicitDriverTerm || hasNamedDriverTripPrefix(text);
 }
 
 export function parseFastWhatsAppQuery(
