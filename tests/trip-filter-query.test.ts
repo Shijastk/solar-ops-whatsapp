@@ -56,13 +56,17 @@ function makeQuery(table: string) {
     return builder;
   };
   builder.order = () => builder;
-  builder.limit = () => builder;
+  builder.limit = (limit: number) => {
+    filters.push({ kind: "limit", column: "", value: limit });
+    return builder;
+  };
   builder.then = (
     resolve: (value: unknown) => unknown,
     reject: (reason?: unknown) => unknown,
   ) => {
     let rows = table === "delivery_trips" ? state.trips : state.drivers;
     for (const filter of filters) {
+      if (filter.kind === "limit") continue;
       rows = rows.filter((row) => {
         const actual = row[filter.column];
         if (filter.kind === "eq") return actual === filter.value;
@@ -73,7 +77,10 @@ function makeQuery(table: string) {
         return true;
       });
     }
-    return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+    const count = rows.length;
+    const limit = filters.find((filter) => filter.kind === "limit")?.value;
+    if (typeof limit === "number") rows = rows.slice(0, limit);
+    return Promise.resolve({ data: rows, error: null, count }).then(resolve, reject);
   };
   return builder;
 }
@@ -118,6 +125,26 @@ describe("trip summary filters", () => {
     expect(reply).toContain("ഇന്നലെ vehicle KL11AA1234 trips");
     expect(reply).toContain("ആകെ 1");
     expect(reply).toContain("Tirur · Malappuram");
+  });
+
+  it("reports the exact total when more than 50 trips match the filter", async () => {
+    state.trips = Array.from({ length: 51 }, (_, index) => ({
+      id: "trip-" + String(index + 1),
+      status: "ready",
+      display_name: "Tirur trip " + String(index + 1),
+      primary_destination: "Tirur",
+      vehicle_number: "KL 11 AA 1234",
+      driver_id: "driver-1",
+      finalized_at: new Date(Date.now() - index * 1000).toISOString(),
+    }));
+
+    await expect(
+      handleFastWhatsAppQuery(makeMessage("KL11AA1234 trips today"), "stored-vehicle-count-cap"),
+    ).resolves.toBe("handled");
+
+    const reply = state.sendOpsReply.mock.calls[0][0].body as string;
+    expect(reply).toContain("ആകെ 51");
+    expect(reply).toContain("ആദ്യത്തെ 50 trips മാത്രം");
   });
 
   it("filters by an exact case-insensitive primary destination", async () => {
