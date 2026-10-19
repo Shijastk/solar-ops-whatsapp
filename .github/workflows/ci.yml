@@ -453,6 +453,13 @@ jobs:
             psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 -f "$migration"
           done
 
+      - name: Verify core ingestion table least-privilege grants
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 \
+            -f tests/sql/core-table-least-privilege.sql
+
       - name: Verify stock query company identity and known-zero semantics
         env:
           PGPASSWORD: postgres
