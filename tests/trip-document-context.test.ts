@@ -4,6 +4,8 @@ const state = vi.hoisted(() => ({
   activeTrip: null as Record<string, unknown> | null,
   tripReadError: null as { message: string } | null,
   insertError: null as { code?: string; message: string } | null,
+  existingTripId: "trip-current" as string | null,
+  reservationReadError: null as { message: string } | null,
   from: vi.fn(),
   insert: vi.fn(),
   insertedRows: [] as Array<Record<string, unknown>>,
@@ -33,6 +35,8 @@ beforeEach(() => {
   state.activeTrip = { ...collectingTrip };
   state.tripReadError = null;
   state.insertError = null;
+  state.existingTripId = "trip-current";
+  state.reservationReadError = null;
   state.insertedRows = [];
   state.insert.mockImplementation((row: Record<string, unknown>) => {
     state.insertedRows.push(row);
@@ -40,7 +44,15 @@ beforeEach(() => {
   });
   state.from.mockImplementation((table: string) => {
     if (table === "trip_documents") {
-      return { insert: state.insert };
+      const builder: Record<string, unknown> = {};
+      builder.insert = state.insert;
+      builder.select = () => builder;
+      builder.eq = () => builder;
+      builder.maybeSingle = async () => ({
+        data: state.existingTripId ? { trip_id: state.existingTripId } : null,
+        error: state.reservationReadError,
+      });
+      return builder;
     }
 
     const builder: Record<string, unknown> = {};
@@ -119,6 +131,36 @@ describe("bill-to-trip conversation context", () => {
     ).resolves.toBe("trip-current");
 
     expect(state.insertedRows).toHaveLength(1);
+  });
+
+  it("does not claim a replayed bill belongs to a different active trip", async () => {
+    state.insertError = {
+      code: "23505",
+      message: "trip_documents_message_once_idx",
+    };
+    state.existingTripId = "trip-previous";
+
+    await expect(
+      reserveTripDocument({
+        senderPhone: "919999999999",
+        messageId: "bill-message-from-previous-trip",
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it("fails closed when duplicate reservation ownership cannot be verified", async () => {
+    state.insertError = {
+      code: "23505",
+      message: "trip_documents_message_once_idx",
+    };
+    state.reservationReadError = { message: "synthetic reservation read failure" };
+
+    await expect(
+      reserveTripDocument({
+        senderPhone: "919999999999",
+        messageId: "bill-message-ownership-unknown",
+      }),
+    ).rejects.toThrow("Failed to verify trip document reservation");
   });
 
   it("fails visibly when reservation fails for a reason other than a duplicate", async () => {
