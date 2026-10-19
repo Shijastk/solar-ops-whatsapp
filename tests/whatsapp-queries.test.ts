@@ -93,6 +93,7 @@ describe("fast WhatsApp operational query parsing", () => {
       yesterday: true,
     });
     expect(parseFastWhatsAppQuery("new trip to Tirur")).toBeNull();
+    expect(parseFastWhatsAppQuery("new trip KL11AA1234")).toBeNull();
   });
 
   it("routes driver wording to semantic classification instead of positional name parsing", () => {
