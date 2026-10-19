@@ -162,10 +162,6 @@ export function classifyNaturalTripStartCommand(value: string): boolean {
   return naturalStartPatterns.some((pattern) => pattern.test(text));
 }
 
-function isNaturalTripStartEnabled(): boolean {
-  return process.env.SOLAR_OPS_NATURAL_TRIP_START_ENABLED === "true";
-}
-
 function hasTripMention(normalizedText: string): boolean {
   return (
     /\btrips?\b/.test(normalizedText) ||
@@ -1502,7 +1498,6 @@ export async function handleTripWorkflowInbound(
   }
 
   if (
-    isNaturalTripStartEnabled() &&
     classifyNaturalTripStartCommand(message.textBody)
   ) {
     await startTrip(message, storedMessageId);
@@ -1603,16 +1598,6 @@ export async function handleTripWorkflowInbound(
   }
 
   if (looksLikePotentialTripStartRequest(message.textBody)) {
-    if (!isNaturalTripStartEnabled()) {
-      await sendOpsReply({
-        requestId: deterministicUuid("trip-natural-start-disabled:" + storedMessageId),
-        replyToMessageId: storedMessageId,
-        knownInboundAt: message.timestamp,
-        body: "Natural-language trip start ഇപ്പോൾ enabled അല്ല. Trip തുടങ്ങാൻ 'trip' അല്ലെങ്കിൽ 'New Trip' അയക്കൂ.",
-      });
-      return "handled";
-    }
-
     let classification: Awaited<ReturnType<typeof classifyOperationalQueryWithGroq>> = null;
     try {
       classification = await classifyOperationalQueryWithGroq(message.textBody);
