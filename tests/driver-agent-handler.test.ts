@@ -72,20 +72,6 @@ describe("driver agent isolated read-only handler", () => {
     }
   });
 
-  it("does not query the database when the feature gate is disabled", async () => {
-    const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
-    delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
-    try {
-      const result = await handleDriverMutation(makeMessage("List drivers"), "stored-inbound-2");
-      expect(result).toBe("ignored");
-      expect(state.from).not.toHaveBeenCalled();
-      expect(state.sendReply).not.toHaveBeenCalled();
-    } finally {
-      if (originalFlag === undefined) delete process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
-      else process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = originalFlag;
-    }
-  });
-
   it("does not query or reply for an ambiguous message", async () => {
     const originalFlag = process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED;
     process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED = "true";

@@ -96,20 +96,18 @@ SUPABASE_STORAGE_BUCKET=whatsapp-media
 MAX_MEDIA_BYTES=15728640
 
 # Optional verified-document automation
-DOCUMENT_AUTOMATION_ENABLED=false
 GROQ_API_KEY
 GROQ_MODEL=openai/gpt-oss-20b
 GROQ_TIMEOUT_MS=7000
 
 # Natural-language trip-start rollout (disabled by default)
-SOLAR_OPS_NATURAL_TRIP_START_ENABLED=false
 ```
 
 Production configuration audit (2026-10-19):
 
 - The Vercel production environment contains `ALLOWED_WHATSAPP_SENDERS` and `WHATSAPP_PHONE_NUMBER_ID`; their secret values were not retrieved.
 - The sender allowlist is mandatory in behavior: if it is missing or empty, all inbound senders are rejected before persistence or workflow execution.
-- `SOLAR_OPS_NATURAL_TRIP_START_ENABLED` is not currently configured in production. Natural-language trip creation therefore remains disabled by default; the existing explicit trip command is separate.
+- Operational workflow activation is controlled by the authenticated `/ops/settings` portal switch. The central setting defaults to disabled; when enabled, driver, stock, trip, and document workflows share that state.
 - Do not enable natural-language trip creation until its production rollout has been intentionally approved and the operational acceptance checks are complete.
 
 ### B3. Deployment
@@ -322,9 +320,7 @@ Keep:
 
 Only after ZDR and the key are ready, set:
 
-`DOCUMENT_AUTOMATION_ENABLED=true`
-
-A deployment/redeployment must use the updated environment before the feature is considered enabled.
+Set the Groq credentials in Vercel Environment Variables, then enable operational processing from `/ops/settings` after the required tests pass. Changing the portal switch does not require a deployment.
 
 ### H3. Health
 
@@ -514,4 +510,4 @@ After the backend and Flutter builds are deployed:
 Do not describe authenticated production mobile access as device-verified until a real installed build completes these steps.
 
 
-Natural-language trip creation is a separate write-path rollout. Keep `SOLAR_OPS_NATURAL_TRIP_START_ENABLED=false` until the exact-head CI passes and the operator is ready for a restricted WhatsApp acceptance test. Existing explicit `trip` / `New Trip` commands continue to work while this flag is off. Set it to the literal string `true` in Vercel Production only when explicitly approved; changing this setting requires a fresh deployment.
+Natural-language trip creation shares the central `/ops/settings` Agent Enabled switch with driver, stock, and document workflows. Keep the central switch disabled until exact-head CI and the restricted WhatsApp acceptance test are complete. Enabling or disabling it takes effect without a Vercel redeployment.

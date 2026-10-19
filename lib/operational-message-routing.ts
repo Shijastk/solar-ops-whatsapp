@@ -2,14 +2,15 @@ import { handleDocumentWorkflowInbound } from "@/lib/document-automation";
 import { handleDriverMutation } from "@/lib/driver-agent";
 import { handleStockWorkflowInbound } from "@/lib/stock-workflow";
 import { handleTripWorkflowInbound } from "@/lib/trips";
+import { getAgentEnabled } from "@/lib/agent-settings";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
-type WorkflowResult = "handled" | "ignored";
+type WorkflowResult = "handled" | "ignored" | "disabled";
 
 export async function routeOperationalTextMessage(
   message: NormalizedWhatsAppMessage,
   storedMessageId: string,
-  options: { fromVoice?: boolean } = {},
+  options: { fromVoice?: boolean; agentEnabled?: boolean } = {},
 ): Promise<WorkflowResult> {
   const startedAt = performance.now();
   const stageDurationsMs: Record<string, number> = {};
@@ -28,6 +29,12 @@ export async function routeOperationalTextMessage(
   };
 
   try {
+    const agentEnabled = options.agentEnabled ?? (await getAgentEnabled());
+    if (!agentEnabled) {
+      outcome = "disabled";
+      return "disabled";
+    }
+
     let result = await runStage("driver", () =>
       handleDriverMutation(message, storedMessageId),
     );

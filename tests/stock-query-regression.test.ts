@@ -30,7 +30,6 @@ type StockFixture = {
 };
 
 const originalEnv = {
-  enabled: process.env.DOCUMENT_AUTOMATION_ENABLED,
   key: process.env.GROQ_API_KEY,
   model: process.env.GROQ_MODEL,
 };

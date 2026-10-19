@@ -1,5 +1,7 @@
 # Driver Agent — Persistent Execution Log
 
+> **Current control model (2026-10-19):** per-workflow environment enable flags are being replaced by the authenticated `/ops/settings` Agent Enabled control. The central setting is fail-closed and defaults to disabled. Historical entries below describe the state at the time they were written; do not use them as current runtime configuration instructions.
+
 Last updated: 2026-10-18
 
 ## Current objective

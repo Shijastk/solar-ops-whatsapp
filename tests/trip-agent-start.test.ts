@@ -125,11 +125,9 @@ function makeMessage(textBody: string) {
 }
 
 const originalEnv = {
-  enabled: process.env.DOCUMENT_AUTOMATION_ENABLED,
   key: process.env.GROQ_API_KEY,
   model: process.env.GROQ_MODEL,
   timeout: process.env.GROQ_TIMEOUT_MS,
-  naturalTripStart: process.env.SOLAR_OPS_NATURAL_TRIP_START_ENABLED,
 };
 
 beforeEach(() => {
@@ -144,9 +142,7 @@ beforeEach(() => {
   state.duplicateInsert = false;
   state.from.mockImplementation((table: string) => makeChain(table));
   state.sendReply.mockResolvedValue(undefined);
-  process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
   process.env.GROQ_API_KEY = "groq-test-secret";
-  process.env.SOLAR_OPS_NATURAL_TRIP_START_ENABLED = "true";
 });
 
 afterEach(() => {
@@ -156,16 +152,13 @@ afterEach(() => {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   };
-  restore("DOCUMENT_AUTOMATION_ENABLED", originalEnv.enabled);
   restore("GROQ_API_KEY", originalEnv.key);
   restore("GROQ_MODEL", originalEnv.model);
   restore("GROQ_TIMEOUT_MS", originalEnv.timeout);
-  restore("SOLAR_OPS_NATURAL_TRIP_START_ENABLED", originalEnv.naturalTripStart);
 });
 
 describe("natural-language trip start", () => {
   it("preserves the existing explicit trip command when the new rollout flag is off", async () => {
-    delete process.env.SOLAR_OPS_NATURAL_TRIP_START_ENABLED;
     const fetchMock = mockIntent("start_trip");
 
     const result = await handleTripWorkflowInbound(
@@ -199,20 +192,18 @@ describe("natural-language trip start", () => {
     expect(state.sendReply.mock.calls[0][0].body).toContain("New Trip തുറന്നു");
   });
 
-  it("keeps natural-language trip creation disabled unless the rollout flag is true", async () => {
-    delete process.env.SOLAR_OPS_NATURAL_TRIP_START_ENABLED;
+  it("recognizes natural-language trip start without a per-workflow environment flag", async () => {
     const fetchMock = mockIntent("start_trip");
 
     const result = await handleTripWorkflowInbound(
       makeMessage("Please open a delivery trip"),
-      "stored-trip-message-flag-off",
+      "stored-trip-message-central-flag",
     );
 
     expect(result).toBe("handled");
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(state.insertedTrips).toHaveLength(0);
-    expect(state.sendReply).toHaveBeenCalledTimes(1);
-    expect(state.sendReply.mock.calls[0][0].body).toContain("enabled അല്ല");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(state.insertedTrips).toHaveLength(1);
+    expect(state.sendReply.mock.calls[0][0].body).toContain("New Trip തുറന്നു");
   });
 
   it("assigns a named driver only after exact active-directory matching", async () => {

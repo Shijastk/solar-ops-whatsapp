@@ -1,4 +1,5 @@
 import { getDocumentAutomationEnv } from "@/lib/env";
+import { getAgentEnabled } from "@/lib/agent-settings";
 import {
   compareDocumentVerification,
   extractDocumentWithGroq,
@@ -632,12 +633,13 @@ function verificationCandidate(draft: DraftContext): VerificationCandidate {
 
 export async function runDocumentAutomationForDraft(
   draftId: string,
-  options: { suppressReply?: boolean } = {},
+  options: { suppressReply?: boolean; agentEnabled?: boolean } = {},
 ): Promise<
   "disabled" | "recorded" | "review_required" | "cancelled" | "already_recorded"
 > {
   const env = getDocumentAutomationEnv();
-  if (!env.enabled) return "disabled";
+  const agentEnabled = options.agentEnabled ?? (await getAgentEnabled());
+  if (!agentEnabled || !env.apiKey) return "disabled";
   const suppressReply = Boolean(options.suppressReply);
 
   const draft = await loadDraftContext(draftId);

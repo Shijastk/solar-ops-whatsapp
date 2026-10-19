@@ -655,7 +655,7 @@ export async function extractDocumentWithGroq(
 ): Promise<GroqDocumentExtraction> {
   const env = getDocumentAutomationEnv();
 
-  if (!env.enabled || !env.apiKey) {
+  if (!env.apiKey) {
     throw new Error("Document automation is not enabled");
   }
 

@@ -19,10 +19,6 @@ const ingestionEnvSchema = z.object({
 });
 
 const automationEnvSchema = z.object({
-  DOCUMENT_AUTOMATION_ENABLED: z
-    .enum(["true", "false"])
-    .default("false")
-    .transform((value) => value === "true"),
   GROQ_API_KEY: nonEmpty.optional(),
   GROQ_MODEL: nonEmpty.default("openai/gpt-oss-20b"),
   GROQ_TIMEOUT_MS: z.coerce.number().int().min(1000).max(10000).default(7000),
@@ -56,14 +52,7 @@ export function getIngestionEnv() {
 export function getDocumentAutomationEnv() {
   const parsed = automationEnvSchema.parse(process.env);
 
-  if (parsed.DOCUMENT_AUTOMATION_ENABLED && !parsed.GROQ_API_KEY) {
-    throw new Error(
-      "GROQ_API_KEY is required when DOCUMENT_AUTOMATION_ENABLED=true",
-    );
-  }
-
   return {
-    enabled: parsed.DOCUMENT_AUTOMATION_ENABLED,
     apiKey: parsed.GROQ_API_KEY ?? null,
     model: parsed.GROQ_MODEL,
     timeoutMs: parsed.GROQ_TIMEOUT_MS,
@@ -101,7 +90,6 @@ export function getHealthConfiguration() {
     "SUPABASE_SECRET_KEY",
     "SUPABASE_STORAGE_BUCKET",
     "MAX_MEDIA_BYTES",
-    "DOCUMENT_AUTOMATION_ENABLED",
     "GROQ_API_KEY",
     "GROQ_MODEL",
     "GROQ_TIMEOUT_MS",
@@ -120,10 +108,9 @@ export function getHealthConfiguration() {
   const voiceTranscriptionValidation = voiceTranscriptionEnvSchema.safeParse(process.env);
 
   const automationInvalidFields = automationValidation.success
-    ? automationValidation.data.DOCUMENT_AUTOMATION_ENABLED &&
-      !automationValidation.data.GROQ_API_KEY
-      ? ["GROQ_API_KEY"]
-      : []
+    ? automationValidation.data.GROQ_API_KEY
+      ? []
+      : ["GROQ_API_KEY"]
     : invalidFieldNames(automationValidation.error);
 
   const invalidFields = [
@@ -141,13 +128,10 @@ export function getHealthConfiguration() {
       webhook: webhookValidation.success,
       ingestion: ingestionValidation.success,
       automation: {
-        enabled:
-          automationValidation.success &&
-          automationValidation.data.DOCUMENT_AUTOMATION_ENABLED,
+        configured:
+          automationValidation.success && Boolean(automationValidation.data.GROQ_API_KEY),
         ready:
-          automationValidation.success &&
-          (!automationValidation.data.DOCUMENT_AUTOMATION_ENABLED ||
-            Boolean(automationValidation.data.GROQ_API_KEY)),
+          automationValidation.success && Boolean(automationValidation.data.GROQ_API_KEY),
         invalidFields: automationInvalidFields,
       },
       voiceTranscription: {
