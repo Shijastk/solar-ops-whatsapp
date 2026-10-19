@@ -167,9 +167,26 @@ function findExactDriverNameInQuery(
   const matches = driverNames.filter((driverName) => {
     const nameTokens = normalizeNameTokens(driverName);
     if (nameTokens.length === 0 || nameTokens.length > queryTokens.length) return false;
-    return queryTokens.some((_, index) =>
-      nameTokens.every((token, offset) => queryTokens[index + offset] === token),
-    );
+    return queryTokens.some((_, index) => {
+      const matchesName = nameTokens.every(
+        (token, offset) => queryTokens[index + offset] === token,
+      );
+      if (!matchesName) return false;
+
+      // Do not accept a shorter directory name when the message contains a
+      // longer adjacent name, e.g. "Majeed P innale" matching "Majeed".
+      const tokenAfterName = queryTokens[index + nameTokens.length];
+      if (!tokenAfterName) return true;
+      const allowedAfterName = new Set([
+        "please", "today", "yesterday", "innu", "innale", "innathe",
+        "how", "many", "trip", "trips", "ethra", "എത്ര", "എണ്ണം",
+        "ഇന്ന്", "ഇന്നലെ", "ട്രിപ്പ്", "ട്രിപ്പുകൾ", "poyi", "poya",
+        "went", "make", "made", "go", "completed", "dispatch", "dispatched",
+        "did", "does", "has", "have", "inte", "ude", "ine", "inu",
+        "aanu", "aayirunnu", "എന്ന", "എന്നുള്ള", "ഡ്രൈവർ", "ഡ്രൈവര്",
+      ]);
+      return allowedAfterName.has(tokenAfterName);
+    });
   });
   return matches.length === 1 ? matches[0] : null;
 }
