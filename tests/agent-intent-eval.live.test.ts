@@ -75,7 +75,8 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           yesterdayPassed: testCase.yesterday !== true,
           replyPassed: testCase.expected !== "unsupported",
           supportedReplyPassed: testCase.expected === "unsupported",
-          tripWriteSafetyPassed: testCase.expected === "start_trip",
+          // A provider error returns no classification, so it cannot authorize trip creation.
+          tripWriteSafetyPassed: true,
           providerError: true,
           ...sanitizeProviderError(error),
         });
