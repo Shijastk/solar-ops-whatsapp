@@ -197,7 +197,7 @@ jobs:
           values ('33333333-3333-4333-8333-333333333333', true, 'Synthetic panel');
           SQL
           psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 \
-            -f supabase/migrations/20261019120000_stock_in_idempotency_lock_order.sql
+            -f supabase/migrations/20261019071044_stock_in_idempotency_lock_order.sql
 
       - name: Verify concurrent retry returns idempotent status without duplicate receipt
         env:
@@ -221,3 +221,84 @@ jobs:
           grep -q 'stock_in_applied' /tmp/stock-first.out
           grep -q 'stock_in_already_applied' /tmp/stock-retry.out
           psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At -c "select count(*) from public.stock_ledger where idempotency_key = 'stock_in:44444444-4444-4444-8444-444444444444'" | grep -qx '1'
+
+      - name: Verify invalid and inactive receipts plus failure recovery
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 <<'SQL'
+          insert into public.stock_products(id, active, canonical_name)
+          values ('55555555-5555-4555-8555-555555555555', false, 'Inactive panel');
+
+          do $test$
+          declare
+            v_result jsonb;
+          begin
+            v_result := public.record_stock_in(
+              '33333333-3333-4333-8333-333333333333', 0,
+              '66666666-6666-4666-8666-666666666666'
+            );
+            if v_result->>'status' <> 'invalid_item' then
+              raise exception 'Zero quantity should be invalid: %', v_result;
+            end if;
+
+            v_result := public.record_stock_in(
+              '55555555-5555-4555-8555-555555555555', 1,
+              '77777777-7777-4777-8777-777777777777'
+            );
+            if v_result->>'status' <> 'not_ready' then
+              raise exception 'Inactive product should not accept stock: %', v_result;
+            end if;
+
+            if exists (
+              select 1 from public.stock_ledger
+              where idempotency_key in (
+                'stock_in:66666666-6666-4666-8666-666666666666',
+                'stock_in:77777777-7777-4777-8777-777777777777'
+              )
+            ) then
+              raise exception 'Invalid or inactive receipt wrote ledger rows';
+            end if;
+          end;
+          $test$;
+
+          create function public.reject_test_quantity() returns trigger
+          language plpgsql as $trigger$
+          begin
+            if new.quantity_delta = 13 then
+              raise exception 'intentional failure-recovery fixture';
+            end if;
+            return new;
+          end;
+          $trigger$;
+          create trigger reject_test_quantity
+            before insert on public.stock_ledger
+            for each row execute function public.reject_test_quantity();
+          SQL
+
+          set +e
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 \
+            -c "select public.record_stock_in('33333333-3333-4333-8333-333333333333', 13, '88888888-8888-4888-8888-888888888888')->>'status'" \
+            > /tmp/stock-failure-recovery.out 2>&1
+          failed_status=$?
+          set -e
+          if [ "$failed_status" -eq 0 ]; then
+            echo "Expected the injected ledger failure to abort the receipt"
+            exit 1
+          fi
+
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At \
+            -c "select count(*) from public.stock_ledger where idempotency_key = 'stock_in:88888888-8888-4888-8888-888888888888'" \
+            | grep -qx '0'
+
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 \
+            -c "drop trigger reject_test_quantity on public.stock_ledger; drop function public.reject_test_quantity()"
+
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At \
+            -c "select public.record_stock_in('33333333-3333-4333-8333-333333333333', 13, '88888888-8888-4888-8888-888888888888')->>'status'" \
+            | grep -qx 'stock_in_applied'
+
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At \
+            -c "select count(*) from public.stock_ledger where idempotency_key = 'stock_in:88888888-8888-4888-8888-888888888888'" \
+            | grep -qx '1'
