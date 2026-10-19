@@ -295,11 +295,18 @@ export async function approveDocumentDraft(messageId: string): Promise<string> {
   if (draft.workflow_status === "cancelled") {
     throw new Error("Cancelled document drafts cannot be approved");
   }
+  if (
+    draft.parse_status === "approved" &&
+    draft.workflow_status === "recorded"
+  ) {
+    // A duplicate approval request is safe to resume through idempotent stock processing.
+    return draft.id;
+  }
   if (draft.parse_status !== "ready_for_review") {
     throw new Error("Only complete parser drafts can be approved");
   }
 
-  const { error } = await supabase
+  const { data: updatedDraft, error } = await supabase
     .from("document_drafts")
     .update({
       parse_status: "approved",
@@ -309,11 +316,37 @@ export async function approveDocumentDraft(messageId: string): Promise<string> {
       parse_error: null,
     })
     .eq("id", draft.id)
-    .eq("parse_status", "ready_for_review");
+    .eq("parse_status", "ready_for_review")
+    .eq("workflow_status", draft.workflow_status)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw new Error("Failed to approve document draft: " + error.message);
   }
+  if (updatedDraft) return draft.id;
 
-  return draft.id;
+  // A competing approval may have won, or cancellation may have raced this write.
+  const { data: current, error: currentReadError } = await supabase
+    .from("document_drafts")
+    .select("parse_status, workflow_status")
+    .eq("id", draft.id)
+    .maybeSingle();
+
+  if (currentReadError) {
+    throw new Error(
+      "Failed to verify document approval state: " + currentReadError.message,
+    );
+  }
+  if (current?.workflow_status === "cancelled") {
+    throw new Error("Cancelled document drafts cannot be approved");
+  }
+  if (
+    current?.parse_status === "approved" &&
+    current.workflow_status === "recorded"
+  ) {
+    return draft.id;
+  }
+
+  throw new Error("Document changed while approval was in progress");
 }
