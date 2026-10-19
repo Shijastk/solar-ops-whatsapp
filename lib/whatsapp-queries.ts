@@ -1017,7 +1017,7 @@ async function filteredTripsSummary(
   const bounds = indiaDayBounds(queryTime);
   let request = supabase
     .from("delivery_trips")
-    .select("display_name, primary_destination, vehicle_number, driver_id, finalized_at")
+    .select("display_name, primary_destination, vehicle_number, driver_id, finalized_at", { count: "exact" })
     .eq("status", "ready")
     .gte("finalized_at", bounds.start)
     .lt("finalized_at", bounds.end)
@@ -1040,7 +1040,7 @@ async function filteredTripsSummary(
     request = request.ilike("primary_destination", filterValue);
   }
 
-  const { data, error } = await request;
+  const { data, error, count } = await request;
   if (error) throw new Error("Failed to load filtered trips: " + error.message);
 
   const rows = (data ?? []) as TripSummaryRow[];
@@ -1051,10 +1051,12 @@ async function filteredTripsSummary(
   const filterLabel = filterBy === "vehicle"
     ? "vehicle " + filterValue
     : "destination " + filterValue;
+  const total = count ?? rows.length;
+  const truncationNote = total > rows.length ? " — ആദ്യത്തെ " + String(rows.length) + " trips മാത്രം" : "";
   return formatTripSummary(
     rows,
     names,
-    dayLabel + " " + filterLabel + " trips (ആകെ " + String(rows.length) + "):",
+    dayLabel + " " + filterLabel + " trips (ആകെ " + String(total) + truncationNote + "):",
   );
 }
 
