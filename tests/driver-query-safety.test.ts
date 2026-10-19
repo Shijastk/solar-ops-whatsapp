@@ -75,20 +75,23 @@ function mockSupabaseDirectory() {
         state.filters.push([column, value]);
         return query;
       },
-      gte() {
+      gte(..._args: unknown[]) {
         return query;
       },
-      lt() {
+      lt(..._args: unknown[]) {
         return query;
       },
-      order() {
+      order(..._args: unknown[]) {
         return query;
       },
-      limit() {
+      limit(_count: number) {
         return Promise.resolve(result());
       },
-      then(resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) {
-        return Promise.resolve(result()).then(resolve, reject);
+      then<TResult1 = QueryResult, TResult2 = never>(
+        onfulfilled?: ((value: QueryResult) => TResult1 | PromiseLike<TResult1>) | null,
+        onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+      ): PromiseLike<TResult1 | TResult2> {
+        return Promise.resolve(result()).then(onfulfilled ?? undefined, onrejected ?? undefined);
       },
     };
 
