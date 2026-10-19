@@ -92,6 +92,15 @@ describe("fast WhatsApp operational query parsing", () => {
       type: "stock_balance",
       productQuery: "Solar 560 panel",
     });
+
+    expect(parseFastWhatsAppQuery("Emvee 560 panel stock undu")).toEqual({
+      type: "stock_balance",
+      productQuery: "Emvee 560 panel",
+    });
+    expect(parseFastWhatsAppQuery("Emvee 560 panel stock undo")).toEqual({
+      type: "stock_balance",
+      productQuery: "Emvee 560 panel",
+    });
   });
 
   it("recognizes broad stock inventory list requests without guessing a product", () => {
