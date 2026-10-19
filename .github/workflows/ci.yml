@@ -201,7 +201,7 @@ jobs:
           psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/20261019071044_stock_in_idempotency_lock_order.sql
           psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 \
-            -f supabase/migrations/20261019080000_stock_in_idempotency_payload_conflict.sql
+            -f supabase/migrations/20261019080421_stock_in_idempotency_payload_conflict.sql
 
       - name: Verify concurrent retry returns idempotent status without duplicate receipt
         env:
