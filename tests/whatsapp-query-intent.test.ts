@@ -202,6 +202,42 @@ describe("WhatsApp AI intent fallback", () => {
     });
   });
 
+  it("deterministically resolves an exact named driver when AI returns a general yesterday trip intent", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                intent: "yesterday_trip_summary",
+                product_query: null,
+                driver_name: null,
+                yesterday: true,
+                period: null,
+                reply: null,
+              }),
+            },
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      classifyOperationalQueryWithGroq("Rasheed innale ethra trip poyi?", {
+        driverNames: ["Rasheed", "Majeed"],
+      }),
+    ).resolves.toMatchObject({
+      intent: "driver_trip_summary",
+      driver_name: "Rasheed",
+      yesterday: true,
+    });
+  });
+
   it("supplies canonical driver directory names for Malayalam driver questions", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
