@@ -178,6 +178,8 @@ const STOCK_QUESTION_TERMS = [
   "quantity",
   "ethra",
   "undo",
+  "undu",
+  "undallo",
   "bakki",
   "എത്ര",
   "ബാക്കി",
@@ -239,7 +241,7 @@ function extractStockProductQuery(value: string): string | null {
 
   cleaned = cleaned
     .replace(
-      /\b(?:stock|balance|available|availability|remaining|left|qty|quantity|how|many|much|is|there|what|current|please|tell|me|of|ethra|undo|bakki|aanu|aan)\b/gi,
+      /\b(?:stock|balance|available|availability|remaining|left|qty|quantity|how|many|much|is|there|what|current|please|tell|me|of|ethra|undo|undu|undallo|bakki|aanu|aan)\b/gi,
       " ",
     )
     .replace(
