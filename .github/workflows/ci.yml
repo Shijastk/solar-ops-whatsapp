@@ -143,3 +143,81 @@ jobs:
           end;
           $test$;
           SQL
+
+
+  stock-in-idempotency:
+    name: stock-in-idempotency
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: solar_stock_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d solar_stock_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+      - name: Apply stock receipt function to isolated schema
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 <<'SQL'
+          create table public.stock_products (
+            id uuid primary key,
+            active boolean not null,
+            canonical_name text not null
+          );
+          create table public.stock_ledger (
+            id bigserial primary key,
+            product_id uuid not null references public.stock_products(id),
+            draft_id uuid,
+            document_item_id uuid,
+            movement_type text not null,
+            quantity_delta numeric not null,
+            idempotency_key text not null unique
+          );
+          insert into public.stock_products(id, active, canonical_name)
+          values ('33333333-3333-4333-8333-333333333333', true, 'Synthetic panel');
+          SQL
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/20261019120000_stock_in_idempotency_lock_order.sql
+
+      - name: Verify concurrent retry returns idempotent status without duplicate receipt
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At <<'SQL' > /tmp/stock-first.out &
+          begin;
+          select id from public.stock_products where id = '33333333-3333-4333-8333-333333333333' for update;
+          select pg_sleep(2);
+          select public.record_stock_in(
+            '33333333-3333-4333-8333-333333333333', 7,
+            '44444444-4444-4444-8444-444444444444'
+          )->>'status';
+          commit;
+          SQL
+          first_pid=$!
+          sleep 0.3
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At -c "select public.record_stock_in('33333333-3333-4333-8333-333333333333', 7, '44444444-4444-4444-8444-444444444444')->>'status'" > /tmp/stock-retry.out
+          wait "$first_pid"
+          grep -q 'stock_in_applied' /tmp/stock-first.out
+          grep -q 'stock_in_already_applied' /tmp/stock-retry.out
+          psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 -At -c "select count(*) from public.stock_ledger where idempotency_key = 'stock_in:44444444-4444-4444-8444-444444444444'" | grep -qx '1'
