@@ -280,6 +280,12 @@ function hasNamedDriverTripPrefix(text: string): boolean {
   const normalized = normalizeQueryText(text);
   if (!includesAny(normalized, TRIP_TERMS)) return false;
 
+  // Vehicle-filter queries have a separate deterministic path and must not be
+  // reclassified as named-driver queries.
+  if (/\\b([a-z]{2})\\s*(\\d{1,2})\\s*([a-z]{1,3})\\s*(\\d{1,4})\\b/i.test(normalized)) {
+    return false;
+  }
+
   const tokens = normalized.split(" ").filter(Boolean);
   const cueTokens = new Set(
     [
@@ -288,6 +294,7 @@ function hasNamedDriverTripPrefix(text: string): boolean {
       ...TODAY_TERMS,
       ...YESTERDAY_TERMS,
       ...TRIP_QUERY_TERMS,
+      ...TRIP_LATEST_TERMS,
       ...TODAY_PRODUCT_MOVEMENT_TERMS,
     ].flatMap((term) => term.split(/\s+/)),
   );
@@ -296,6 +303,7 @@ function hasNamedDriverTripPrefix(text: string): boolean {
     const prefix = tokens.slice(0, firstCueIndex);
     const nonNamePrefixes = new Set([
       "please", "tell", "me", "the", "for", "of", "about", "driver",
+      "new", "all", "any", "my", "our", "their", "these", "those", "every",
       "ഡ്രൈവർ", "ഡ്രൈവര്", "ട്രൈവർ", "എന്ന", "എന്നുള്ള",
     ]);
     if (prefix.some((token) => !nonNamePrefixes.has(token))) return true;
