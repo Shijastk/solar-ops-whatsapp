@@ -545,9 +545,7 @@ async function latestBillSummary(): Promise<string> {
 
   const { data: draft, error: draftError } = await supabase
     .from("document_drafts")
-    .select(
-      "supplier_name, document_number, total_amount, workflow_status, stock_status",
-    )
+    .select("supplier_name, document_number, workflow_status, stock_status")
     .eq("message_id", message.id)
     .maybeSingle();
 
@@ -561,16 +559,7 @@ async function latestBillSummary(): Promise<string> {
   if (!draft?.document_number && message.original_filename) {
     lines.push("ഫയൽ: " + message.original_filename);
   }
-  if (draft?.total_amount !== null && draft?.total_amount !== undefined) {
-    lines.push(
-      "ആകെ: " +
-        new Intl.NumberFormat("en-IN", {
-          style: "currency",
-          currency: "INR",
-          maximumFractionDigits: 2,
-        }).format(Number(draft.total_amount)),
-    );
-  }
+  
   if (draft?.workflow_status) {
     lines.push("നില: " + draft.workflow_status.replaceAll("_", " "));
   }
