@@ -67,6 +67,35 @@ describe("fast WhatsApp operational query parsing", () => {
     });
   });
 
+  it("parses exact vehicle and destination trip filters without intercepting trip creation", () => {
+    expect(parseFastWhatsAppQuery("KL 11 AA 1234 trips today")).toEqual({
+      type: "trip_filter_summary",
+      filterBy: "vehicle",
+      filterValue: "KL11AA1234",
+      yesterday: false,
+    });
+    expect(parseFastWhatsAppQuery("KL11AA1234 innale ethra trip poyi")).toEqual({
+      type: "trip_filter_summary",
+      filterBy: "vehicle",
+      filterValue: "KL11AA1234",
+      yesterday: true,
+    });
+    expect(parseFastWhatsAppQuery("How many trips to Tirur today")).toEqual({
+      type: "trip_filter_summary",
+      filterBy: "destination",
+      filterValue: "tirur",
+      yesterday: false,
+    });
+    expect(parseFastWhatsAppQuery("show trips to Kottakkal yesterday")).toEqual({
+      type: "trip_filter_summary",
+      filterBy: "destination",
+      filterValue: "kottakkal",
+      yesterday: true,
+    });
+    expect(parseFastWhatsAppQuery("new trip to Tirur")).toBeNull();
+    expect(parseFastWhatsAppQuery("new trip KL11AA1234")).toBeNull();
+  });
+
   it("routes driver wording to semantic classification instead of positional name parsing", () => {
     expect(parseFastWhatsAppQuery("റഷീദ് എന്ന ഡ്രൈവർ ഇന്ന് എത്ര ട്രിപ്പ് പോയിട്ടുണ്ട്?")).toBeNull();
     expect(parseFastWhatsAppQuery("ഡ്രൈവർ റഷീദിന് എത്ര ട്രിപ്പ്?")).toBeNull();
