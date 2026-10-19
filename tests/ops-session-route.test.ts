@@ -23,8 +23,6 @@ afterEach(() => {
 });
 
 function loginRequest(accessKey: string, origin = "https://ops.example.test") {
-  const form = new FormData();
-  form.set("accessKey", accessKey);
   return new Request("https://ops.example.test/api/ops/session", {
     method: "POST",
     headers: { origin, "content-type": "application/x-www-form-urlencoded" },
