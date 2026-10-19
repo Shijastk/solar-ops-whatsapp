@@ -112,6 +112,14 @@ function mockSupabaseDirectory() {
   getSupabaseAdminMock.mockReturnValue({ from });
 }
 
+function expectNoTripRecordsRead() {
+  const supabase = getSupabaseAdminMock.mock.results[0]?.value as
+    | { from: ReturnType<typeof vi.fn> }
+    | undefined;
+  expect(supabase).toBeDefined();
+  expect(supabase?.from).not.toHaveBeenCalledWith("delivery_trips");
+}
+
 function inbound(textBody: string): NormalizedWhatsAppMessage {
   return {
     senderPhone: "synthetic-sender",
@@ -183,6 +191,7 @@ describe("named-driver response safety", () => {
       }),
     );
     expect(sendOpsReplyMock.mock.calls[0][0].body).not.toContain("completed trips (ആകെ");
+    expectNoTripRecordsRead();
   });
 
   it("does not fuzzy-match an unknown driver to an active driver's trips", async () => {
@@ -200,5 +209,20 @@ describe("named-driver response safety", () => {
       }),
     );
     expect(sendOpsReplyMock.mock.calls[0][0].body).not.toContain("completed trips (ആകെ");
+    expectNoTripRecordsRead();
+  });
+
+  it("rejects a partial name when it could collide with a longer driver name", async () => {
+    mockGroqIntent("driver_trip_summary", "Majeed");
+
+    await handleFastWhatsAppQuery(
+      inbound("Majeed P innale ethra trip poyi?"),
+      "synthetic-inbound-id",
+    );
+
+    expect(sendOpsReplyMock).toHaveBeenCalledTimes(1);
+    expect(sendOpsReplyMock.mock.calls[0][0].body).toContain("Driver directory");
+    expect(sendOpsReplyMock.mock.calls[0][0].body).not.toContain("completed trips (ആകെ");
+    expectNoTripRecordsRead();
   });
 });
