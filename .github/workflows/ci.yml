@@ -428,7 +428,7 @@ jobs:
             psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 -f "$migration"
           done
 
-      - name: Verify stock deduction, duplicate approval, correction, reversal, and trip gates
+      - name: Verify stock ledger and trip workflow SQL acceptance
         env:
           PGPASSWORD: postgres
         run: |
@@ -436,3 +436,11 @@ jobs:
           psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 \
             -f tests/sql/duplicate-stock-rollback.sql | tee /tmp/stock-workflow-test.out
           grep -q "PASS: first application" /tmp/stock-workflow-test.out
+
+          psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 \
+            -f tests/sql/mobile-trip-lifecycle-rollback.sql
+          echo "PASS: mobile trip lifecycle rollback"
+
+          psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 \
+            -f tests/sql/mobile-trip-reuse-rollback.sql
+          echo "PASS: mobile trip reuse rollback"
