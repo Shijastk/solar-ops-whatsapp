@@ -10,6 +10,7 @@ import { getIngestionEnv } from "@/lib/env";
 import { downloadWhatsAppMedia } from "@/lib/meta";
 import { sendOpsReply } from "@/lib/replies";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { handleStockWorkflowInbound } from "@/lib/stock-workflow";
 import {
   handleTripWorkflowInbound,
   markTripDocumentProcessed,
@@ -197,6 +198,12 @@ export async function ingestWhatsAppMessage(
     let workflowResult: "handled" | "ignored" = "ignored";
     try {
       workflowResult = await handleDriverMutation(message, persistedMessage.id);
+      if (workflowResult === "ignored") {
+        workflowResult = await handleStockWorkflowInbound(
+          message,
+          persistedMessage.id,
+        );
+      }
       if (workflowResult === "ignored") {
         workflowResult = await handleTripWorkflowInbound(
           message,
