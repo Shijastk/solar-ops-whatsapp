@@ -77,12 +77,10 @@ beforeEach(() => {
   state.sendOpsReply.mockResolvedValue(undefined);
   state.sendOpsReplyButtons.mockResolvedValue(undefined);
   state.from.mockImplementation((table: string) => {
-    let mode: "read" | "update" = "read";
     const builder: Record<string, unknown> = {};
     builder.select = () => builder;
     builder.eq = () => builder;
     builder.update = (values: Record<string, unknown>) => {
-      mode = "update";
       state.updates.push(values);
       return builder;
     };
@@ -107,10 +105,7 @@ beforeEach(() => {
       resolve: (value: unknown) => unknown,
       reject: (reason?: unknown) => unknown,
     ) =>
-      Promise.resolve({
-        data: null,
-        error: mode === "update" ? null : null,
-      }).then(resolve, reject);
+      Promise.resolve({ data: null, error: null }).then(resolve, reject);
     return builder;
   });
 });
