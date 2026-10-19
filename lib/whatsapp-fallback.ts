@@ -77,7 +77,7 @@ export async function generateUniversalWhatsAppReply(
   text: string,
 ): Promise<string | null> {
   const env = getDocumentAutomationEnv();
-  if (!env.enabled || !env.apiKey) return null;
+  if (!env.apiKey) return null;
 
   const boundedText = text
     .normalize("NFKC")
