@@ -577,6 +577,7 @@ describe("WhatsApp AI intent fallback", () => {
       "active drivers count",
       "Stockil ippo ethokke products undu?",
       "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്.",
+      "നമ്മുടെ സ്റ്റോക്ക് ലിസ്റ്റ് കാണിക്കൂ",
     ]) {
       const expectedIntent = input === "active drivers count"
         ? "driver_count"
@@ -590,7 +591,7 @@ describe("WhatsApp AI intent fallback", () => {
         reply: null,
       });
     }
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("classifies an explicit natural-language trip start and extracts only a named driver", async () => {
