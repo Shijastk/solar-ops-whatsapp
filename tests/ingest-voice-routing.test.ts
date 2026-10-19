@@ -11,11 +11,12 @@ const state = vi.hoisted(() => ({
   sendOpsReply: vi.fn(),
   updates: [] as Array<Record<string, unknown>>,
   transcriptError: null as { message: string } | null,
+  allowedSenders: new Set<string>(["919999999999"]),
 }));
 
 vi.mock("@/lib/env", () => ({
   getIngestionEnv: () => ({
-    allowedSenders: new Set<string>(),
+    allowedSenders: state.allowedSenders,
     WHATSAPP_PHONE_NUMBER_ID: null,
     SUPABASE_STORAGE_BUCKET: "test-bucket",
   }),
@@ -68,6 +69,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.updates = [];
   state.transcriptError = null;
+  state.allowedSenders = new Set(["919999999999"]);
   state.download.mockResolvedValue({
     bytes: Buffer.from("synthetic voice bytes"),
     mimeType: "audio/ogg",
@@ -103,6 +105,31 @@ beforeEach(() => {
 });
 
 describe("WhatsApp voice workflow integration", () => {
+  it("fails closed when the sender allowlist is empty", async () => {
+    state.allowedSenders = new Set();
+
+    await expect(ingestWhatsAppMessage(voiceMessage)).resolves.toBe("ignored");
+
+    expect(state.from).not.toHaveBeenCalled();
+    expect(state.download).not.toHaveBeenCalled();
+    expect(state.transcribe).not.toHaveBeenCalled();
+    expect(state.route).not.toHaveBeenCalled();
+  });
+
+  it("ignores senders not present in the allowlist before database access", async () => {
+    const unauthorized = {
+      ...voiceMessage,
+      senderPhone: "918888888888",
+    } as NormalizedWhatsAppMessage;
+
+    await expect(ingestWhatsAppMessage(unauthorized)).resolves.toBe("ignored");
+
+    expect(state.from).not.toHaveBeenCalled();
+    expect(state.download).not.toHaveBeenCalled();
+    expect(state.transcribe).not.toHaveBeenCalled();
+    expect(state.route).not.toHaveBeenCalled();
+  });
+
   it("persists the transcript and routes it through the shared operational pipeline", async () => {
     await expect(ingestWhatsAppMessage(voiceMessage)).resolves.toBe("stored");
 
