@@ -65,6 +65,21 @@ describe("document approval idempotency and race safety", () => {
     expect(state.updatePayload).toBeNull();
   });
 
+  it("approves a reviewable draft only when its original workflow state still matches", async () => {
+    state.reads = [draft("ready_for_review", "review_required")];
+
+    await expect(approveDocumentDraft("message-1")).resolves.toBe("draft-1");
+
+    expect(state.updateFilters[0]).toContainEqual([
+      "parse_status",
+      "ready_for_review",
+    ]);
+    expect(state.updateFilters[0]).toContainEqual([
+      "workflow_status",
+      "review_required",
+    ]);
+  });
+
   it("uses a workflow-status compare-and-swap and accepts a concurrent approval winner", async () => {
     state.reads = [
       draft("ready_for_review", "review_required"),
