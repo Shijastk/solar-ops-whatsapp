@@ -12,17 +12,35 @@
 | Public views | 2 |
 | Public functions | 25 |
 | Public indexes | 77 |
-| Public triggers | 8 |
+| Public triggers | 7 |
 | Public RLS policies | 0 |
 | Public constraints | 233 |
 | Client-role table grants (anon + authenticated) | 0 |
 | Client-role routine grants (anon + authenticated) | 0 |
 
-Constraint count is 173 CHECK, 26 FOREIGN KEY, 20 PRIMARY KEY, and 14 UNIQUE constraints.
+Constraint counts depend on the catalog view. `information_schema.table_constraints` reports 233 rows: 173 as `CHECK`, 26 `FOREIGN KEY`, 20 `PRIMARY KEY`, and 14 `UNIQUE`. The 173 `CHECK` rows include 126 synthetic `*_not_null` entries for NOT NULL columns; the current public schema has 126 NOT NULL columns. `pg_constraint` reports 107 explicit constraints: 47 CHECK, 26 FOREIGN KEY, 20 PRIMARY KEY, and 14 UNIQUE. The 126-row difference is therefore catalog representation, not evidence of missing constraints.
 
 All 20 public base tables have RLS enabled. The application accesses these operational tables through server-side service-role code; no browser/WhatsApp client role should query them directly. With no policies and no table/routine grants to anon or authenticated, direct client-role access is denied.
 
-The two views are stock_balances and stock_history.
+The two views are `stock_balances` and `stock_history`.
+
+## Reconciled trigger and constraint catalog (2026-10-19)
+
+A fresh read-only query against the live `public` schema confirmed seven enabled, non-internal triggers:
+
+- `whatsapp_messages.set_whatsapp_messages_updated_at` — BEFORE UPDATE, `set_updated_at()`.
+- `document_drafts.set_document_drafts_updated_at` — BEFORE UPDATE, `set_updated_at()`.
+- `whatsapp_outbound_messages.set_whatsapp_outbound_messages_updated_at` — BEFORE UPDATE, `set_updated_at()`.
+- `document_edit_sessions.set_document_edit_sessions_updated_at` — BEFORE UPDATE, `set_updated_at()`.
+- `stock_companies.set_stock_companies_updated_at` — BEFORE UPDATE, `set_updated_at()`.
+- `stock_products.set_stock_products_updated_at` — BEFORE UPDATE, `set_updated_at()`.
+- `delivery_trips.delivery_trip_custom_name` — BEFORE INSERT OR UPDATE, `preserve_trip_custom_name()`; introduced by migration `20261004130211_mobile_trip_lifecycle_profiles.sql`.
+
+The earlier count of eight public triggers was incorrect and is corrected above. The trigger list is based on live `pg_trigger` metadata; it is not inferred from `supabase/schema.sql` alone.
+
+The live catalog also confirmed 20 public base tables, 2 views, 25 public functions, 77 public indexes, 20 primary keys, 14 unique constraints, 26 foreign keys, and 47 explicit CHECK constraints. All 20 public base tables have RLS enabled and not forced; the public policy count is zero. Direct grants to `anon` and `authenticated` on public tables and routines are zero. The central setting `ops_agent_settings.enabled` was false at the time of the read-only check.
+
+This reconciliation fixes the trigger count and explains the constraint-count methodology. It does **not** complete the migration-to-live definition diff: columns/defaults, every index and view definition, all function bodies and permissions, sequences/custom types, default privileges, publications, and platform-managed object exclusions still require a disposable-database replay and object-by-object comparison.
 
 ## Privilege findings and remediation
 
