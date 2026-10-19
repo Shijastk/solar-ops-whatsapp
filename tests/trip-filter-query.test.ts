@@ -107,6 +107,19 @@ describe("trip summary filters", () => {
     expect(reply).toContain("Rasheed");
   });
 
+  it("uses the previous India-day window for yesterday vehicle queries", async () => {
+    state.trips[0].finalized_at = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    await expect(
+      handleFastWhatsAppQuery(makeMessage("KL11AA1234 trips yesterday"), "stored-yesterday-vehicle-query"),
+    ).resolves.toBe("handled");
+
+    const reply = state.sendOpsReply.mock.calls[0][0].body as string;
+    expect(reply).toContain("ഇന്നലെ vehicle KL11AA1234 trips");
+    expect(reply).toContain("ആകെ 1");
+    expect(reply).toContain("Tirur · Malappuram");
+  });
+
   it("filters by an exact case-insensitive primary destination", async () => {
     await expect(
       handleFastWhatsAppQuery(makeMessage("How many trips to Tirur today"), "stored-destination-query"),
