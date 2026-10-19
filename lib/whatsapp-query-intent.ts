@@ -392,6 +392,19 @@ export async function classifyOperationalQueryWithGroq(
   const productQuery = parsed.data.product_query?.trim() || null;
   const normalizedQuery = boundedText.normalize("NFKC").toLocaleLowerCase("en");
   const exactDriverName = findExactDriverNameInQuery(boundedText, driverNames);
+  // Malayalam-script driver names may be transliterated by the model to the
+  // exact canonical directory spelling. Never use this fallback for Latin
+  // names, where an unknown/partial token must fail closed.
+  const hasMalayalamOnlyNameText =
+    /[\u0D00-\u0D7F]/u.test(boundedText) && !/[A-Za-z]{3,}/u.test(boundedText);
+  const modelCanonicalDriverName = hasMalayalamOnlyNameText
+    ? driverNames.find(
+        (name) =>
+          normalizeNameTokens(name).join(" ") ===
+          normalizeNameTokens(parsed.data.driver_name ?? "").join(" "),
+      ) ?? null
+    : null;
+  const resolvedDriverName = exactDriverName ?? modelCanonicalDriverName;
   const hasTripTerm = /(?:^|[^\p{L}\p{N}])(?:trip|trips|ട്രിപ്പ്|ട്രിപ്പുകൾ)(?:$|[^\p{L}\p{N}])/iu.test(boundedText);
   const hasYesterdayTerm = /(?:^|[^\p{L}\p{N}])(?:yesterday|innale)(?:$|[^\p{L}\p{N}])/iu.test(normalizedQuery) ||
     boundedText.includes("ഇന്നലെ");
@@ -407,13 +420,14 @@ export async function classifyOperationalQueryWithGroq(
       parsed.data.intent === "today_trip_summary");
   const driverTripSummary = hasTripTerm && parsed.data.intent === "driver_trip_summary";
   const correctNamedDriverTrip =
-    exactDriverName !== null && (generalDayTripSummary || driverTripSummary);
+    resolvedDriverName !== null && (generalDayTripSummary || driverTripSummary);
 
   // A named-driver query that does not match the active directory must never
   // degrade into a company-wide summary or trust a model-inferred partial name.
   if (
+    driverNames.length > 0 &&
     (generalDayTripSummary || driverTripSummary) &&
-    exactDriverName === null &&
+    resolvedDriverName === null &&
     hasExplicitNamedDriverTripQuery(boundedText)
   ) {
     return {
@@ -430,7 +444,7 @@ export async function classifyOperationalQueryWithGroq(
     intent: correctNamedDriverTrip ? "driver_trip_summary" : parsed.data.intent,
     product_query: productQuery,
     driver_name: correctNamedDriverTrip
-      ? exactDriverName
+      ? resolvedDriverName
       : parsed.data.driver_name?.normalize("NFKC").trim() || null,
     yesterday: correctNamedDriverTrip
       ? hasYesterdayTerm
