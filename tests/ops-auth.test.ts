@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getWebhookEnv } from "../lib/env";
 import {
   createOpsSession,
@@ -13,7 +13,6 @@ const originalValues = {
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN,
   META_APP_SECRET: process.env.META_APP_SECRET,
   OPS_ACCESS_KEY: process.env.OPS_ACCESS_KEY,
-  NODE_ENV: process.env.NODE_ENV,
 };
 
 beforeEach(() => {
@@ -23,6 +22,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const [key, value] of Object.entries(originalValues)) {
     if (value === undefined) {
       delete process.env[key];
@@ -83,7 +83,7 @@ describe("ops authentication", () => {
   });
 
   it("sets secure, HttpOnly, same-site session cookie attributes", () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     expect(opsSessionCookieOptions()).toMatchObject({
       httpOnly: true,
       secure: true,
@@ -91,7 +91,6 @@ describe("ops authentication", () => {
       path: "/",
       maxAge: 8 * 60 * 60,
     });
-    delete process.env.NODE_ENV;
   });
 
   it("accepts same-origin POST context from Origin or Referer", () => {
