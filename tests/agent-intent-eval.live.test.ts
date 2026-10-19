@@ -28,7 +28,7 @@ const cases: Array<{
   { id: "driver-trip-yesterday-malayalam", input: "റഷീദ് ഇന്നലെ എത്ര ട്രിപ്പ് പോയി?", expected: "driver_trip_summary", namedDriver: "Rasheed", yesterday: true },
   { id: "driver-trip-yesterday-majeed", input: "Majeed innale ethra trip poyi?", expected: "driver_trip_summary", namedDriver: "Majeed", yesterday: true },
   { id: "general-yesterday-trip-manglish", input: "innale ethra trip poyi?", expected: "yesterday_trip_summary", yesterday: true },
-  { id: "unknown-driver-yesterday", input: "Suhail innale ethra trip poyi?", expected: "unsupported", driverNameMustBeNull: true },
+  { id: "unknown-driver-yesterday", input: "Suhail innale ethra trip poyi?", expected: "driver_trip_summary", namedDriver: "Suhail", yesterday: true },
   { id: "ambiguous-two-driver-yesterday", input: "Rasheed or Majeed innale ethra trip poyi?", expected: "unsupported", driverNameMustBeNull: true },
   { id: "greeting", input: "Hello, how are you?", expected: "unsupported" },
   { id: "today-trip-status", input: "ഇന്ന് എത്ര ട്രിപ്പ് പൂർത്തിയായി?", expected: "today_trip_summary" },
