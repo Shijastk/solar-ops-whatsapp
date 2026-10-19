@@ -78,7 +78,7 @@ describe("getIngestionEnv", () => {
 });
 
 describe("getHealthConfiguration", () => {
-  it("reports full runtime configuration as valid without exposing values", () => {
+  it("reports configuration health without exposing secret values", () => {
     setValidEnvironment();
 
     const result = getHealthConfiguration();
