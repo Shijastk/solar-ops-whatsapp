@@ -1,24 +1,19 @@
 import { createHash } from "node:crypto";
 import { extname } from "node:path";
-import {
-  handleDocumentWorkflowInbound,
-  runDocumentAutomationForDraft,
-} from "@/lib/document-automation";
+import { runDocumentAutomationForDraft } from "@/lib/document-automation";
+import { routeOperationalTextMessage } from "@/lib/operational-message-routing";
 import { processPdfBytesForMessage } from "@/lib/document-processing";
 import { deterministicUuid } from "@/lib/idempotency";
 import { getIngestionEnv } from "@/lib/env";
 import { downloadWhatsAppMedia } from "@/lib/meta";
 import { sendOpsReply } from "@/lib/replies";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { handleStockWorkflowInbound } from "@/lib/stock-workflow";
 import {
-  handleTripWorkflowInbound,
   markTripDocumentProcessed,
   finishTripAfterDuplicate,
   reserveTripDocument,
 } from "@/lib/trips";
 import { transcribeOperationalVoice } from "@/lib/voice-transcription";
-import { handleDriverMutation } from "@/lib/driver-agent";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
 const MEDIA_TYPES = new Set(["document", "image", "audio", "video", "sticker"]);
@@ -197,25 +192,10 @@ export async function ingestWhatsAppMessage(
   if (!message.media || !MEDIA_TYPES.has(message.type)) {
     let workflowResult: "handled" | "ignored" = "ignored";
     try {
-      workflowResult = await handleDriverMutation(message, persistedMessage.id);
-      if (workflowResult === "ignored") {
-        workflowResult = await handleStockWorkflowInbound(
-          message,
-          persistedMessage.id,
-        );
-      }
-      if (workflowResult === "ignored") {
-        workflowResult = await handleTripWorkflowInbound(
-          message,
-          persistedMessage.id,
-        );
-      }
-      if (workflowResult === "ignored") {
-        workflowResult = await handleDocumentWorkflowInbound(
-          message,
-          persistedMessage.id,
-        );
-      }
+      workflowResult = await routeOperationalTextMessage(
+        message,
+        persistedMessage.id,
+      );
     } catch (error) {
       console.warn("WhatsApp document workflow interaction did not complete", {
         messageStored: true,
@@ -447,14 +427,11 @@ export async function ingestWhatsAppMessage(
           media: undefined,
         };
 
-        let voiceResult = await handleDriverMutation(voiceAsText, persistedMessage.id);
-        if (voiceResult === "ignored") {
-          voiceResult = await handleDocumentWorkflowInbound(
-            voiceAsText,
-            persistedMessage.id,
-            { fromVoice: true },
-          );
-        }
+        let voiceResult = await routeOperationalTextMessage(
+          voiceAsText,
+          persistedMessage.id,
+          { fromVoice: true },
+        );
 
         if (voiceResult === "ignored") {
           await sendOpsReply({
