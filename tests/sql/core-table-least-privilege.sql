@@ -29,6 +29,12 @@ begin
         raise exception 'service_role is missing % on %', v_privilege, v_table;
       end if;
     end loop;
+
+    foreach v_privilege in array array['TRUNCATE', 'REFERENCES', 'TRIGGER'] loop
+      if has_table_privilege('service_role', v_table, v_privilege) then
+        raise exception 'service_role retains unnecessary % on %', v_privilege, v_table;
+      end if;
+    end loop;
   end loop;
 
   if has_function_privilege('anon', 'public.set_updated_at()', 'EXECUTE')
