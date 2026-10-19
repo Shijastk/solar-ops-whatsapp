@@ -153,6 +153,18 @@ describe("WhatsApp voice workflow integration", () => {
     expect(state.sendOpsReply).not.toHaveBeenCalled();
   });
 
+  it("stores voice media but skips transcription and routing while the agent is disabled", async () => {
+    state.agentEnabled.mockResolvedValue(false);
+
+    await expect(ingestWhatsAppMessage(voiceMessage)).resolves.toBe("stored");
+
+    expect(state.download).toHaveBeenCalledTimes(1);
+    expect(state.upload).toHaveBeenCalledTimes(1);
+    expect(state.transcribe).not.toHaveBeenCalled();
+    expect(state.route).not.toHaveBeenCalled();
+    expect(state.sendOpsReply).not.toHaveBeenCalled();
+  });
+
   it("does not report a transcription failure when downstream routing fails", async () => {
     state.route.mockRejectedValue(new Error("synthetic database failure"));
 
