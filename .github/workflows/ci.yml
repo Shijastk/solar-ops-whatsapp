@@ -197,7 +197,7 @@ jobs:
           values ('33333333-3333-4333-8333-333333333333', true, 'Synthetic panel');
           SQL
           psql -h localhost -U postgres -d solar_stock_test -v ON_ERROR_STOP=1 \
-            -f supabase/migrations/20261019120000_stock_in_idempotency_lock_order.sql
+            -f supabase/migrations/20261019071044_stock_in_idempotency_lock_order.sql
 
       - name: Verify concurrent retry returns idempotent status without duplicate receipt
         env:
