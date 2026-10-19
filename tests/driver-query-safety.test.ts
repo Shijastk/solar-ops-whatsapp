@@ -159,6 +159,7 @@ beforeEach(() => {
   process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
   process.env.GROQ_API_KEY = "synthetic-test-key";
   process.env.GROQ_MODEL = "openai/gpt-oss-20b";
+  getSupabaseAdminMock.mockClear();
   mockSupabaseDirectory();
   sendOpsReplyMock.mockClear();
 });
