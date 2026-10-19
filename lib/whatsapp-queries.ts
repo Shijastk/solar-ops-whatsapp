@@ -289,7 +289,7 @@ function hasNamedDriverTripPrefix(text: string): boolean {
       ...YESTERDAY_TERMS,
       ...TRIP_QUERY_TERMS,
       ...TODAY_PRODUCT_MOVEMENT_TERMS,
-    ].flatMap((term) => term.split(/\\s+/)),
+    ].flatMap((term) => term.split(/\s+/)),
   );
   const firstCueIndex = tokens.findIndex((token) => cueTokens.has(token));
   if (firstCueIndex > 0) {
@@ -304,7 +304,7 @@ function hasNamedDriverTripPrefix(text: string): boolean {
   // Also cover English forms such as "How many trips did Majeed make
   // yesterday?" without treating generic pronouns as driver names.
   const nameAfterCue = normalized.match(
-    /\\b(?:for|of|did|does|has|have)\\s+([\\p{L}\\p{N}]+)(?=\\s|$)/u,
+    /\b(?:for|of|did|does|has|have)\s+([\p{L}\p{N}]+)(?=\s|$)/u,
   )?.[1];
   const genericSubjects = new Set([
     "we", "you", "they", "i", "he", "she", "it", "us", "them", "all",
@@ -316,7 +316,7 @@ function hasNamedDriverTripPrefix(text: string): boolean {
 export function isDriverRelatedQuestion(text: string): boolean {
   const normalized = normalizeQueryText(text);
   const explicitDriverTerm =
-    /\\b(driver|drivers|driverude|driverine)\\b/.test(normalized) ||
+    /\b(driver|drivers|driverude|driverine)\b/.test(normalized) ||
     [
       "ഡ്രൈവർ",
       "ഡ്രൈവര്",
