@@ -282,7 +282,7 @@ function hasNamedDriverTripPrefix(text: string): boolean {
 
   // Vehicle-filter queries have a separate deterministic path and must not be
   // reclassified as named-driver queries.
-  if (/\\b([a-z]{2})\\s*(\\d{1,2})\\s*([a-z]{1,3})\\s*(\\d{1,4})\\b/i.test(normalized)) {
+  if (/\b([a-z]{2})\s*(\d{1,2})\s*([a-z]{1,3})\s*(\d{1,4})\b/i.test(normalized)) {
     return false;
   }
 
