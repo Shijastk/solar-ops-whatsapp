@@ -22,6 +22,14 @@ const bodySchema = z.object({
   quantity: z.union([z.string(), z.number()]),
   allowSimilarCompany: z.boolean().optional(),
   allowSimilarProduct: z.boolean().optional(),
+}).superRefine((body, context) => {
+  if (body.productId && !body.requestId) {
+    context.addIssue({
+      code: "custom",
+      path: ["requestId"],
+      message: "requestId is required for additive stock receipts",
+    });
+  }
 });
 
 export async function POST(request: Request) {
