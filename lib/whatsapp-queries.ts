@@ -320,7 +320,12 @@ export function parseFastWhatsAppQuery(
 
   if (includesAny(normalized, TRIP_TERMS)) {
     const vehicleMatch = normalized.match(/\b([a-z]{2})\s*(\d{1,2})\s*([a-z]{1,3})\s*(\d{1,4})\b/i);
-    if (vehicleMatch) {
+    if (
+      vehicleMatch &&
+      (includesAny(normalized, TRIP_QUERY_TERMS) ||
+        includesAny(normalized, TODAY_TERMS) ||
+        includesAny(normalized, YESTERDAY_TERMS))
+    ) {
       const [, state, district, series, number] = vehicleMatch;
       const vehicleNumber = [state, district, series, number]
         .join("")
