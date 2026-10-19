@@ -10,7 +10,7 @@ type WorkflowResult = "handled" | "ignored" | "disabled";
 export async function routeOperationalTextMessage(
   message: NormalizedWhatsAppMessage,
   storedMessageId: string,
-  options: { fromVoice?: boolean } = {},
+  options: { fromVoice?: boolean; agentEnabled?: boolean } = {},
 ): Promise<WorkflowResult> {
   const startedAt = performance.now();
   const stageDurationsMs: Record<string, number> = {};
@@ -29,7 +29,8 @@ export async function routeOperationalTextMessage(
   };
 
   try {
-    if (!(await getAgentEnabled())) {
+    const agentEnabled = options.agentEnabled ?? (await getAgentEnabled());
+    if (!agentEnabled) {
       outcome = "disabled";
       return "disabled";
     }
