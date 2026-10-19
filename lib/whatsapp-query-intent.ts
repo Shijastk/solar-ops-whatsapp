@@ -405,12 +405,14 @@ export async function classifyOperationalQueryWithGroq(
     hasTripTerm &&
     (parsed.data.intent === "yesterday_trip_summary" ||
       parsed.data.intent === "today_trip_summary");
-  const correctNamedDriverTrip = generalDayTripSummary && exactDriverName !== null;
+  const driverTripSummary = hasTripTerm && parsed.data.intent === "driver_trip_summary";
+  const correctNamedDriverTrip =
+    exactDriverName !== null && (generalDayTripSummary || driverTripSummary);
 
   // A named-driver query that does not match the active directory must never
-  // degrade into a company-wide summary. Ask the user to confirm the name.
+  // degrade into a company-wide summary or trust a model-inferred partial name.
   if (
-    generalDayTripSummary &&
+    (generalDayTripSummary || driverTripSummary) &&
     exactDriverName === null &&
     hasExplicitNamedDriverTripQuery(boundedText)
   ) {
