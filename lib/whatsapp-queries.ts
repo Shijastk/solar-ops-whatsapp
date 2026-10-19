@@ -1016,31 +1016,10 @@ async function driverTripsSummary(
     throw new Error("Failed to load exact driver match: " + exactDriverError.message);
   }
 
-  let matched = (exactDrivers ?? []) as Array<{ id: string; name: string }>;
-  if (matched.length === 0) {
-    // Fuzzy fallback is bounded and only accepted when it resolves uniquely.
-    const { data: drivers, error: driverError } = await supabase
-      .from("ops_drivers")
-      .select("id, name")
-      .order("name", { ascending: true })
-      .limit(100);
-
-    if (driverError) {
-      throw new Error("Failed to load driver directory: " + driverError.message);
-    }
-
-    const normalizeForFuzzyMatch = (value: string) =>
-      value.normalize("NFKC").toLocaleLowerCase("en")
-        .replace(/[^\\p{L}\\p{N}]/gu, "");
-    const normalizedTarget = normalizeForFuzzyMatch(driverName);
-    matched = ((drivers ?? []) as Array<{ id: string; name: string }>).filter((driver) => {
-      const name = normalizeForFuzzyMatch(String(driver.name ?? ""));
-      return name.length > 0 &&
-        (name === normalizedTarget ||
-          name.includes(normalizedTarget) ||
-          normalizedTarget.includes(name));
-    });
-  }
+  // Never turn an unrecognized name into a different driver's record through
+  // substring matching. The semantic resolver must provide the canonical name;
+  // otherwise ask the sender to confirm it.
+  const matched = (exactDrivers ?? []) as Array<{ id: string; name: string }>;
 
   if (matched.length !== 1) {
     return matched.length === 0
@@ -1502,6 +1481,9 @@ export async function handleFastWhatsAppQuery(
 
   if (query) {
     body = await answerFastQuery(query);
+  } else if (driverQuestion && classificationReply) {
+    resolver = "ai_fallback";
+    body = classificationReply;
   } else if (driverQuestion) {
     resolver = "fixed_fallback";
     body = "ഏത് driver-ന്റെ trips ആണ് വേണ്ടത്? Driver-ന്റെ പേര്, ഇന്ന്/ഇന്നലെ എന്ന് അയക്കൂ.";
