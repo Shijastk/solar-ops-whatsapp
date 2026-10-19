@@ -11,11 +11,13 @@ import {
 const original = {
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN,
   META_APP_SECRET: process.env.META_APP_SECRET,
+  OPS_ACCESS_KEY: process.env.OPS_ACCESS_KEY,
 };
 
 beforeEach(() => {
   process.env.WHATSAPP_VERIFY_TOKEN = "verify-key";
   process.env.META_APP_SECRET = "mobile-secret";
+  process.env.OPS_ACCESS_KEY = "mobile-dashboard-test-key";
 });
 
 afterEach(() => {
