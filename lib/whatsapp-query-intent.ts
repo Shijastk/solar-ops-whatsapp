@@ -254,8 +254,7 @@ function waitForRetry(delayMs: number): Promise<void> {
 function hasExplicitNamedDriverTripQuery(query: string): boolean {
   const normalized = normalizeQueryText(query);
   const hasTripTerm = /(?:^|[^\p{L}\p{N}])(?:trip|trips|ട്രിപ്പ്|ട്രിപ്പുകൾ)(?:$|[^\p{L}\p{N}])/iu.test(normalized);
-  const hasDayTerm = /(?:^|[^\p{L}\p{N}])(?:today|yesterday|innu|innale|ഇന്ന്|ഇന്നലെ)(?:$|[^\p{L}\p{N}])/iu.test(normalized);
-  if (!hasTripTerm || !hasDayTerm) return false;
+  if (!hasTripTerm) return false;
 
   const tokens = normalized.split(/\s+/).filter(Boolean);
   const cueTerms = [
@@ -387,8 +386,8 @@ export async function classifyOperationalQueryWithGroq(
   // names one exact active driver, preserve that driver filter.
   const generalDayTripSummary =
     hasTripTerm &&
-    ((parsed.data.intent === "yesterday_trip_summary" && hasYesterdayTerm) ||
-      (parsed.data.intent === "today_trip_summary" && hasTodayTerm));
+    (parsed.data.intent === "yesterday_trip_summary" ||
+      parsed.data.intent === "today_trip_summary");
   const correctNamedDriverTrip = generalDayTripSummary && exactDriverName !== null;
 
   // A named-driver query that does not match the active directory must never
@@ -415,7 +414,7 @@ export async function classifyOperationalQueryWithGroq(
       ? exactDriverName
       : parsed.data.driver_name?.normalize("NFKC").trim() || null,
     yesterday: correctNamedDriverTrip
-      ? parsed.data.intent === "yesterday_trip_summary"
+      ? hasYesterdayTerm
       : parsed.data.yesterday,
     period: parsed.data.period,
     reply: parsed.data.reply?.normalize("NFKC").trim() || null,
