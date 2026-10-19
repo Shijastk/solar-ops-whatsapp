@@ -324,7 +324,10 @@ export async function ingestWhatsAppMessage(
           } else {
             automationResult = await runDocumentAutomationForDraft(
               parsed.draftId,
-              { suppressReply: Boolean(reservedTripId) },
+              {
+                suppressReply: Boolean(reservedTripId),
+                agentEnabled,
+              },
             );
           }
           console.info("WhatsApp document automation summary", {
