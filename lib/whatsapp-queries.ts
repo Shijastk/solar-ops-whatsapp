@@ -39,6 +39,7 @@ export type FastWhatsAppQuery =
   | { type: "today_trip_summary" }
   | { type: "yesterday_trip_summary" }
   | { type: "driver_trip_summary"; driverName: string; yesterday: boolean }
+  | { type: "trip_filter_summary"; filterBy: "vehicle" | "destination"; filterValue: string; yesterday: boolean }
   | { type: "driver_count" }
   | { type: "today_products_summary" }
   | { type: "yesterday_products_summary" }
@@ -141,6 +142,10 @@ const TODAY_PRODUCT_MOVEMENT_TERMS = [
   "പുറത്തുപോയ",
 ];
 const TRIP_LATEST_TERMS = ["latest", "last", "recent", "അവസാന", "ലാസ്റ്റ്"];
+const TRIP_QUERY_TERMS = [
+  "how many", "count", "ethra", "show", "list", "details", "summary",
+  "എത്ര", "എണ്ണം", "കാണിക്കൂ", "കാണിക്ക്", "പറയൂ", "വിവരങ്ങൾ",
+];
 
 const PERIOD_TERMS: Array<{ period: OpsPeriod; terms: string[] }> = [
   {
@@ -311,6 +316,40 @@ export function parseFastWhatsAppQuery(
 
   if (hasBill && includesAny(normalized, LATEST_TERMS)) {
     return { type: "latest_bill" };
+  }
+
+  if (includesAny(normalized, TRIP_TERMS)) {
+    const vehicleMatch = normalized.match(/\\b([a-z]{2})\\s*(\\d{1,2})\\s*([a-z]{1,3})\\s*(\\d{1,4})\\b/i);
+    if (vehicleMatch) {
+      const [, state, district, series, number] = vehicleMatch;
+      const vehicleNumber = [state, district, series, number]
+        .join("")
+        .toUpperCase();
+      const yesterday = includesAny(normalized, YESTERDAY_TERMS);
+      return {
+        type: "trip_filter_summary",
+        filterBy: "vehicle",
+        filterValue: vehicleNumber,
+        yesterday,
+      };
+    }
+
+    if (includesAny(normalized, TRIP_QUERY_TERMS)) {
+      const destinationMatch = normalized.match(
+        /(?:trips?|ട്രിപ്പ്|ട്രിപ്പുകൾ)\\s+(?:to|for|at|in)\\s+(.+?)(?=\\s+(?:today|innu|innathe|inn|yesterday|innale|how many|count|ethra|show|list|details|summary|ഇന്ന്|ഇന്നത്തെ|ഇന്നലെ|എത്ര|എണ്ണം|കാണിക്കൂ|കാണിക്ക്|പറയൂ|വിവരങ്ങൾ)|$)/i,
+      );
+      const destination = destinationMatch?.[1]
+        ?.replace(/[%_]/g, "")
+        .trim();
+      if (destination && destination.length >= 2 && destination.length <= 60) {
+        return {
+          type: "trip_filter_summary",
+          filterBy: "destination",
+          filterValue: destination,
+          yesterday: includesAny(normalized, YESTERDAY_TERMS),
+        };
+      }
+    }
   }
 
   if (
@@ -845,6 +884,7 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
 
 type TripSummaryRow = {
   display_name: string | null;
+  primary_destination?: string | null;
   vehicle_number: string | null;
   driver_id: string | null;
   finalized_at: string | null;
@@ -876,7 +916,7 @@ function formatTripSummary(
     heading,
     ...rows.map((trip, index) => {
       const parts = [
-        String(index + 1) + ". " + (trip.display_name ?? "Trip"),
+        String(index + 1) + ". " + (trip.display_name ?? trip.primary_destination ?? "Trip"),
         trip.driver_id ? driverNames.get(trip.driver_id) ?? null : null,
         trip.vehicle_number ?? null,
       ].filter((part): part is string => Boolean(part));
@@ -959,6 +999,58 @@ async function driverTripsSummary(
   return rows.length === 0
     ? (yesterday ? "ഇന്നലെ " : "ഇന്ന് ") + driverName + " എന്ന driver-ന്റെ finalized trip കണ്ടെത്തിയില്ല."
     : formatTripSummary(rows, names, (yesterday ? "ഇന്നലത്തെ " : "ഇന്നത്തെ ") + driverName + "യുടെ trips (ആകെ " + String(rows.length) + "):");
+}
+
+async function filteredTripsSummary(
+  filterBy: "vehicle" | "destination",
+  filterValue: string,
+  yesterday = false,
+  now = new Date(),
+): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const queryTime = yesterday ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
+  const bounds = indiaDayBounds(queryTime);
+  let request = supabase
+    .from("delivery_trips")
+    .select("display_name, primary_destination, vehicle_number, driver_id, finalized_at")
+    .eq("status", "ready")
+    .gte("finalized_at", bounds.start)
+    .lt("finalized_at", bounds.end)
+    .order("finalized_at", { ascending: false })
+    .limit(50);
+
+  if (filterBy === "vehicle") {
+    const match = filterValue.match(/^([A-Z]{2})(\\d{1,2})([A-Z]{1,3})(\\d{1,4})$/);
+    if (!match) return "Vehicle number കൃത്യമായി മനസ്സിലായില്ല. വീണ്ടും അയക്കൂ.";
+    const [, state, district, series, number] = match;
+    const variants = Array.from(new Set([
+      [state, district, series, number].join(""),
+      [state, district, series, number].join(" "),
+      state + district + " " + series + " " + number,
+      state + " " + district + series + " " + number,
+      [state, district, series, number].join("-"),
+    ]));
+    request = request.in("vehicle_number", variants);
+  } else {
+    request = request.ilike("primary_destination", filterValue);
+  }
+
+  const { data, error } = await request;
+  if (error) throw new Error("Failed to load filtered trips: " + error.message);
+
+  const rows = (data ?? []) as TripSummaryRow[];
+  const names = await driverNamesById(
+    rows.map((row) => row.driver_id).filter((id): id is string => Boolean(id)),
+  );
+  const dayLabel = yesterday ? "ഇന്നലെ" : "ഇന്ന്";
+  const filterLabel = filterBy === "vehicle"
+    ? "vehicle " + filterValue
+    : "destination " + filterValue;
+  return formatTripSummary(
+    rows,
+    names,
+    dayLabel + " " + filterLabel + " trips (ആകെ " + String(rows.length) + "):",
+  );
 }
 
 async function tripsSummaryForDay(
@@ -1237,6 +1329,10 @@ async function answerFastQuery(
 
   if (query.type === "driver_trip_summary") {
     return driverTripsSummary(query.driverName, query.yesterday);
+  }
+
+  if (query.type === "trip_filter_summary") {
+    return filteredTripsSummary(query.filterBy, query.filterValue, query.yesterday);
   }
 
   if (query.type === "today_products_summary") {
