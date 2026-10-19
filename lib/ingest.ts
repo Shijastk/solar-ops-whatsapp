@@ -195,6 +195,7 @@ export async function ingestWhatsAppMessage(
       workflowResult = await routeOperationalTextMessage(
         message,
         persistedMessage.id,
+        { agentEnabled },
       );
     } catch (error) {
       console.warn("WhatsApp document workflow interaction did not complete", {
@@ -438,7 +439,7 @@ export async function ingestWhatsAppMessage(
         const voiceResult = await routeOperationalTextMessage(
           voiceAsText,
           persistedMessage.id,
-          { fromVoice: true },
+          { fromVoice: true, agentEnabled },
         );
 
         if (voiceResult === "ignored") {
