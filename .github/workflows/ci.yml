@@ -79,7 +79,32 @@ jobs:
             -c "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;"
           psql -h localhost -U postgres -d solar_ops_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/20261018140554_ops_drivers_catalog.sql \
-            -f supabase/migrations/20261018140604_ops_driver_deactivation_confirmation.sql
+            -f supabase/migrations/20261018140604_ops_driver_deactivation_confirmation.sql \
+            -f supabase/migrations/20261019110000_ops_agent_settings.sql
+
+      - name: Verify central agent setting defaults off and is service-role-only
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d solar_ops_test -v ON_ERROR_STOP=1 <<'SQL'
+          do $test$
+          begin
+            if (select enabled from public.ops_agent_settings where singleton) is distinct from false then
+              raise exception 'Central agent setting must default to disabled';
+            end if;
+            if has_table_privilege('anon', 'public.ops_agent_settings', 'SELECT')
+               or has_table_privilege('authenticated', 'public.ops_agent_settings', 'SELECT')
+               or has_table_privilege('anon', 'public.ops_agent_settings', 'UPDATE')
+               or has_table_privilege('authenticated', 'public.ops_agent_settings', 'UPDATE') then
+              raise exception 'Client roles must not access central agent settings';
+            end if;
+            if not has_table_privilege('service_role', 'public.ops_agent_settings', 'SELECT')
+               or not has_table_privilege('service_role', 'public.ops_agent_settings', 'UPDATE') then
+              raise exception 'Service role must be able to manage central agent settings';
+            end if;
+          end;
+          $test$;
+          SQL
 
       - name: Verify sender binding, expiry, and one-time consumption
         env:
