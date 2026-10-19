@@ -80,7 +80,7 @@ jobs:
           psql -h localhost -U postgres -d solar_ops_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/20261018140554_ops_drivers_catalog.sql \
             -f supabase/migrations/20261018140604_ops_driver_deactivation_confirmation.sql \
-            -f supabase/migrations/20261019110000_ops_agent_settings.sql
+            -f supabase/migrations/20261019114001_ops_agent_settings.sql
 
       - name: Verify central agent setting defaults off and is service-role-only
         env:
