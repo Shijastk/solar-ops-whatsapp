@@ -796,6 +796,25 @@ export async function reserveTripDocument(input: {
     throw new Error("Failed to reserve trip document: " + error.message);
   }
 
+  if (error?.code === "23505") {
+    // message_id is globally unique across trips. A duplicate webhook may
+    // replay a bill already reserved to an older trip; verify ownership rather
+    // than falsely claiming it belongs to the currently collecting trip.
+    const { data: existing, error: readError } = await supabase
+      .from("trip_documents")
+      .select("trip_id")
+      .eq("message_id", input.messageId)
+      .maybeSingle();
+
+    if (readError) {
+      throw new Error(
+        "Failed to verify trip document reservation: " + readError.message,
+      );
+    }
+
+    return existing?.trip_id === trip.id ? trip.id : null;
+  }
+
   return trip.id;
 }
 
