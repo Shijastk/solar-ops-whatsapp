@@ -161,6 +161,38 @@ describe("stock workflow integration", () => {
     );
   });
 
+  it("retries stock processing after a recoverable catalog failure", async () => {
+    state.ensureStockCatalogForDraft
+      .mockRejectedValueOnce(new Error("temporary catalog failure"))
+      .mockResolvedValueOnce({
+        companyId,
+        productIds: ["44444444-4444-4444-8444-444444444444"],
+      });
+
+    await expect(
+      processStockForDraft({
+        draftId,
+        replyToMessageId: messageId,
+        suppressNotifications: true,
+      }),
+    ).rejects.toThrow("temporary catalog failure");
+
+    await expect(
+      processStockForDraft({
+        draftId,
+        replyToMessageId: messageId,
+        suppressNotifications: true,
+      }),
+    ).resolves.toMatchObject({ status: "applied" });
+
+    expect(state.rpc).toHaveBeenCalledTimes(2);
+    expect(state.applyStockOutForDraft).toHaveBeenCalledTimes(1);
+    expect(state.updates).toContainEqual({
+      stock_error: "stock_processing_failed",
+      stock_updated_at: expect.any(String),
+    });
+  });
+
   it("records a recoverable stock error when catalog or deduction fails", async () => {
     state.ensureStockCatalogForDraft.mockRejectedValue(
       new Error("synthetic catalog failure"),
