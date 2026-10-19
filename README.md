@@ -33,7 +33,7 @@ For the account-level deployment sequence, use:
 
 - Verifies Meta's `x-hub-signature-256` HMAC signature.
 - Keeps Supabase secret key and Meta access token server-side only.
-- Supports an optional sender allowlist.
+- Requires every inbound sender to match `ALLOWED_WHATSAPP_SENDERS`; an absent or empty allowlist rejects all inbound messages.
 - Rejects messages delivered to an unexpected WhatsApp Phone Number ID.
 - Stores files in a private bucket.
 - Does not expose temporary Meta media URLs.
@@ -60,7 +60,7 @@ WHATSAPP_ACCESS_TOKEN=
 WHATSAPP_PHONE_NUMBER_ID=
 META_APP_SECRET=
 META_GRAPH_API_VERSION=v26.0
-ALLOWED_WHATSAPP_SENDERS=
+ALLOWED_WHATSAPP_SENDERS=<comma-separated-authorized-numbers>
 
 SUPABASE_URL=
 SUPABASE_SECRET_KEY=
