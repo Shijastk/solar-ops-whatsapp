@@ -45,7 +45,7 @@ describe("driver/date query end-to-end dispatch", () => {
           };
         }
         builder.then = (resolve: (value: unknown) => unknown) => {
-          let data: unknown[] = [];
+          let data: Array<Record<string, unknown>> = [];
           if (table === "ops_drivers") {
             data = [
               { id: "driver-rasheed", name: "Rasheed", normalized_name: "rasheed" },
