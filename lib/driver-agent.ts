@@ -87,7 +87,6 @@ export async function handleDriverMutation(
   storedMessageId: string,
 ): Promise<"handled" | "ignored"> {
   if (message.type !== "text" || !message.textBody) return "ignored";
-  if (process.env.SOLAR_OPS_DRIVER_AGENT_ENABLED !== "true") return "ignored";
 
   const supabase = getSupabaseAdmin();
   const confirmationMatch = message.textBody.trim().match(/^confirm\s+driver\s+([a-f0-9]{48})$/i);
