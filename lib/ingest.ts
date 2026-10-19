@@ -1,24 +1,19 @@
 import { createHash } from "node:crypto";
 import { extname } from "node:path";
-import {
-  handleDocumentWorkflowInbound,
-  runDocumentAutomationForDraft,
-} from "@/lib/document-automation";
+import { runDocumentAutomationForDraft } from "@/lib/document-automation";
+import { routeOperationalTextMessage } from "@/lib/operational-message-routing";
 import { processPdfBytesForMessage } from "@/lib/document-processing";
 import { deterministicUuid } from "@/lib/idempotency";
 import { getIngestionEnv } from "@/lib/env";
 import { downloadWhatsAppMedia } from "@/lib/meta";
 import { sendOpsReply } from "@/lib/replies";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { handleStockWorkflowInbound } from "@/lib/stock-workflow";
 import {
-  handleTripWorkflowInbound,
   markTripDocumentProcessed,
   finishTripAfterDuplicate,
   reserveTripDocument,
 } from "@/lib/trips";
 import { transcribeOperationalVoice } from "@/lib/voice-transcription";
-import { handleDriverMutation } from "@/lib/driver-agent";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
 
 const MEDIA_TYPES = new Set(["document", "image", "audio", "video", "sticker"]);
@@ -197,25 +192,10 @@ export async function ingestWhatsAppMessage(
   if (!message.media || !MEDIA_TYPES.has(message.type)) {
     let workflowResult: "handled" | "ignored" = "ignored";
     try {
-      workflowResult = await handleDriverMutation(message, persistedMessage.id);
-      if (workflowResult === "ignored") {
-        workflowResult = await handleStockWorkflowInbound(
-          message,
-          persistedMessage.id,
-        );
-      }
-      if (workflowResult === "ignored") {
-        workflowResult = await handleTripWorkflowInbound(
-          message,
-          persistedMessage.id,
-        );
-      }
-      if (workflowResult === "ignored") {
-        workflowResult = await handleDocumentWorkflowInbound(
-          message,
-          persistedMessage.id,
-        );
-      }
+      workflowResult = await routeOperationalTextMessage(
+        message,
+        persistedMessage.id,
+      );
     } catch (error) {
       console.warn("WhatsApp document workflow interaction did not complete", {
         messageStored: true,
@@ -419,6 +399,8 @@ export async function ingestWhatsAppMessage(
         }
       }
     } else if (message.type === "audio") {
+      let voiceStage: "transcription" | "persistence" | "routing" =
+        "transcription";
       try {
         const transcript = await transcribeOperationalVoice({
           bytes: media.bytes,
@@ -429,6 +411,7 @@ export async function ingestWhatsAppMessage(
           throw new Error("Voice transcription was empty");
         }
 
+        voiceStage = "persistence";
         const { error: transcriptError } = await supabase
           .from("whatsapp_messages")
           .update({ text_body: transcript })
@@ -440,6 +423,7 @@ export async function ingestWhatsAppMessage(
           );
         }
 
+        voiceStage = "routing";
         const voiceAsText: NormalizedWhatsAppMessage = {
           ...message,
           type: "text",
@@ -447,14 +431,11 @@ export async function ingestWhatsAppMessage(
           media: undefined,
         };
 
-        let voiceResult = await handleDriverMutation(voiceAsText, persistedMessage.id);
-        if (voiceResult === "ignored") {
-          voiceResult = await handleDocumentWorkflowInbound(
-            voiceAsText,
-            persistedMessage.id,
-            { fromVoice: true },
-          );
-        }
+        const voiceResult = await routeOperationalTextMessage(
+          voiceAsText,
+          persistedMessage.id,
+          { fromVoice: true },
+        );
 
         if (voiceResult === "ignored") {
           await sendOpsReply({
@@ -475,18 +456,31 @@ export async function ingestWhatsAppMessage(
           transcriptChars: transcript.length,
         });
       } catch (error) {
-        console.warn("WhatsApp voice transcription did not complete", {
-          reason:
-            error instanceof Error
-              ? error.message.slice(0, 180)
-              : "Unknown voice error",
-        });
+        console.warn(
+          voiceStage === "transcription"
+            ? "WhatsApp voice transcription did not complete"
+            : "WhatsApp voice request processing did not complete",
+          {
+            stage: voiceStage,
+            reason:
+              error instanceof Error
+                ? error.message.slice(0, 180)
+                : "Unknown voice error",
+          },
+        );
+
+        const failureBody =
+          voiceStage === "transcription"
+            ? "🎙️ Voice message വ്യക്തമായി transcribe ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ചെറിയ voice note ആയി അയക്കൂ, അല്ലെങ്കിൽ text ആയി അയക്കാം."
+            : voiceStage === "persistence"
+              ? "🎙️ Voice മനസ്സിലായി, പക്ഷേ transcript save ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും അയക്കൂ, അല്ലെങ്കിൽ text ആയി അയക്കാം."
+              : "🎙️ Voice മനസ്സിലായി, പക്ഷേ request process ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കൂ, അല്ലെങ്കിൽ text ആയി അയക്കാം.";
 
         try {
           await sendOpsReply({
             requestId: deterministicUuid("voice-failed:" + message.messageId),
             replyToMessageId: persistedMessage.id,
-            body: "🎙️ Voice message വ്യക്തമായി transcribe ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ചെറിയ voice note ആയി അയക്കൂ, അല്ലെങ്കിൽ text ആയി അയക്കാം.",
+            body: failureBody,
             knownInboundAt: message.timestamp,
           });
         } catch {
