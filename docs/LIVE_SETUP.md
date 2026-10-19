@@ -105,12 +105,12 @@ GROQ_TIMEOUT_MS=7000
 SOLAR_OPS_NATURAL_TRIP_START_ENABLED=false
 ```
 
-Important temporary test state:
+Production configuration audit (2026-10-19):
 
-- `ALLOWED_WHATSAPP_SENDERS` was removed temporarily.
-- `WHATSAPP_PHONE_NUMBER_ID` was removed temporarily.
-
-Restore both values before broader live/production testing.
+- The Vercel production environment contains `ALLOWED_WHATSAPP_SENDERS` and `WHATSAPP_PHONE_NUMBER_ID`; their secret values were not retrieved.
+- The sender allowlist is mandatory in behavior: if it is missing or empty, all inbound senders are rejected before persistence or workflow execution.
+- `SOLAR_OPS_NATURAL_TRIP_START_ENABLED` is not currently configured in production. Natural-language trip creation therefore remains disabled by default; the existing explicit trip command is separate.
+- Do not enable natural-language trip creation until its production rollout has been intentionally approved and the operational acceptance checks are complete.
 
 ### B3. Deployment
 
