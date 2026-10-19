@@ -55,7 +55,10 @@ beforeEach(() => {
 
 describe("shared operational text routing", () => {
   it("stops after the first handler that recognizes the message", async () => {
-    state.driver.mockResolvedValue("handled");
+    state.driver.mockImplementation(async () => {
+      state.calls.push("driver");
+      return "handled";
+    });
 
     await expect(
       routeOperationalTextMessage(message, "stored-message"),
