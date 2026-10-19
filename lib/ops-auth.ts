@@ -1,5 +1,4 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { getWebhookEnv } from "@/lib/env";
 
 export const OPS_SESSION_COOKIE = "solar_ops_session";
 const SESSION_VERSION = "v1";
@@ -16,23 +15,23 @@ function safeEqual(left: string, right: string): boolean {
   return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-function getOpsAccessKey(): string {
-  const dedicated = process.env.OPS_ACCESS_KEY?.trim();
-  if (dedicated) {
-    return dedicated;
-  }
-
-  return getWebhookEnv().WHATSAPP_VERIFY_TOKEN;
+function getOpsAccessKey(): string | null {
+  const key = process.env.OPS_ACCESS_KEY?.trim();
+  return key || null;
 }
 
-function signSessionPayload(payload: string): string {
-  return createHmac("sha256", getWebhookEnv().META_APP_SECRET)
-    .update(payload, "utf8")
-    .digest("hex");
+function signSessionPayload(payload: string): string | null {
+  const key = getOpsAccessKey();
+  if (!key) {
+    return null;
+  }
+
+  return createHmac("sha256", key).update(payload, "utf8").digest("hex");
 }
 
 export function isValidOpsAccessKey(value: string): boolean {
-  return safeEqual(value, getOpsAccessKey());
+  const expected = getOpsAccessKey();
+  return expected !== null && safeEqual(value, expected);
 }
 
 export function createOpsSession(
@@ -43,6 +42,10 @@ export function createOpsSession(
   const payload = `${SESSION_VERSION}.${expiresAt}`;
   const signature = signSessionPayload(payload);
 
+  if (!signature) {
+    throw new Error("Operations access key is not configured");
+  }
+
   return `${payload}.${signature}`;
 }
 
@@ -50,7 +53,7 @@ export function verifyOpsSession(
   session: string | undefined,
   now = Date.now(),
 ): boolean {
-  if (!session) {
+  if (!session || !getOpsAccessKey()) {
     return false;
   }
 
@@ -72,7 +75,7 @@ export function verifyOpsSession(
   const payload = `${version}.${expiresAtRaw}`;
   const expectedSignature = signSessionPayload(payload);
 
-  return safeEqual(signature, expectedSignature);
+  return expectedSignature !== null && safeEqual(signature, expectedSignature);
 }
 
 export function getOpsSessionExpiresAt(
