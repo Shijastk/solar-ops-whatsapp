@@ -16,6 +16,20 @@ vi.mock("@/lib/replies", () => ({
 import { handleFastWhatsAppQuery } from "../lib/whatsapp-queries";
 
 type Filter = [column: string, value: unknown];
+type QueryResult = { data: unknown[]; error: null; count?: number };
+type QueryBuilder = PromiseLike<QueryResult> & {
+  select(selection: string): QueryBuilder;
+  eq(column: string, value: unknown): QueryBuilder;
+  gte(...args: unknown[]): QueryBuilder;
+  lt(...args: unknown[]): QueryBuilder;
+  order(...args: unknown[]): QueryBuilder;
+  limit(count: number): Promise<QueryResult>;
+};
+const originalEnv = {
+  enabled: process.env.DOCUMENT_AUTOMATION_ENABLED,
+  key: process.env.GROQ_API_KEY,
+  model: process.env.GROQ_MODEL,
+};
 
 function mockSupabaseDirectory() {
   const from = vi.fn((table: string) => {
@@ -51,7 +65,8 @@ function mockSupabaseDirectory() {
       return { data: [], error: null, count: 0 };
     };
 
-    const query: any = {
+    let query: QueryBuilder;
+    query = {
       select(selection: string) {
         state.selection = selection;
         return query;
@@ -129,7 +144,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  delete process.env.GROQ_API_KEY;
+  const restore = (key: string, value: string | undefined) => {\n    if (value === undefined) delete process.env[key];\n    else process.env[key] = value;\n  };\n  restore("DOCUMENT_AUTOMATION_ENABLED", originalEnv.enabled);\n  restore("GROQ_API_KEY", originalEnv.key);\n  restore("GROQ_MODEL", originalEnv.model);
 });
 
 describe("named-driver response safety", () => {
