@@ -253,18 +253,18 @@ function waitForRetry(delayMs: number): Promise<void> {
 
 function hasExplicitNamedDriverTripQuery(query: string): boolean {
   const normalized = normalizeQueryText(query);
-  const hasTripTerm = /(?:^|[^\\p{L}\\p{N}])(?:trip|trips|ട്രിപ്പ്|ട്രിപ്പുകൾ)(?:$|[^\\p{L}\\p{N}])/iu.test(normalized);
-  const hasDayTerm = /(?:^|[^\\p{L}\\p{N}])(?:today|yesterday|innu|innale|ഇന്ന്|ഇന്നലെ)(?:$|[^\\p{L}\\p{N}])/iu.test(normalized);
+  const hasTripTerm = /(?:^|[^\p{L}\p{N}])(?:trip|trips|ട്രിപ്പ്|ട്രിപ്പുകൾ)(?:$|[^\p{L}\p{N}])/iu.test(normalized);
+  const hasDayTerm = /(?:^|[^\p{L}\p{N}])(?:today|yesterday|innu|innale|ഇന്ന്|ഇന്നലെ)(?:$|[^\p{L}\p{N}])/iu.test(normalized);
   if (!hasTripTerm || !hasDayTerm) return false;
 
-  const tokens = normalized.split(/\\s+/).filter(Boolean);
+  const tokens = normalized.split(/\s+/).filter(Boolean);
   const cueTerms = [
     "how many", "count", "number", "ethra", "എത്ര", "എണ്ണം",
     "today", "yesterday", "innu", "innale", "ഇന്ന്", "ഇന്നലെ",
     "trip", "trips", "ട്രിപ്പ്", "ട്രിപ്പുകൾ", "dispatch", "dispatched",
     "poyi", "poya", "went", "completed",
   ];
-  const cueTokens = new Set(cueTerms.flatMap((term) => term.split(/\\s+/)));
+  const cueTokens = new Set(cueTerms.flatMap((term) => term.split(/\s+/)));
   const firstCueIndex = tokens.findIndex((token) => cueTokens.has(token));
   const genericPrefixTokens = new Set([
     "please", "tell", "me", "the", "for", "of", "about", "driver", "drivers",
@@ -279,7 +279,7 @@ function hasExplicitNamedDriverTripQuery(query: string): boolean {
 
   // English word order can place the named driver after the count phrase.
   const nameAfterCue = normalized.match(
-    /\\b(?:for|of|did|does|has|have)\\s+([\\p{L}\\p{N}]+)(?=\\s|$)/u,
+    /\b(?:for|of|did|does|has|have)\s+([\p{L}\p{N}]+)(?=\s|$)/u,
   )?.[1];
   const genericSubjects = new Set([
     "we", "you", "they", "i", "he", "she", "it", "us", "them", "all", "any",
