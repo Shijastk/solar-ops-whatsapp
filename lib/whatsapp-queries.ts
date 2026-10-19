@@ -319,7 +319,7 @@ export function parseFastWhatsAppQuery(
   }
 
   if (includesAny(normalized, TRIP_TERMS)) {
-    const vehicleMatch = normalized.match(/\\b([a-z]{2})\\s*(\\d{1,2})\\s*([a-z]{1,3})\\s*(\\d{1,4})\\b/i);
+    const vehicleMatch = normalized.match(/\b([a-z]{2})\s*(\d{1,2})\s*([a-z]{1,3})\s*(\d{1,4})\b/i);
     if (vehicleMatch) {
       const [, state, district, series, number] = vehicleMatch;
       const vehicleNumber = [state, district, series, number]
@@ -336,7 +336,7 @@ export function parseFastWhatsAppQuery(
 
     if (includesAny(normalized, TRIP_QUERY_TERMS)) {
       const destinationMatch = normalized.match(
-        /(?:trips?|ട്രിപ്പ്|ട്രിപ്പുകൾ)\\s+(?:to|for|at|in)\\s+(.+?)(?=\\s+(?:today|innu|innathe|inn|yesterday|innale|how many|count|ethra|show|list|details|summary|ഇന്ന്|ഇന്നത്തെ|ഇന്നലെ|എത്ര|എണ്ണം|കാണിക്കൂ|കാണിക്ക്|പറയൂ|വിവരങ്ങൾ)|$)/i,
+        /(?:trips?|ട്രിപ്പ്|ട്രിപ്പുകൾ)\s+(?:to|for|at|in)\s+(.+?)(?=\s+(?:today|innu|innathe|inn|yesterday|innale|how many|count|ethra|show|list|details|summary|ഇന്ന്|ഇന്നത്തെ|ഇന്നലെ|എത്ര|എണ്ണം|കാണിക്കൂ|കാണിക്ക്|പറയൂ|വിവരങ്ങൾ)|$)/i,
       );
       const destination = destinationMatch?.[1]
         ?.replace(/[%_]/g, "")
@@ -1020,7 +1020,7 @@ async function filteredTripsSummary(
     .limit(50);
 
   if (filterBy === "vehicle") {
-    const match = filterValue.match(/^([A-Z]{2})(\\d{1,2})([A-Z]{1,3})(\\d{1,4})$/);
+    const match = filterValue.match(/^([A-Z]{2})(\d{1,2})([A-Z]{1,3})(\d{1,4})$/);
     if (!match) return "Vehicle number കൃത്യമായി മനസ്സിലായില്ല. വീണ്ടും അയക്കൂ.";
     const [, state, district, series, number] = match;
     const variants = Array.from(new Set([
