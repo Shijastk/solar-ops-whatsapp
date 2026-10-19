@@ -251,6 +251,44 @@ function waitForRetry(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
+function hasExplicitNamedDriverTripQuery(query: string): boolean {
+  const normalized = normalizeQueryText(query);
+  const hasTripTerm = /(?:^|[^\\p{L}\\p{N}])(?:trip|trips|ട്രിപ്പ്|ട്രിപ്പുകൾ)(?:$|[^\\p{L}\\p{N}])/iu.test(normalized);
+  const hasDayTerm = /(?:^|[^\\p{L}\\p{N}])(?:today|yesterday|innu|innale|ഇന്ന്|ഇന്നലെ)(?:$|[^\\p{L}\\p{N}])/iu.test(normalized);
+  if (!hasTripTerm || !hasDayTerm) return false;
+
+  const tokens = normalized.split(/\\s+/).filter(Boolean);
+  const cueTerms = [
+    "how many", "count", "number", "ethra", "എത്ര", "എണ്ണം",
+    "today", "yesterday", "innu", "innale", "ഇന്ന്", "ഇന്നലെ",
+    "trip", "trips", "ട്രിപ്പ്", "ട്രിപ്പുകൾ", "dispatch", "dispatched",
+    "poyi", "poya", "went", "completed",
+  ];
+  const cueTokens = new Set(cueTerms.flatMap((term) => term.split(/\\s+/)));
+  const firstCueIndex = tokens.findIndex((token) => cueTokens.has(token));
+  const genericPrefixTokens = new Set([
+    "please", "tell", "me", "the", "for", "of", "about", "driver", "drivers",
+    "new", "all", "any", "my", "our", "their", "these", "those", "every",
+    "we", "you", "they", "i", "he", "she", "it", "us", "them", "team", "company",
+    "ഡ്രൈവർ", "ഡ്രൈവര്", "ട്രൈവർ", "എന്ന", "എന്നുള്ള",
+  ]);
+  if (firstCueIndex > 0) {
+    const prefix = tokens.slice(0, firstCueIndex);
+    if (prefix.some((token) => !genericPrefixTokens.has(token))) return true;
+  }
+
+  // English word order can place the named driver after the count phrase.
+  const nameAfterCue = normalized.match(
+    /\\b(?:for|of|did|does|has|have)\\s+([\\p{L}\\p{N}]+)(?=\\s|$)/u,
+  )?.[1];
+  const genericSubjects = new Set([
+    "we", "you", "they", "i", "he", "she", "it", "us", "them", "all", "any",
+    "the", "a", "an", "our", "their", "my", "team", "company", "driver", "drivers",
+    "today", "yesterday", "trip", "trips", "ഇന്ന്", "ഇന്നലെ",
+  ]);
+  return Boolean(nameAfterCue && !genericSubjects.has(nameAfterCue));
+}
+
 export async function classifyOperationalQueryWithGroq(
   text: string,
   options: { driverNames?: string[] } = {},
@@ -346,12 +384,29 @@ export async function classifyOperationalQueryWithGroq(
     boundedText.includes("ഇന്നത്തെ");
 
   // When the model returns a general day summary for a query that explicitly
-  // names one exact driver from the directory, preserve the driver filter.
-  const correctNamedDriverTrip =
+  // names one exact active driver, preserve that driver filter.
+  const generalDayTripSummary =
     hasTripTerm &&
-    exactDriverName !== null &&
     ((parsed.data.intent === "yesterday_trip_summary" && hasYesterdayTerm) ||
       (parsed.data.intent === "today_trip_summary" && hasTodayTerm));
+  const correctNamedDriverTrip = generalDayTripSummary && exactDriverName !== null;
+
+  // A named-driver query that does not match the active directory must never
+  // degrade into a company-wide summary. Ask the user to confirm the name.
+  if (
+    generalDayTripSummary &&
+    exactDriverName === null &&
+    hasExplicitNamedDriverTripQuery(boundedText)
+  ) {
+    return {
+      intent: "unsupported",
+      product_query: null,
+      driver_name: null,
+      yesterday: false,
+      period: null,
+      reply: "Driver directory-ൽ ഈ പേര് കൃത്യമായി കണ്ടെത്താനായില്ല. പേര് confirm ചെയ്യൂ.",
+    };
+  }
 
   return {
     intent: correctNamedDriverTrip ? "driver_trip_summary" : parsed.data.intent,
