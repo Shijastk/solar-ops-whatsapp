@@ -401,9 +401,10 @@ describe("WhatsApp AI intent fallback", () => {
         driverNames: ["Rasheed P", "Majeed"],
       }),
     ).resolves.toMatchObject({
-      intent: "today_trip_summary",
+      intent: "unsupported",
       driver_name: null,
       yesterday: false,
+      reply: expect.stringContaining("Driver directory"),
     });
   });
 
