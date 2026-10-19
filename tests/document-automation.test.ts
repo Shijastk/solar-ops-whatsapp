@@ -11,7 +11,6 @@ describe("document automation helpers", () => {
       supplierName: "Sun Grid Solutions Limited",
       documentNumber: "SG000123",
       vehicleNumber: "KL11AA1234",
-      totalAmount: 176026.86,
       items: [
         {
           id: "item-1",
@@ -28,13 +27,16 @@ describe("document automation helpers", () => {
     expect(summary).toContain("ബിൽ പരിശോധിച്ച് സ്ഥിരീകരിച്ചു");
     expect(summary).toContain("Solar 560 Wp Topcon Panel — 6 NOS");
     expect(summary).toContain("സ്റ്റോക്ക് അപ്ഡേറ്റ് പൂർത്തിയായിട്ടില്ല");
+    expect(summary).not.toContain("176,026.86");
+    expect(summary).not.toContain("₹");
+    expect(summary).not.toContain("20000");
+    expect(summary).not.toContain("120000");
     expect(summary.length).toBeLessThanOrEqual(950);
 
     const applied = buildDocumentSummary({
       supplierName: "Sun Grid Solutions Limited",
       documentNumber: "SG000123",
       vehicleNumber: "KL11AA1234",
-      totalAmount: 176026.86,
       stockStatus: "applied",
       items: [
         {
@@ -55,7 +57,6 @@ describe("document automation helpers", () => {
       supplierName: "Sun Grid Solutions Limited",
       documentNumber: "SG000123",
       vehicleNumber: "KL11AA1234",
-      totalAmount: 176026.86,
       stockStatus: "duplicate_document",
       items: [
         {

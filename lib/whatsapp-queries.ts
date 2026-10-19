@@ -1,5 +1,6 @@
 import { normalizeProductDescription } from "@/lib/document-parser";
 import { deterministicUuid } from "@/lib/idempotency";
+import { isPricingQuestion, pricingPolicyReply } from "@/lib/pricing-policy";
 import {
   classifyOperationalQueryWithGroq,
   looksLikeOperationalQuery,
@@ -545,9 +546,7 @@ async function latestBillSummary(): Promise<string> {
 
   const { data: draft, error: draftError } = await supabase
     .from("document_drafts")
-    .select(
-      "supplier_name, document_number, total_amount, workflow_status, stock_status",
-    )
+    .select("supplier_name, document_number, workflow_status, stock_status")
     .eq("message_id", message.id)
     .maybeSingle();
 
@@ -561,16 +560,7 @@ async function latestBillSummary(): Promise<string> {
   if (!draft?.document_number && message.original_filename) {
     lines.push("ഫയൽ: " + message.original_filename);
   }
-  if (draft?.total_amount !== null && draft?.total_amount !== undefined) {
-    lines.push(
-      "ആകെ: " +
-        new Intl.NumberFormat("en-IN", {
-          style: "currency",
-          currency: "INR",
-          maximumFractionDigits: 2,
-        }).format(Number(draft.total_amount)),
-    );
-  }
+  
   if (draft?.workflow_status) {
     lines.push("നില: " + draft.workflow_status.replaceAll("_", " "));
   }
@@ -1238,6 +1228,21 @@ export async function handleFastWhatsAppQuery(
   options: { fromVoice?: boolean } = {},
 ): Promise<"handled" | "ignored"> {
   if (message.type !== "text" || !message.textBody) return "ignored";
+
+  if (isPricingQuestion(message.textBody)) {
+    await sendOpsReply({
+      requestId: deterministicUuid("pricing-policy:" + message.messageId),
+      replyToMessageId: storedMessageId,
+      body: pricingPolicyReply(),
+      knownInboundAt: message.timestamp,
+    });
+    console.info("WhatsApp pricing question restricted", {
+      correlationId: storedMessageId,
+      inputType: options.fromVoice ? "voice" : "text",
+      inputChars: message.textBody.length,
+    });
+    return "handled";
+  }
 
   const startedAt = performance.now();
   let resolver: "deterministic" | "ai_intent" | "ai_fallback" | "fixed_fallback" =

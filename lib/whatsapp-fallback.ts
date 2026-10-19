@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getDocumentAutomationEnv } from "@/lib/env";
+import { isPricingQuestion, pricingPolicyReply } from "@/lib/pricing-policy";
 
 const MAX_MESSAGE_CHARS = 900;
 
@@ -42,6 +43,8 @@ export function voiceQueryClarification(transcript: string): string {
 
 export function fixedUniversalFallback(text: string): string {
   const normalized = text.normalize("NFKC").trim().toLowerCase();
+
+  if (isPricingQuestion(normalized)) return pricingPolicyReply();
 
   if (
     /^(thanks|thank you|thx|നന്ദി|താങ്ക്സ്|നന്നി|ok thanks|okay thanks)[.! ]*$/.test(
@@ -97,7 +100,7 @@ export async function generateUniversalWhatsAppReply(
           {
             role: "system",
             content:
-              "You are the Solar Ops WhatsApp assistant for a small solar godown. Reply briefly and naturally in the same language/style as the user (Malayalam, Manglish, or English). You may greet, explain how Solar Ops works, clarify commands, and answer general non-live questions. IMPORTANT: you have NO live database facts in this fallback call. Never invent or guess current stock quantities, bills, trips, drivers, destinations, company data, totals, dates, or statuses. If the user asks for a live operational fact that is not available in this call, say you cannot safely verify that specific fact from this fallback and suggest a supported direct query such as today's bills, pending bills, latest bill, '<product> stock', today's trip, or latest trip. Do not claim an action was performed. Do not mention Groq or AI unless the user asks. Keep the response under 5 short lines.",
+              "You are the Solar Ops WhatsApp assistant for a small solar godown. Reply briefly and naturally in the same language/style as the user (Malayalam, Manglish, or English). You may greet, explain how Solar Ops works, clarify commands, and answer general non-live questions. IMPORTANT: you have NO live database facts in this fallback call. Never invent or guess current stock quantities, bills, trips, drivers, destinations, company data, totals, dates, or statuses. Never provide, estimate, infer, or repeat product prices, rates, discounts, invoice totals, taxes, or other pricing amounts; if asked, state that pricing is managed by the company and is not shared via WhatsApp. If the user asks for a live operational fact that is not available in this call, say you cannot safely verify that specific fact from this fallback and suggest a supported direct query such as today's bills, pending bills, latest bill, '<product> stock', today's trip, or latest trip. Do not claim an action was performed. Do not mention Groq or AI unless the user asks. Keep the response under 5 short lines.",
           },
           {
             role: "user",

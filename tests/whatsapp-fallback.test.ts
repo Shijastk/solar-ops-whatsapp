@@ -32,6 +32,9 @@ describe("universal WhatsApp fallback", () => {
     expect(fixedUniversalFallback("thanks")).toContain("Trip");
     expect(fixedUniversalFallback("some random message")).toContain("Message");
     expect(fixedOperationalFallback()).toContain("latest trip");
+    expect(fixedUniversalFallback("price of Emmvee 560 panel")).toContain(
+      "Pricing സ്ഥിരീകരിക്കാൻ കമ്പനിയെ ബന്ധപ്പെടുക",
+    );
   });
 
   it("generates a bounded conversational reply with the configured Groq model", async () => {
@@ -71,5 +74,8 @@ describe("universal WhatsApp fallback", () => {
     expect(body.model).toBe("openai/gpt-oss-20b");
     expect(body.reasoning_effort).toBe("low");
     expect(body.max_completion_tokens).toBe(220);
+    expect(body.messages[0].content).toContain(
+      "Never provide, estimate, infer, or repeat product prices",
+    );
   });
 });
