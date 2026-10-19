@@ -453,6 +453,12 @@ jobs:
             psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 -f "$migration"
           done
 
+      - name: Verify stock query company identity and known-zero semantics
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d solar_stock_workflow_test -v ON_ERROR_STOP=1 -f tests/sql/stock-query-acceptance.sql
+
       - name: Verify operational RPC and stock-table least privilege
         env:
           PGPASSWORD: postgres
