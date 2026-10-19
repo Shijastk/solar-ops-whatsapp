@@ -1,5 +1,6 @@
 import { normalizeProductDescription } from "@/lib/document-parser";
 import { deterministicUuid } from "@/lib/idempotency";
+import { isPricingQuestion, pricingPolicyReply } from "@/lib/pricing-policy";
 import {
   classifyOperationalQueryWithGroq,
   looksLikeOperationalQuery,
@@ -272,18 +273,6 @@ export function isDriverRelatedQuestion(text: string): boolean {
       "റഷീദിനെ",
       "ഡ്രൈവറായിരുന്നു",
     ].some((term) => normalized.includes(term));
-}
-
-export function isPricingQuestion(text: string): boolean {
-  const normalized = normalizeQueryText(text);
-  return (
-    /₹|\b(?:price|pricing|rate|cost|amount|quotation|quote)\b|\b(?:rs\.?|rupees?|inr)\b|\b(?:bill|invoice)\s+(?:total|amount)\b/i.test(
-      text,
-    ) ||
-    /(?:വില|റേറ്റ്|വിലവിവരം|തുക|എത്ര രൂപ|എത്ര വില)|\b(?:vila|vilay|vilayethra|ethra roopa|ethra rate)\b/i.test(
-      normalized,
-    )
-  );
 }
 
 export function parseFastWhatsAppQuery(
@@ -1244,7 +1233,7 @@ export async function handleFastWhatsAppQuery(
     await sendOpsReply({
       requestId: deterministicUuid("pricing-policy:" + message.messageId),
       replyToMessageId: storedMessageId,
-      body: "വില/റേറ്റ്/ബിൽ തുകകൾ WhatsApp-ൽ പങ്കിടുന്നില്ല. Pricing സ്ഥിരീകരിക്കാൻ കമ്പനിയെ ബന്ധപ്പെടുക.",
+      body: pricingPolicyReply(),
       knownInboundAt: message.timestamp,
     });
     console.info("WhatsApp pricing question restricted", {
