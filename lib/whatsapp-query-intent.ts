@@ -229,6 +229,28 @@ async function readGroqErrorDetail(response: Response): Promise<string | null> {
   }
 }
 
+const MAX_GROQ_ATTEMPTS = 3;
+const GROQ_RETRY_BASE_DELAY_MS = 1_000;
+
+function getRetryDelayMs(response: Response, attempt: number): number {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.min(seconds * 1_000, 10_000);
+    }
+    const retryAt = Date.parse(retryAfter);
+    if (Number.isFinite(retryAt)) {
+      return Math.min(Math.max(retryAt - Date.now(), 0), 10_000);
+    }
+  }
+  return Math.min(GROQ_RETRY_BASE_DELAY_MS * 2 ** attempt, 4_000);
+}
+
+function waitForRetry(delayMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
 export async function classifyOperationalQueryWithGroq(
   text: string,
   options: { driverNames?: string[] } = {},
@@ -240,10 +262,12 @@ export async function classifyOperationalQueryWithGroq(
   if (!boundedText) return null;
   const driverNames = (options.driverNames ?? []).map((name) => name.normalize("NFKC").trim()).filter(Boolean);
 
-  const response = await fetch(
-    "https://api.groq.com/openai/v1/chat/completions",
-    {
-      method: "POST",
+  let response: Response;
+  for (let attempt = 0; ; attempt += 1) {
+    response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
       headers: {
         Authorization: "Bearer " + env.apiKey,
         "Content-Type": "application/json",
@@ -275,9 +299,15 @@ export async function classifyOperationalQueryWithGroq(
         stream: false,
       }),
       signal: AbortSignal.timeout(Math.min(env.timeoutMs, 4000)),
-      cache: "no-store",
-    },
-  );
+        cache: "no-store",
+      },
+    );
+
+    const shouldRetry = response.status === 429 && attempt < MAX_GROQ_ATTEMPTS - 1;
+    if (!shouldRetry) break;
+
+    await waitForRetry(getRetryDelayMs(response, attempt));
+  }
 
   if (!response.ok) {
     const detail = await readGroqErrorDetail(response);
