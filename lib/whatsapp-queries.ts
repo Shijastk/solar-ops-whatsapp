@@ -893,15 +893,51 @@ async function driverTripsSummary(
   const supabase = getSupabaseAdmin();
   const queryTime = yesterday ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
   const bounds = indiaDayBounds(queryTime);
-  const { data: drivers, error: driverError } = await supabase
+  const exactNameKey = driverName
+    .normalize("NFKC")
+    .trim()
+    .replace(/\\s+/g, " ")
+    .toLocaleLowerCase("en-IN");
+
+  // Prefer the canonical normalized_name key before fuzzy matching. This
+  // prevents "Rasheed" from becoming ambiguous just because "Rasheed K"
+  // also exists in the directory.
+  const { data: exactDrivers, error: exactDriverError } = await supabase
     .from("ops_drivers")
-    .select("id, name");
-  if (driverError) throw new Error("Failed to load driver directory: " + driverError.message);
-  const normalizedTarget = driverName.normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]/gu, "");
-  const matched = (drivers ?? []).filter((driver) => {
-    const name = String(driver.name ?? "").normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]/gu, "");
-    return name === normalizedTarget || name.includes(normalizedTarget) || normalizedTarget.includes(name);
-  });
+    .select("id, name")
+    .eq("normalized_name", exactNameKey)
+    .limit(2);
+
+  if (exactDriverError) {
+    throw new Error("Failed to load exact driver match: " + exactDriverError.message);
+  }
+
+  let matched = (exactDrivers ?? []) as Array<{ id: string; name: string }>;
+  if (matched.length === 0) {
+    // Fuzzy fallback is bounded and only accepted when it resolves uniquely.
+    const { data: drivers, error: driverError } = await supabase
+      .from("ops_drivers")
+      .select("id, name")
+      .order("name", { ascending: true })
+      .limit(100);
+
+    if (driverError) {
+      throw new Error("Failed to load driver directory: " + driverError.message);
+    }
+
+    const normalizeForFuzzyMatch = (value: string) =>
+      value.normalize("NFKC").toLocaleLowerCase("en")
+        .replace(/[^\\p{L}\\p{N}]/gu, "");
+    const normalizedTarget = normalizeForFuzzyMatch(driverName);
+    matched = ((drivers ?? []) as Array<{ id: string; name: string }>).filter((driver) => {
+      const name = normalizeForFuzzyMatch(String(driver.name ?? ""));
+      return name.length > 0 &&
+        (name === normalizedTarget ||
+          name.includes(normalizedTarget) ||
+          normalizedTarget.includes(name));
+    });
+  }
+
   if (matched.length !== 1) {
     return matched.length === 0
       ? "Driver directory-ൽ “" + driverName + "” എന്ന പേര് കൃത്യമായി കണ്ടെത്താനായില്ല. പേര് confirm ചെയ്യൂ."
