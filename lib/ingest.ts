@@ -5,6 +5,7 @@ import { routeOperationalTextMessage } from "@/lib/operational-message-routing";
 import { processPdfBytesForMessage } from "@/lib/document-processing";
 import { deterministicUuid } from "@/lib/idempotency";
 import { getIngestionEnv } from "@/lib/env";
+import { getAgentEnabled } from "@/lib/agent-settings";
 import { downloadWhatsAppMedia } from "@/lib/meta";
 import { sendOpsReply } from "@/lib/replies";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -142,7 +143,9 @@ export async function ingestWhatsAppMessage(
     );
   }
 
+  const agentEnabled = await getAgentEnabled();
   const likelyPdfDocument =
+    agentEnabled &&
     message.type === "document" &&
     (!message.media?.mimeType ||
       message.media.mimeType.toLowerCase().includes("pdf") ||
@@ -187,7 +190,7 @@ export async function ingestWhatsAppMessage(
   }
 
   if (!message.media || !MEDIA_TYPES.has(message.type)) {
-    let workflowResult: "handled" | "ignored" = "ignored";
+    let workflowResult: "handled" | "ignored" | "disabled" = "ignored";
     try {
       workflowResult = await routeOperationalTextMessage(
         message,
@@ -266,6 +269,10 @@ export async function ingestWhatsAppMessage(
       throw new Error(
         `Failed to finalize WhatsApp message: ${updateError.message}`,
       );
+    }
+
+    if (!agentEnabled) {
+      return "stored";
     }
 
     if (media.mimeType.toLowerCase() === "application/pdf") {
