@@ -341,23 +341,27 @@ export async function classifyOperationalQueryWithGroq(
   const hasTripTerm = /(?:^|[^\p{L}\p{N}])(?:trip|trips|ട്രിപ്പ്|ട്രിപ്പുകൾ)(?:$|[^\p{L}\p{N}])/iu.test(boundedText);
   const hasYesterdayTerm = /(?:^|[^\p{L}\p{N}])(?:yesterday|innale)(?:$|[^\p{L}\p{N}])/iu.test(normalizedQuery) ||
     boundedText.includes("ഇന്നലെ");
+  const hasTodayTerm = /(?:^|[^\p{L}\p{N}])(?:today|innu|innathe|inn)(?:$|[^\p{L}\p{N}])/iu.test(normalizedQuery) ||
+    boundedText.includes("ഇന്ന്") ||
+    boundedText.includes("ഇന്നത്തെ");
 
-  // Keep this correction narrow: the observed failure was a named-driver query
-  // classified as a general yesterday summary. Resolve an exact directory-name
-  // match deterministically rather than asking the model to reproduce spelling.
-  const correctNamedYesterdayTrip =
-    parsed.data.intent === "yesterday_trip_summary" &&
+  // When the model returns a general day summary for a query that explicitly
+  // names one exact driver from the directory, preserve the driver filter.
+  const correctNamedDriverTrip =
     hasTripTerm &&
-    hasYesterdayTerm &&
-    exactDriverName !== null;
+    exactDriverName !== null &&
+    ((parsed.data.intent === "yesterday_trip_summary" && hasYesterdayTerm) ||
+      (parsed.data.intent === "today_trip_summary" && hasTodayTerm));
 
   return {
-    intent: correctNamedYesterdayTrip ? "driver_trip_summary" : parsed.data.intent,
+    intent: correctNamedDriverTrip ? "driver_trip_summary" : parsed.data.intent,
     product_query: productQuery,
-    driver_name: correctNamedYesterdayTrip
+    driver_name: correctNamedDriverTrip
       ? exactDriverName
       : parsed.data.driver_name?.normalize("NFKC").trim() || null,
-    yesterday: correctNamedYesterdayTrip ? true : parsed.data.yesterday,
+    yesterday: correctNamedDriverTrip
+      ? parsed.data.intent === "yesterday_trip_summary"
+      : parsed.data.yesterday,
     period: parsed.data.period,
     reply: parsed.data.reply?.normalize("NFKC").trim() || null,
   };
