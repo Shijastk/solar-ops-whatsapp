@@ -223,7 +223,7 @@ function explicitIntentFromKnownPhrases(
     /(?:ഉണ്ട്|ഉണ്ടോ|കാണിക്കൂ|കാണിക്കുക)/u.test(normalized);
   const englishStockList =
     /\b(?:show|list)\b/u.test(normalized) &&
-    /\b(?:our|the|current|available)?\s*stock\b/u.test(normalized);
+    /\b(?:stock list|stock inventory|stock balances|our stock|the stock we have|current stock|available stock)\b/u.test(normalized);
 
   if (manglishStockList || malayalamStockList || englishStockList) {
     return "stock_inventory_summary";
