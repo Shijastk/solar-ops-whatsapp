@@ -58,6 +58,18 @@ function mockSupabaseDirectory() {
         return { data: [], error: null };
       }
 
+      if (table === "ops_drivers" && state.selection === "id, name") {
+        // If fuzzy matching regresses, this synthetic directory would resolve
+        // "Majeed2" to Majeed and the safety assertion below would fail.
+        return {
+          data: [
+            { id: "synthetic-majeed-id", name: "Majeed" },
+            { id: "synthetic-rasheed-id", name: "Rasheed" },
+          ],
+          error: null,
+        };
+      }
+
       if (table === "delivery_trips") {
         return { data: [], error: null, count: 0 };
       }
