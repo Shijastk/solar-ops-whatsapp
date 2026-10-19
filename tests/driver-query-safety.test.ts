@@ -147,7 +147,13 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  const restore = (key: string, value: string | undefined) => {\n    if (value === undefined) delete process.env[key];\n    else process.env[key] = value;\n  };\n  restore("DOCUMENT_AUTOMATION_ENABLED", originalEnv.enabled);\n  restore("GROQ_API_KEY", originalEnv.key);\n  restore("GROQ_MODEL", originalEnv.model);
+  const restore = (key: string, value: string | undefined) => {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  };
+  restore("DOCUMENT_AUTOMATION_ENABLED", originalEnv.enabled);
+  restore("GROQ_API_KEY", originalEnv.key);
+  restore("GROQ_MODEL", originalEnv.model);
 });
 
 describe("named-driver response safety", () => {
