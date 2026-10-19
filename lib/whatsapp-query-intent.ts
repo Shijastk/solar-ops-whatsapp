@@ -256,7 +256,7 @@ export async function classifyOperationalQueryWithGroq(
   options: { driverNames?: string[] } = {},
 ): Promise<AiOperationalQueryClassification | null> {
   const env = getDocumentAutomationEnv();
-  if (!env.enabled || !env.apiKey) return null;
+  if (!env.apiKey) return null;
 
   const boundedText = text.normalize("NFKC").trim().slice(0, MAX_QUERY_CHARS);
   if (!boundedText) return null;
