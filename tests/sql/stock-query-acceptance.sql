@@ -9,8 +9,6 @@ declare
   v_company_unknown uuid := gen_random_uuid();
   v_product_known uuid := gen_random_uuid();
   v_product_unknown uuid := gen_random_uuid();
-  v_message uuid := gen_random_uuid();
-  v_draft uuid := gen_random_uuid();
   v_known record;
   v_unknown record;
 begin
@@ -26,20 +24,6 @@ begin
     (v_product_known, v_company_known, 'Synthetic 560 Wp Panel', 'synthetic 560 wp panel', 'NOS', 'NOS', true),
     (v_product_unknown, v_company_unknown, 'Synthetic 560 Wp Panel', 'synthetic 560 wp panel', 'PCS', 'PCS', true);
 
-  insert into public.whatsapp_messages
-    (id, whatsapp_message_id, sender_phone, message_type, processing_status)
-  values
-    (v_message, 'stock-query-acceptance:' || v_key, 'synthetic-stock-query', 'document', 'stored');
-
-  insert into public.document_drafts
-    (id, message_id, parser_version, parse_status, workflow_status,
-     verification_status, supplier_gstin, document_number, stock_company_id,
-     eway_bill_number, total_amount)
-  values
-    (v_draft, v_message, 'stock-query-acceptance', 'approved', 'recorded',
-     'manual_override', '32AAAAB1234C1Z5', 'STOCK-QUERY-' || v_key,
-     v_company_known, 'STOCK-QUERY-EWAY-' || v_key, 0);
-
   -- A positive opening plus a matching adjustment produces a known zero.
   insert into public.stock_ledger
     (product_id, movement_type, quantity_delta, idempotency_key)
@@ -47,9 +31,9 @@ begin
     (v_product_known, 'opening', 5, 'stock-query-opening:' || v_key);
 
   insert into public.stock_ledger
-    (product_id, draft_id, movement_type, quantity_delta, idempotency_key)
+    (product_id, movement_type, quantity_delta, idempotency_key)
   values
-    (v_product_known, v_draft, 'adjustment', -5, 'stock-query-adjustment:' || v_key);
+    (v_product_known, 'adjustment', -5, 'stock-query-adjustment:' || v_key);
 
   select * into v_known
   from public.stock_balances
