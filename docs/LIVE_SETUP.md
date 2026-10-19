@@ -290,7 +290,7 @@ Preferred login configuration:
 
 `OPS_ACCESS_KEY`
 
-If it is not configured, the prototype temporarily accepts the existing webhook verify token as the dashboard access key.
+This dedicated Vercel Production secret is required for `/ops` login. If missing or blank, dashboard login and session validation fail closed. Never reuse `WHATSAPP_VERIFY_TOKEN` or another provider credential for dashboard login.
 
 Available files are opened using a 5-minute signed Supabase URL generated only after server-side session validation.
 

@@ -1,9 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getWebhookEnv } from "../lib/env";
 import {
   createOpsSession,
   getOpsSessionExpiresAt,
   isSameOriginRequest,
   isValidOpsAccessKey,
+  opsSessionCookieOptions,
   verifyOpsSession,
 } from "../lib/ops-auth";
 
@@ -20,6 +22,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const [key, value] of Object.entries(originalValues)) {
     if (value === undefined) {
       delete process.env[key];
@@ -30,41 +33,64 @@ afterEach(() => {
 });
 
 describe("ops authentication", () => {
-  it("falls back to the existing webhook verify token when no dedicated key exists", () => {
-    expect(isValidOpsAccessKey("webhook-verify-key")).toBe(true);
-    expect(isValidOpsAccessKey("wrong-key")).toBe(false);
-  });
+  it("fails closed when the dedicated key is missing or blank", () => {
+    expect(isValidOpsAccessKey("webhook-verify-key")).toBe(false);
+    expect(isValidOpsAccessKey("")).toBe(false);
+    expect(verifyOpsSession("v1.1800000000000.invalid")).toBe(false);
+    expect(() => createOpsSession()).toThrow("Operations access key is not configured");
 
-  it("prefers a dedicated operations access key when configured", () => {
-    process.env.OPS_ACCESS_KEY = "dedicated-dashboard-key";
-
-    expect(isValidOpsAccessKey("dedicated-dashboard-key")).toBe(true);
+    process.env.OPS_ACCESS_KEY = "   ";
     expect(isValidOpsAccessKey("webhook-verify-key")).toBe(false);
   });
 
-  it("accepts a valid signed session before expiry", () => {
+  it("accepts only the dedicated operations key, never the webhook token", () => {
+    process.env.OPS_ACCESS_KEY = "dedicated-dashboard-key";
+
+    expect(isValidOpsAccessKey("dedicated-dashboard-key")).toBe(true);
+    expect(isValidOpsAccessKey("wrong-key")).toBe(false);
+    expect(isValidOpsAccessKey("webhook-verify-key")).toBe(false);
+  });
+
+  it("keeps webhook verification configuration independent of the dashboard key", () => {
+    expect(getWebhookEnv().WHATSAPP_VERIFY_TOKEN).toBe("webhook-verify-key");
+    expect(isValidOpsAccessKey("webhook-verify-key")).toBe(false);
+
+    process.env.OPS_ACCESS_KEY = "dedicated-dashboard-key";
+    expect(getWebhookEnv().WHATSAPP_VERIFY_TOKEN).toBe("webhook-verify-key");
+  });
+
+  it("creates and accepts a signed session only when the dedicated key is configured", () => {
+    process.env.OPS_ACCESS_KEY = "dedicated-dashboard-key";
     const now = 1_800_000_000_000;
     const session = createOpsSession(now, 60_000);
 
     expect(verifyOpsSession(session, now + 30_000)).toBe(true);
-  });
-
-  it("returns expiry only for a currently valid signed session", () => {
-    const now = 1_800_000_000_000;
-    const session = createOpsSession(now, 60_000);
-
     expect(getOpsSessionExpiresAt(session, now + 30_000)).toBe(now + 60_000);
-    expect(getOpsSessionExpiresAt(session, now + 60_001)).toBeNull();
+
+    delete process.env.OPS_ACCESS_KEY;
+    expect(verifyOpsSession(session, now + 30_000)).toBe(false);
+    expect(getOpsSessionExpiresAt(session, now + 30_000)).toBeNull();
   });
 
   it("rejects expired and tampered sessions", () => {
+    process.env.OPS_ACCESS_KEY = "dedicated-dashboard-key";
     const now = 1_800_000_000_000;
     const session = createOpsSession(now, 60_000);
 
     expect(verifyOpsSession(session, now + 60_001)).toBe(false);
-    expect(
-      verifyOpsSession(`${session.slice(0, -1)}0`, now + 30_000),
-    ).toBe(false);
+    expect(getOpsSessionExpiresAt(session, now + 60_001)).toBeNull();
+    expect(verifyOpsSession(`${session.slice(0, -1)}0`, now + 30_000)).toBe(false);
+  });
+
+  it("sets secure, HttpOnly, same-site session cookie attributes", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(opsSessionCookieOptions()).toMatchObject({
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      path: "/",
+      maxAge: 8 * 60 * 60,
+    });
   });
 
   it("accepts same-origin POST context from Origin or Referer", () => {
@@ -95,9 +121,7 @@ describe("ops authentication", () => {
     ).toBe(false);
 
     expect(
-      isSameOriginRequest(
-        new Request("https://ops.example.test/api/ops/logout"),
-      ),
+      isSameOriginRequest(new Request("https://ops.example.test/api/ops/logout")),
     ).toBe(false);
   });
 });

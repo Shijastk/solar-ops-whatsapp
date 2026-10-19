@@ -16,29 +16,32 @@ function safeEqual(left: string, right: string): boolean {
   return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-function getOpsAccessKey(): string {
-  const dedicated = process.env.OPS_ACCESS_KEY?.trim();
-  if (dedicated) {
-    return dedicated;
-  }
-
-  return getWebhookEnv().WHATSAPP_VERIFY_TOKEN;
+function getOpsAccessKey(): string | null {
+  const key = process.env.OPS_ACCESS_KEY?.trim();
+  return key || null;
 }
 
 function signSessionPayload(payload: string): string {
+  // Preserve the existing session-signing key so current sessions survive the
+  // rollout. OPS_ACCESS_KEY controls login eligibility, never the webhook token.
   return createHmac("sha256", getWebhookEnv().META_APP_SECRET)
     .update(payload, "utf8")
     .digest("hex");
 }
 
 export function isValidOpsAccessKey(value: string): boolean {
-  return safeEqual(value, getOpsAccessKey());
+  const expected = getOpsAccessKey();
+  return expected !== null && safeEqual(value, expected);
 }
 
 export function createOpsSession(
   now = Date.now(),
   durationMs = SESSION_DURATION_MS,
 ): string {
+  if (!getOpsAccessKey()) {
+    throw new Error("Operations access key is not configured");
+  }
+
   const expiresAt = now + durationMs;
   const payload = `${SESSION_VERSION}.${expiresAt}`;
   const signature = signSessionPayload(payload);
@@ -50,7 +53,7 @@ export function verifyOpsSession(
   session: string | undefined,
   now = Date.now(),
 ): boolean {
-  if (!session) {
+  if (!session || !getOpsAccessKey()) {
     return false;
   }
 

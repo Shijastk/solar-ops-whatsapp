@@ -201,10 +201,11 @@ Security:
 - private Supabase bucket remains private
 - file previews use a 5-minute signed URL generated server-side
 - raw files can be deleted manually without deleting the message row
-- `OPS_ACCESS_KEY` is the preferred login key
-- if `OPS_ACCESS_KEY` is not configured, the prototype temporarily falls back to `WHATSAPP_VERIFY_TOKEN`
+- `OPS_ACCESS_KEY` is required for `/ops` login and must be configured as a dedicated Vercel server-side secret.
+- If it is missing or blank, dashboard login and session validation fail closed.
+- It must never reuse `WHATSAPP_VERIFY_TOKEN`, `META_APP_SECRET`, or another provider credential.
 
-For broader production or the future mobile app, replace the fallback with dedicated user authentication.
+Dashboard access remains a single-operator shared-key prototype; use a dedicated user-authentication system before broader multi-user rollout.
 
 
 ## Deployment workflow

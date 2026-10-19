@@ -204,9 +204,9 @@ This is acceptable for the current low-cost prototype. If a strict deletion SLA 
 
 ## K019 - Dashboard bootstrap authentication should be replaced before broader production use
 
-The internal dashboard supports a dedicated `OPS_ACCESS_KEY`, but the current deployment can fall back to `WHATSAPP_VERIFY_TOKEN` so the prototype works without a new environment variable.
+The code change removes the fallback from `OPS_ACCESS_KEY` to `WHATSAPP_VERIFY_TOKEN`. Production metadata now shows a dedicated `OPS_ACCESS_KEY` exists for the Production target, but dashboard login has not yet been verified through an authorized browser session. Keep the operational agent disabled until dashboard access and controlled acceptance are confirmed.
 
-This is acceptable for the current single-operator verification prototype, but broader production or mobile use should move to dedicated user authentication (for example Supabase Auth) and remove the fallback.
+This remains a single-operator shared-key prototype; broader production or mobile use should move to dedicated user authentication (for example Supabase Auth).
 
 ## K020 - Human-visible signed preview needs one interactive verification
 
