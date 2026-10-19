@@ -16,8 +16,8 @@ vi.mock("@/lib/replies", () => ({
 import { handleFastWhatsAppQuery } from "../lib/whatsapp-queries";
 
 type StockFixture = {
-  products: Array<{ id: string }>;
-  aliases: Array<{ product_id: string }>;
+  products: Array<{ id: string; normalized_name: string; active: boolean }>;
+  aliases: Array<{ product_id: string; normalized_alias: string }>;
   balances: Array<{
     product_id: string;
     company_id: string;
@@ -54,16 +54,32 @@ describe("stock query database-to-reply integration", () => {
 
     getSupabaseAdminMock.mockReturnValue({
       from(table: string) {
+        const filters: Array<[string, unknown]> = [];
         const builder: Record<string, unknown> = {};
-        for (const method of ["select", "eq", "limit", "in", "order"]) {
-          builder[method] = () => builder;
-        }
+        builder.select = () => builder;
+        builder.eq = (column: string, value: unknown) => {
+          filters.push([column, value]);
+          return builder;
+        };
+        builder.in = (column: string, values: unknown[]) => {
+          filters.push([column, values]);
+          return builder;
+        };
+        builder.limit = () => builder;
+        builder.order = () => builder;
         builder.then = (resolve: (value: unknown) => unknown) => {
-          const data =
+          let data: Array<Record<string, unknown>> =
             table === "stock_products" ? fixture.products
               : table === "stock_product_aliases" ? fixture.aliases
                 : table === "stock_balances" ? fixture.balances
                   : [];
+          for (const [column, value] of filters) {
+            if (column === "product_id" && Array.isArray(value)) {
+              data = data.filter((row) => value.includes(row[column]));
+            } else {
+              data = data.filter((row) => row[column] === value);
+            }
+          }
           return Promise.resolve(resolve({ data, error: null }));
         };
         return builder;
@@ -81,7 +97,11 @@ describe("stock query database-to-reply integration", () => {
   });
 
   it("returns the exact product, company, unit, and a known zero balance", async () => {
-    fixture.products = [{ id: "product-zero" }];
+    fixture.products = [{
+      id: "product-zero",
+      normalized_name: "emmvee 560 wp topcon dcr panel",
+      active: true,
+    }];
     fixture.balances = [{
       product_id: "product-zero",
       company_id: "company-a",
@@ -108,7 +128,11 @@ describe("stock query database-to-reply integration", () => {
   });
 
   it("does not turn an unknown balance into a zero balance", async () => {
-    fixture.products = [{ id: "product-unknown" }];
+    fixture.products = [{
+      id: "product-unknown",
+      normalized_name: "emmvee 560 wp topcon dcr panel",
+      active: true,
+    }];
     fixture.balances = [{
       product_id: "product-unknown",
       company_id: "company-a",
@@ -130,7 +154,18 @@ describe("stock query database-to-reply integration", () => {
   });
 
   it("shows every company match rather than guessing when a product name is ambiguous", async () => {
-    fixture.products = [{ id: "product-a" }, { id: "product-b" }];
+    fixture.products = [
+      {
+        id: "product-a",
+        normalized_name: "emmvee 560 wp topcon dcr panel",
+        active: true,
+      },
+      {
+        id: "product-b",
+        normalized_name: "emmvee 560 wp topcon dcr panel",
+        active: true,
+      },
+    ];
     fixture.balances = [
       {
         product_id: "product-a",
