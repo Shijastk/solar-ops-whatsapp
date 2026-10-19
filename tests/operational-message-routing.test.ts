@@ -83,6 +83,31 @@ describe("shared operational text routing", () => {
     );
   });
 
+  it("records stage timings without logging message content", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await routeOperationalTextMessage(message, "stored-message");
+
+    expect(info).toHaveBeenCalledWith(
+      "WhatsApp operational routing completed",
+      expect.objectContaining({
+        durationMs: expect.any(Number),
+        stageDurationsMs: expect.objectContaining({
+          driver: expect.any(Number),
+          stock: expect.any(Number),
+          trip: expect.any(Number),
+          document_query: expect.any(Number),
+        }),
+        messageType: "text",
+        fromVoice: false,
+        outcome: "handled",
+      }),
+    );
+    const payload = info.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("textBody");
+    expect(payload).not.toHaveProperty("message");
+  });
+
   it("preserves voice context while using the same handler sequence", async () => {
     await expect(
       routeOperationalTextMessage(message, "stored-message", {

@@ -11,22 +11,62 @@ export async function routeOperationalTextMessage(
   storedMessageId: string,
   options: { fromVoice?: boolean } = {},
 ): Promise<WorkflowResult> {
-  let result = await handleDriverMutation(message, storedMessageId);
+  const startedAt = performance.now();
+  const stageDurationsMs: Record<string, number> = {};
+  let outcome: WorkflowResult | "failed" = "failed";
 
-  if (result === "ignored") {
-    result = await handleStockWorkflowInbound(message, storedMessageId);
-  }
+  const runStage = async (
+    stage: string,
+    action: () => Promise<WorkflowResult>,
+  ): Promise<WorkflowResult> => {
+    const stageStartedAt = performance.now();
+    try {
+      return await action();
+    } finally {
+      stageDurationsMs[stage] = Math.round(performance.now() - stageStartedAt);
+    }
+  };
 
-  if (result === "ignored") {
-    result = await handleTripWorkflowInbound(message, storedMessageId);
-  }
+  try {
+    let result = await runStage("driver", () =>
+      handleDriverMutation(message, storedMessageId),
+    );
+    if (result === "handled") {
+      outcome = result;
+      return result;
+    }
 
-  if (result === "ignored") {
-    result = await handleDocumentWorkflowInbound(message, storedMessageId, {
-      ...options,
-      skipOperationalWorkflows: true,
+    result = await runStage("stock", () =>
+      handleStockWorkflowInbound(message, storedMessageId),
+    );
+    if (result === "handled") {
+      outcome = result;
+      return result;
+    }
+
+    result = await runStage("trip", () =>
+      handleTripWorkflowInbound(message, storedMessageId),
+    );
+    if (result === "handled") {
+      outcome = result;
+      return result;
+    }
+
+    result = await runStage("document_query", () =>
+      handleDocumentWorkflowInbound(message, storedMessageId, {
+        ...options,
+        skipOperationalWorkflows: true,
+      }),
+    );
+    outcome = result;
+    return result;
+  } finally {
+    console.info("WhatsApp operational routing completed", {
+      durationMs: Math.round(performance.now() - startedAt),
+      stageDurationsMs,
+      messageType: message.type,
+      fromVoice: options.fromVoice === true,
+      outcome,
     });
   }
-
-  return result;
 }
