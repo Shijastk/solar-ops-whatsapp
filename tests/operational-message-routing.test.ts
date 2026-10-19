@@ -7,7 +7,10 @@ const state = vi.hoisted(() => ({
   stock: vi.fn(),
   trip: vi.fn(),
   document: vi.fn(),
+  agentEnabled: vi.fn(),
 }));
+
+vi.mock("@/lib/agent-settings", () => ({ getAgentEnabled: state.agentEnabled }));
 
 vi.mock("@/lib/driver-agent", () => ({
   handleDriverMutation: state.driver,
@@ -34,6 +37,7 @@ const message = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  state.agentEnabled.mockResolvedValue(true);
   state.calls = [];
   state.driver.mockImplementation(async () => {
     state.calls.push("driver");
@@ -81,6 +85,20 @@ describe("shared operational text routing", () => {
       "stored-message",
       { skipOperationalWorkflows: true },
     );
+  });
+
+  it("does not invoke operational handlers when the central agent is disabled", async () => {
+    state.agentEnabled.mockResolvedValue(false);
+
+    await expect(
+      routeOperationalTextMessage(message, "stored-message"),
+    ).resolves.toBe("disabled");
+
+    expect(state.calls).toEqual([]);
+    expect(state.driver).not.toHaveBeenCalled();
+    expect(state.stock).not.toHaveBeenCalled();
+    expect(state.trip).not.toHaveBeenCalled();
+    expect(state.document).not.toHaveBeenCalled();
   });
 
   it("records stage timings without logging message content", async () => {
