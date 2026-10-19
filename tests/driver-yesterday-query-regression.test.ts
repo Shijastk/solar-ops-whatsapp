@@ -45,9 +45,19 @@ describe("driver/date query end-to-end dispatch", () => {
           };
         }
         builder.then = (resolve: (value: unknown) => unknown) => {
-          let data: unknown[] = [];
+          let data: Array<Record<string, unknown>> = [];
           if (table === "ops_drivers") {
-            data = [{ id: "driver-rasheed", name: "Rasheed" }, { id: "driver-majeed", name: "Majeed" }];
+            data = [
+              { id: "driver-rasheed", name: "Rasheed", normalized_name: "rasheed" },
+              { id: "driver-majeed", name: "Majeed", normalized_name: "majeed" },
+              { id: "driver-rasheed-k", name: "Rasheed K", normalized_name: "rasheed k" },
+            ];
+            const exactNameFilter = call.filters.find(
+              ([method, column]) => method === "eq" && column === "normalized_name",
+            );
+            if (exactNameFilter) {
+              data = data.filter((row) => row.normalized_name === exactNameFilter[2]);
+            }
           } else if (table === "delivery_trips") {
             data = [{
               display_name: "Solar delivery",
