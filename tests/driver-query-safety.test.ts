@@ -65,8 +65,7 @@ function mockSupabaseDirectory() {
       return { data: [], error: null, count: 0 };
     };
 
-    let query: QueryBuilder;
-    query = {
+    const query: QueryBuilder = {
       select(selection: string) {
         state.selection = selection;
         return query;
@@ -75,16 +74,16 @@ function mockSupabaseDirectory() {
         state.filters.push([column, value]);
         return query;
       },
-      gte(..._args: unknown[]) {
+      gte() {
         return query;
       },
-      lt(..._args: unknown[]) {
+      lt() {
         return query;
       },
-      order(..._args: unknown[]) {
+      order() {
         return query;
       },
-      limit(_count: number) {
+      limit() {
         return Promise.resolve(result());
       },
       then<TResult1 = QueryResult, TResult2 = never>(
