@@ -552,8 +552,8 @@ describe("WhatsApp AI intent fallback", () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
 
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
+    const fetchMock = vi.fn().mockImplementation(
+      () => new Response(
         JSON.stringify({
           choices: [{
             message: {
