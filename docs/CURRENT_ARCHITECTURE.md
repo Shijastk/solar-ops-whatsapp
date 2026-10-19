@@ -273,8 +273,8 @@ A mobile-first internal verification UI is implemented at:
 `lib/ops-auth.ts` provides:
 
 - timing-safe access-key comparison
-- optional dedicated `OPS_ACCESS_KEY`
-- temporary fallback to `WHATSAPP_VERIFY_TOKEN` when no dedicated dashboard key is configured
+- required dedicated `OPS_ACCESS_KEY` for dashboard login
+- missing/blank dashboard key fails closed; no fallback to webhook verification credentials
 - HMAC-signed, expiring session cookies using the existing server-side Meta app secret
 - HttpOnly + SameSite=Strict cookie settings
 - same-origin validation for state-changing POST requests
