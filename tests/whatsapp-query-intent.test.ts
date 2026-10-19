@@ -310,6 +310,67 @@ describe("WhatsApp AI intent fallback", () => {
     });
   });
 
+  it("preserves Majeed, rejects unknown named drivers, and keeps general counts general", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const generalYesterdayResponse = () =>
+      new Response(
+        JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                intent: "yesterday_trip_summary",
+                product_query: null,
+                driver_name: null,
+                yesterday: true,
+                period: null,
+                reply: null,
+              }),
+            },
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const fetchMock = vi.fn().mockImplementation(generalYesterdayResponse);
+    vi.stubGlobal("fetch", fetchMock);
+    const options = { driverNames: ["abdulla", "Majeed", "rasheed"] };
+
+    await expect(
+      classifyOperationalQueryWithGroq("Majeed innale ethra trip poyi?", options),
+    ).resolves.toMatchObject({
+      intent: "driver_trip_summary",
+      driver_name: "Majeed",
+      yesterday: true,
+    });
+
+    await expect(
+      classifyOperationalQueryWithGroq("UnknownTestDriver innale ethra trip poyi?", options),
+    ).resolves.toMatchObject({
+      intent: "unsupported",
+      driver_name: null,
+      yesterday: false,
+      reply: expect.stringContaining("Driver directory"),
+    });
+
+    await expect(
+      classifyOperationalQueryWithGroq("How many trips did UnknownTestDriver make yesterday?", options),
+    ).resolves.toMatchObject({
+      intent: "unsupported",
+      driver_name: null,
+      yesterday: false,
+      reply: expect.stringContaining("Driver directory"),
+    });
+
+    await expect(
+      classifyOperationalQueryWithGroq("Innale ethra trips dispatch cheythu?", options),
+    ).resolves.toMatchObject({
+      intent: "yesterday_trip_summary",
+      driver_name: null,
+      yesterday: true,
+    });
+  });
+
   it("does not infer a named driver from a partial directory-name match", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
