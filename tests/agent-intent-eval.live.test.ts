@@ -16,6 +16,7 @@ const cases: Array<{
   { id: "company-name-with-question", input: "Savtr Solar enna company ninakkariyamo?", expected: "company_directory" },
   { id: "company-name-alone", input: "Savtr Solar", expected: "company_directory" },
   { id: "company-products-available", input: "Savitr Solar products ethra available", expected: "company_directory" },
+  { id: "company-stock-query-manglish", input: "savitr solar stock ethra und?", expected: "company_directory" },
   { id: "stock-summary-en", input: "show me the stock we have", expected: "stock_inventory_summary" },
   { id: "stock-summary-ml", input: "നമ്മുടെ സ്റ്റോക്ക് ലിസ്റ്റ് കാണിക്കൂ", expected: "stock_inventory_summary" },
   { id: "driver-count-ml", input: "എത്ര ഡ്രൈവർമാരുണ്ട്?", expected: "driver_count" },

@@ -13,6 +13,20 @@ vi.mock("@/lib/replies", () => ({
   sendOpsReply: sendOpsReplyMock,
 }));
 
+vi.mock("@/lib/whatsapp-query-intent", () => ({
+  classifyOperationalQueryWithGroq: async (text: string) => ({
+    intent: "stock_balance",
+    product_query: text.toLowerCase().includes("unknown")
+      ? "Unknown 999 product"
+      : "Emmvee 560 Wp TOPCON DCR Panel",
+    company_name: null,
+    driver_name: null,
+    yesterday: false,
+    period: null,
+    reply: null,
+  }),
+}));
+
 import { handleFastWhatsAppQuery } from "../lib/whatsapp-queries";
 
 type StockFixture = {

@@ -15,8 +15,21 @@ vi.mock("@/lib/replies", () => ({
   sendOpsReply: state.sendOpsReply,
 }));
 vi.mock("@/lib/whatsapp-query-intent", () => ({
-  classifyOperationalQueryWithGroq: vi.fn().mockResolvedValue(null),
-  looksLikeOperationalQuery: vi.fn().mockReturnValue(true),
+  classifyOperationalQueryWithGroq: vi.fn(async (text: string) => {
+    const normalized = text.toLocaleLowerCase("en");
+    const destination = normalized.includes("kottakkal") ? "kottakkal"
+      : normalized.includes("tirur") ? "tirur" : null;
+    return {
+      intent: destination ? "trip_filter_summary" : "trip_filter_summary",
+      product_query: null,
+      driver_name: null,
+      yesterday: /yesterday|innale|ഇന്നലെ/u.test(normalized),
+      period: null,
+      reply: null,
+      filter_by: destination ? "destination" : "vehicle",
+      filter_value: destination ?? "KL11AA1234",
+    };
+  }),
 }));
 
 import { handleFastWhatsAppQuery } from "@/lib/whatsapp-queries";

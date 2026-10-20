@@ -2,199 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   filterSafeFuzzyStockCandidates,
   formatStockInventorySummary,
-  isDriverRelatedQuestion,
   indiaDayBounds,
   mapAiClassificationToFastQuery,
   opsPeriodBounds,
-  parseFastWhatsAppQuery,
   scoreCompanyNameMatch,
 } from "../lib/whatsapp-queries";
 
-describe("fast WhatsApp operational query parsing", () => {
-  it("recognizes bounded bill-count intents without AI", () => {
-    expect(parseFastWhatsAppQuery("ഇന്ന് എത്ര ബിൽ വന്നു?")).toEqual({
-      type: "today_bill_count",
-    });
-    expect(parseFastWhatsAppQuery("today bill count")).toEqual({
-      type: "today_bill_count",
-    });
-    expect(parseFastWhatsAppQuery("pending bill ethra")).toEqual({
-      type: "pending_bill_count",
-    });
-    expect(parseFastWhatsAppQuery("How many bills need checking?")).toEqual({
-      type: "pending_bill_count",
-    });
-    expect(parseFastWhatsAppQuery("ഇന്ന് എത്ര ബില്ലുകൾ ചെക്ക് ചെയ്യണം?")).toEqual({
-      type: "pending_bill_count",
-    });
-    expect(parseFastWhatsAppQuery("latest bill")).toEqual({
-      type: "latest_bill",
-    });
-    expect(parseFastWhatsAppQuery("ഇന്നത്തെ trip ഏതാണ്?")).toEqual({
-      type: "today_trip_summary",
-    });
-    expect(parseFastWhatsAppQuery("latest trip")).toEqual({
-      type: "latest_trip",
-    });
-    expect(parseFastWhatsAppQuery("eethellam company ippol available aanu")).toEqual({
-      type: "company_directory",
-      companyName: null,
-      includeProducts: false,
-    });
-    expect(parseFastWhatsAppQuery("Savtr Solar enna company ninakkariyamo")).toEqual({
-      type: "company_directory",
-      companyName: "Savtr Solar",
-      includeProducts: false,
-    });
-    expect(parseFastWhatsAppQuery("Savitr Solar products ethra available")).toEqual({
-      type: "company_directory",
-      companyName: "Savitr Solar",
-      includeProducts: true,
-    });
-    expect(scoreCompanyNameMatch("Savtr Solar", "SAVITR SOLAR SOLUTIONS LIMITED")).toBeGreaterThanOrEqual(0.62);
-    expect(scoreCompanyNameMatch("Nexon", "NEXON SOLAR LIMITED")).toBeGreaterThanOrEqual(0.62);
-    expect(
-      parseFastWhatsAppQuery("Innu poya products eethellam aanu"),
-    ).toEqual({ type: "today_products_summary" });
-    expect(
-      parseFastWhatsAppQuery("What products went out today?"),
-    ).toEqual({ type: "today_products_summary" });
-    expect(parseFastWhatsAppQuery("ഇന്ന് എത്ര പ്രൊഡക്റ്റുകൾ പോയി?")).toEqual({
-      type: "today_products_summary",
-    });
-    expect(parseFastWhatsAppQuery("Inn ethra stock despatch aayi")).toEqual({
-      type: "today_products_summary",
-    });
-    expect(parseFastWhatsAppQuery("Innale ethra products poyi")).toEqual({
-      type: "yesterday_products_summary",
-    });
-    expect(parseFastWhatsAppQuery("ഇന്നലെ എത്ര പ്രൊഡക്റ്റുകൾ പോയി?")).toEqual({
-      type: "yesterday_products_summary",
-    });
-    expect(parseFastWhatsAppQuery("Yesterday how much trip")).toEqual({
-      type: "yesterday_trip_summary",
-    });
-    expect(parseFastWhatsAppQuery("today driver Rasheed trips")).toBeNull();
-    expect(parseFastWhatsAppQuery("ഈ മാസം summary")).toEqual({
-      type: "ops_period_summary",
-      period: "this_month",
-    });
-    expect(parseFastWhatsAppQuery("last year summary")).toEqual({
-      type: "ops_period_summary",
-      period: "last_year",
-    });
-  });
-
-  it("parses exact vehicle and destination trip filters without intercepting trip creation", () => {
-    expect(parseFastWhatsAppQuery("KL 11 AA 1234 trips today")).toEqual({
-      type: "trip_filter_summary",
-      filterBy: "vehicle",
-      filterValue: "KL11AA1234",
-      yesterday: false,
-    });
-    expect(parseFastWhatsAppQuery("KL11AA1234 innale ethra trip poyi")).toEqual({
-      type: "trip_filter_summary",
-      filterBy: "vehicle",
-      filterValue: "KL11AA1234",
-      yesterday: true,
-    });
-    expect(parseFastWhatsAppQuery("How many trips to Tirur today")).toEqual({
-      type: "trip_filter_summary",
-      filterBy: "destination",
-      filterValue: "tirur",
-      yesterday: false,
-    });
-    expect(parseFastWhatsAppQuery("show trips to Kottakkal yesterday")).toEqual({
-      type: "trip_filter_summary",
-      filterBy: "destination",
-      filterValue: "kottakkal",
-      yesterday: true,
-    });
-    expect(parseFastWhatsAppQuery("new trip to Tirur")).toBeNull();
-    expect(parseFastWhatsAppQuery("new trip KL11AA1234")).toBeNull();
-  });
-
-  it("routes named-driver trip queries to semantic classification rather than a general trip count", () => {
-    expect(parseFastWhatsAppQuery("റഷീദ് എന്ന ഡ്രൈവർ ഇന്ന് എത്ര ട്രിപ്പ് പോയിട്ടുണ്ട്?")).toBeNull();
-    expect(parseFastWhatsAppQuery("ഡ്രൈവർ റഷീദിന് എത്ര ട്രിപ്പ്?")).toBeNull();
-    expect(parseFastWhatsAppQuery("ഇന്നലെ രാത്രി പോയ ഡ്രൈവർ റഷീദ് ആയിരുന്നോ?")).toBeNull();
-    expect(parseFastWhatsAppQuery("എത്ര ഡ്രൈവർമാരുണ്ട്?")).toBeNull();
-    expect(parseFastWhatsAppQuery("Rasheed innale ethra trip poyi?")).toBeNull();
-    expect(parseFastWhatsAppQuery("Majeed innale ethra trip poyi?")).toBeNull();
-    expect(parseFastWhatsAppQuery("UnknownTestDriver innale ethra trip poyi?")).toBeNull();
-    expect(parseFastWhatsAppQuery("How many trips did Majeed make yesterday?")).toBeNull();
-    expect(parseFastWhatsAppQuery("Innale ethra trips dispatch cheythu?")).toEqual({
-      type: "yesterday_trip_summary",
-    });
-  });
-
-  it("detects named-driver trip questions without hardcoding a specific driver", () => {
-    expect(isDriverRelatedQuestion("Innu poya driver Rasheed ariyamo?")).toBe(true);
-    expect(isDriverRelatedQuestion("ഇന്ന് പോയത് ഡ്രൈവർ റഷീദായിരുന്നു")).toBe(true);
-    expect(isDriverRelatedQuestion("Rasheed innale ethra trip poyi?")).toBe(true);
-    expect(isDriverRelatedQuestion("Majeed innale ethra trip poyi?")).toBe(true);
-    expect(isDriverRelatedQuestion("UnknownTestDriver innale ethra trip poyi?")).toBe(true);
-    expect(isDriverRelatedQuestion("Innale ethra trips dispatch cheythu?")).toBe(false);
-    expect(isDriverRelatedQuestion("How many trips did Majeed make yesterday?")).toBe(true);
-    expect(isDriverRelatedQuestion("Majeedinte aake trip list cheyyamo")).toBe(true);
-    expect(isDriverRelatedQuestion("How many trips did we make yesterday?")).toBe(false);
-    expect(isDriverRelatedQuestion("latest bill")).toBe(false);
-  });
-
-  it("extracts the product phrase from Malayalam and Manglish stock questions", () => {
-    expect(
-      parseFastWhatsAppQuery("Emmvee 560 Wp Topcon Dcr Panel സ്റ്റോക്ക് എത്ര?"),
-    ).toEqual({
-      type: "stock_balance",
-      productQuery: "Emmvee 560 Wp Topcon Dcr Panel",
-    });
-
-    expect(parseFastWhatsAppQuery("Solar 560 panel stock ethra")).toEqual({
-      type: "stock_balance",
-      productQuery: "Solar 560 panel",
-    });
-
-    expect(parseFastWhatsAppQuery("Emvee 560 panel stock undu")).toEqual({
-      type: "stock_balance",
-      productQuery: "Emvee 560 panel",
-    });
-    expect(parseFastWhatsAppQuery("Emvee 560 panel stock undo")).toEqual({
-      type: "stock_balance",
-      productQuery: "Emvee 560 panel",
-    });
-  });
-
-  it("recognizes broad stock inventory list requests without guessing a product", () => {
-    expect(parseFastWhatsAppQuery("show all stock")).toEqual({
-      type: "stock_inventory_summary",
-    });
-    expect(parseFastWhatsAppQuery("stock list kaanikku")).toEqual({
-      type: "stock_inventory_summary",
-    });
-    expect(parseFastWhatsAppQuery("എല്ലാ സ്റ്റോക്കും കാണിക്കൂ")).toEqual({
-      type: "stock_inventory_summary",
-    });
-    expect(parseFastWhatsAppQuery("Which products are in stock?")).toEqual({
-      type: "stock_inventory_summary",
-    });
-    expect(parseFastWhatsAppQuery("Stockil ippo ethokke products undu?")).toEqual({
-      type: "stock_inventory_summary",
-    });
-    expect(parseFastWhatsAppQuery("സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്")).toEqual({
-      type: "stock_inventory_summary",
-    });
-    expect(parseFastWhatsAppQuery("Emmvee 560 panel stock ethra")).toEqual({
-      type: "stock_balance",
-      productQuery: "Emmvee 560 panel",
-    });
-  });
-
-  it("asks for a product instead of guessing when a stock question is incomplete", () => {
-    expect(parseFastWhatsAppQuery("സ്റ്റോക്ക് എത്ര?")).toEqual({
-      type: "stock_product_required",
-    });
-  });
-
+describe("typed operational query helpers", () => {
   it("formats live stock rows without inventing unknown counts and caps the reply", () => {
     expect(
       formatStockInventorySummary([
@@ -249,7 +63,7 @@ describe("fast WhatsApp operational query parsing", () => {
         period: null,
         reply: null,
       }),
-    ).toEqual({ type: "company_directory", companyName: null });
+    ).toEqual({ type: "company_directory", companyName: null, includeProducts: false });
   });
 
   it("maps all-time driver trip list classifications to a typed read query", () => {
@@ -276,12 +90,6 @@ describe("fast WhatsApp operational query parsing", () => {
         reply: null,
       }),
     ).toBeNull();
-  });
-
-  it("does not intercept arbitrary text or correction-only values", () => {
-    expect(parseFastWhatsAppQuery("Hello")).toBeNull();
-    expect(parseFastWhatsAppQuery("8")).toBeNull();
-    expect(parseFastWhatsAppQuery("KL55AF7615")).toBeNull();
   });
 
   it("calculates the current India day without depending on server timezone", () => {

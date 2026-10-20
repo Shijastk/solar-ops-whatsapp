@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  classifyOperationalQueryWithGroq,
-  looksLikeOperationalQuery,
-} from "../lib/whatsapp-query-intent";
+import { classifyOperationalQueryWithGroq } from "../lib/whatsapp-query-intent";
 
 const originalEnv = {
   enabled: process.env.DOCUMENT_AUTOMATION_ENABLED,
@@ -54,10 +51,6 @@ describe("WhatsApp AI intent fallback", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    expect(looksLikeOperationalQuery("Hello, എങ്ങനെയുണ്ട്?")).toBe(false);
-    expect(looksLikeOperationalQuery("ഇന്നത്തെ trip details എന്താണ്?")).toBe(true);
-    expect(looksLikeOperationalQuery("ഈ മാസം summary")).toBe(true);
-    expect(looksLikeOperationalQuery("Innu poya products eethellam aanu")).toBe(true);
     await expect(
       classifyOperationalQueryWithGroq("Hello, എങ്ങനെയുണ്ട്?"),
     ).resolves.toEqual({
@@ -96,14 +89,13 @@ describe("WhatsApp AI intent fallback", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    expect(looksLikeOperationalQuery("Savtr Solar")).toBe(true);
     await expect(classifyOperationalQueryWithGroq("Savtr Solar")).resolves.toMatchObject({
       intent: "company_directory",
       product_query: "Savtr Solar",
     });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(String(init.body));
-    expect(body.messages[0].content).toContain("copy only that company name into product_query");
+    expect(body.messages[0].content).toContain("For company_directory, copy only the company name into product_query");
   });
 
   it("sends only bounded user text for unresolved operational intent classification", async () => {
@@ -200,7 +192,7 @@ describe("WhatsApp AI intent fallback", () => {
     expect(body.messages[1].content.length).toBe(500);
   });
 
-  it("resolves Manglish possessive driver names and all-time trip-list wording", async () => {
+  it("uses the canonical driver entity and semantic all-time trip-list intent", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
 
@@ -211,9 +203,9 @@ describe("WhatsApp AI intent fallback", () => {
             {
               message: {
                 content: JSON.stringify({
-                  intent: "driver_trip_summary",
+                  intent: "driver_trip_list",
                   product_query: null,
-                  driver_name: "Majeedinte",
+                  driver_name: "Majeed",
                   yesterday: false,
                   period: null,
                   reply: null,
@@ -269,7 +261,7 @@ describe("WhatsApp AI intent fallback", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      classifyOperationalQueryWithGroq("Rasheed innale ethra trip poyi?"),
+      classifyOperationalQueryWithGroq("Rasheed innale ethra trip poyi?", { driverNames: ["Rasheed", "Majeed"] }),
     ).resolves.toEqual({
       intent: "driver_trip_summary",
       product_query: null,
@@ -280,7 +272,7 @@ describe("WhatsApp AI intent fallback", () => {
     });
   });
 
-  it("deterministically resolves an exact named driver when AI returns a general yesterday trip intent", async () => {
+  it("uses the model-extracted driver entity when intent is initially a general yesterday summary", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
 
@@ -292,7 +284,7 @@ describe("WhatsApp AI intent fallback", () => {
               content: JSON.stringify({
                 intent: "yesterday_trip_summary",
                 product_query: null,
-                driver_name: null,
+                driver_name: "Rasheed",
                 yesterday: true,
                 period: null,
                 reply: null,
@@ -316,7 +308,7 @@ describe("WhatsApp AI intent fallback", () => {
     });
   });
 
-  it("deterministically resolves an exact named driver when AI returns a general today trip intent", async () => {
+  it("uses the model-extracted driver entity when intent is initially a general today summary", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
 
@@ -328,7 +320,7 @@ describe("WhatsApp AI intent fallback", () => {
               content: JSON.stringify({
                 intent: "today_trip_summary",
                 product_query: null,
-                driver_name: null,
+                driver_name: "Rasheed",
                 yesterday: false,
                 period: null,
                 reply: null,
@@ -352,7 +344,7 @@ describe("WhatsApp AI intent fallback", () => {
     });
   });
 
-  it("deterministically resolves an exact named driver when AI returns a general yesterday trip intent", async () => {
+  it("uses the model-extracted driver entity when intent is initially a general yesterday summary", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
 
@@ -364,7 +356,7 @@ describe("WhatsApp AI intent fallback", () => {
               content: JSON.stringify({
                 intent: "yesterday_trip_summary",
                 product_query: null,
-                driver_name: null,
+                driver_name: "Rasheed",
                 yesterday: true,
                 period: null,
                 reply: null,
@@ -392,16 +384,22 @@ describe("WhatsApp AI intent fallback", () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
 
-    const generalYesterdayResponse = () =>
-      new Response(
+    const generalYesterdayResponse = (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body)) as { messages: Array<{ content: string }> };
+      const userQuery = body.messages[1]?.content ?? "";
+      const requestedDriver = userQuery.includes("UnknownTestDriver")
+        ? "UnknownTestDriver"
+        : userQuery.includes("Majeed") ? "Majeed" : null;
+      const yesterday = !userQuery.includes("Majeed ethra trip");
+      return new Response(
         JSON.stringify({
           choices: [{
             message: {
               content: JSON.stringify({
                 intent: "yesterday_trip_summary",
                 product_query: null,
-                driver_name: null,
-                yesterday: true,
+                driver_name: requestedDriver,
+                yesterday,
                 period: null,
                 reply: null,
               }),
@@ -410,6 +408,7 @@ describe("WhatsApp AI intent fallback", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
+    };
     const fetchMock = vi.fn().mockImplementation(generalYesterdayResponse);
     vi.stubGlobal("fetch", fetchMock);
     const options = { driverNames: ["abdulla", "Majeed", "rasheed"] };
@@ -478,7 +477,7 @@ describe("WhatsApp AI intent fallback", () => {
               content: JSON.stringify({
                 intent: "today_trip_summary",
                 product_query: null,
-                driver_name: null,
+                driver_name: "Rasheed",
                 yesterday: false,
                 period: null,
                 reply: null,
@@ -626,7 +625,7 @@ describe("WhatsApp AI intent fallback", () => {
     );
   });
 
-  it("overrides unsupported model output for explicit driver-count and multilingual stock-list phrases", async () => {
+  it("preserves the semantic model result instead of overriding it with phrase rules", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
 
@@ -657,16 +656,13 @@ describe("WhatsApp AI intent fallback", () => {
       "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്.",
       "നമ്മുടെ സ്റ്റോക്ക് ലിസ്റ്റ് കാണിക്കൂ",
     ]) {
-      const expectedIntent = input === "active drivers count"
-        ? "driver_count"
-        : "stock_inventory_summary";
       await expect(classifyOperationalQueryWithGroq(input)).resolves.toEqual({
-        intent: expectedIntent,
+        intent: "unsupported",
         product_query: null,
         driver_name: null,
         yesterday: false,
         period: null,
-        reply: null,
+        reply: "Please clarify your request.",
       });
     }
     expect(fetchMock).toHaveBeenCalledTimes(4);
@@ -700,7 +696,7 @@ describe("WhatsApp AI intent fallback", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      classifyOperationalQueryWithGroq("Please open a new trip with Rasheed"),
+      classifyOperationalQueryWithGroq("Please open a new trip with Rasheed", { driverNames: ["Rasheed"] }),
     ).resolves.toEqual({
       intent: "start_trip",
       product_query: null,

@@ -3,15 +3,12 @@ import { deterministicUuid } from "@/lib/idempotency";
 import { isPricingQuestion, pricingPolicyReply } from "@/lib/pricing-policy";
 import {
   classifyOperationalQueryWithGroq,
-  looksLikeOperationalQuery,
   type AiOperationalQueryClassification,
 } from "@/lib/whatsapp-query-intent";
 import { sendOpsReply } from "@/lib/replies";
 import {
-  fixedOperationalFallback,
   voiceQueryClarification,
   fixedUniversalFallback,
-  generateUniversalWhatsAppReply,
 } from "@/lib/whatsapp-fallback";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
@@ -33,7 +30,7 @@ export type FastWhatsAppQuery =
   | { type: "today_bill_count" }
   | { type: "pending_bill_count" }
   | { type: "latest_bill" }
-  | { type: "stock_balance"; productQuery: string }
+  | { type: "stock_balance"; productQuery: string; companyName?: string }
   | { type: "stock_inventory_summary" }
   | { type: "company_directory"; companyName: string | null; includeProducts?: boolean }
   | { type: "stock_product_required" }
@@ -47,217 +44,6 @@ export type FastWhatsAppQuery =
   | { type: "yesterday_products_summary" }
   | { type: "latest_trip" }
   | { type: "ops_period_summary"; period: OpsPeriod };
-
-const BILL_TERMS = [
-  "bill",
-  "bills",
-  "invoice",
-  "invoices",
-  "ബിൽ",
-  "ബില്ല്",
-  "ബില്ലുകൾ",
-];
-
-const COUNT_TERMS = [
-  "count",
-  "how many",
-  "number",
-  "ethra",
-  "എത്ര",
-  "എണ്ണം",
-];
-
-const TODAY_TERMS = [
-  "today",
-  "innu",
-  "innathe",
-  "inn",
-  "ഇന്ന്",
-  "ഇന്നത്തെ",
-];
-
-const YESTERDAY_TERMS = ["yesterday", "innale", "ഇന്നലെ", "കഴിഞ്ഞ ദിവസം"];
-
-const PENDING_TERMS = [
-  "pending",
-  "review",
-  "pendingulla",
-  "പെൻഡിങ്",
-  "പെൻഡിംഗ്",
-  "പരിശോധിക്കാനുള്ള",
-  "കാത്തിരിക്കുന്ന",
-  "needs checking",
-  "need checking",
-  "check needed",
-  "to check",
-  "check cheyyan",
-  "check cheyyanam",
-  "verify",
-  "verification",
-  "ചെക്ക് ചെയ്യാനുള്ള",
-  "ചെക്ക് ചെയ്യണം",
-  "പരിശോധിക്കണം",
-  "പരിശോധിക്കേണ്ട",
-  "വെരിഫൈ",
-];
-
-const LATEST_TERMS = [
-  "latest",
-  "last bill",
-  "recent bill",
-  "avasana",
-  "അവസാന",
-  "അവസാനത്തെ",
-  "ലാസ്റ്റ്",
-];
-
-const STOCK_TERMS = ["stock", "സ്റ്റോക്ക"];
-const COMPANY_TERMS = ["company", "companies", "supplier", "കമ്പനി", "കമ്പനികൾ", "കമ്പനിയുടെ", "കമ്പനികള", "കമ്പനികളുടെ", "കമ്പനികളാണ്"];
-const COMPANY_DIRECTORY_QUESTION_TERMS = [
-  "available", "availability", "which", "what", "list", "all", "eethellam",
-  "ariyamo", "known", "know", "ആരിയാമോ", "അറിയാമോ", "ഏതെല്ലാം", "ഏതൊക്കെ",
-  "ലഭ്യമാണ്", "ലഭ്യമാണോ", "ഇപ്പോൾ", "എതെല്ലാം", "ഉള്ളത്", "ഉള്ള",
-];
-const TRIP_TERMS = ["trip", "trips", "ട്രിപ്പ്", "ട്രിപ്പുകൾ"];
-const PRODUCT_TERMS = [
-  "product",
-  "products",
-  "item",
-  "items",
-  "സാധനം",
-  "സാധനങ്ങൾ",
-  "ഉൽപ്പന്നം",
-  "ഉൽപ്പന്നങ്ങൾ",
-  "പ്രോഡക്റ്റ്",
-  "പ്രൊഡക്റ്റ്",
-  "പ്രൊഡക്റ്റുകൾ",
-  "പ്രൊഡക്ട്",
-  "പ്രോഡക്റ്റുകൾ",
-];
-const TODAY_PRODUCT_MOVEMENT_TERMS = [
-  "poya",
-  "poyi",
-  "went",
-  "went out",
-  "sent out",
-  "delivered",
-  "dispatched",
-  "dispatch",
-  "despatch",
-  "പോയി",
-  "പോയ",
-  "പോയത്",
-  "പുറത്തുപോയ",
-];
-const TRIP_LATEST_TERMS = ["latest", "last", "recent", "അവസാന", "ലാസ്റ്റ്"];
-const TRIP_QUERY_TERMS = [
-  "how many", "count", "ethra", "show", "list", "details", "summary",
-  "എത്ര", "എണ്ണം", "കാണിക്കൂ", "കാണിക്ക്", "പറയൂ", "വിവരങ്ങൾ",
-];
-
-const PERIOD_TERMS: Array<{ period: OpsPeriod; terms: string[] }> = [
-  {
-    period: "last_week",
-    terms: ["last week", "previous week", "kazhinja week", "കഴിഞ്ഞ ആഴ്ച"],
-  },
-  {
-    period: "last_month",
-    terms: ["last month", "previous month", "kazhinja month", "കഴിഞ്ഞ മാസം"],
-  },
-  {
-    period: "last_year",
-    terms: ["last year", "previous year", "kazhinja year", "കഴിഞ്ഞ വർഷം"],
-  },
-  {
-    period: "this_week",
-    terms: ["this week", "ee week", "ഈ ആഴ്ച", "ഈ വാരം"],
-  },
-  {
-    period: "this_month",
-    terms: ["this month", "ee month", "ഈ മാസം"],
-  },
-  {
-    period: "this_year",
-    terms: ["this year", "ee year", "ഈ വർഷം"],
-  },
-];
-
-const STOCK_QUESTION_TERMS = [
-  "balance",
-  "available",
-  "availability",
-  "remaining",
-  "left",
-  "qty",
-  "quantity",
-  "ethra",
-  "undo",
-  "undu",
-  "undallo",
-  "bakki",
-  "എത്ര",
-  "ബാക്കി",
-  "ഉണ്ടോ",
-  "ഉണ്ട്",
-  "എണ്ണം",
-];
-
-const STOCK_INVENTORY_LIST_TERMS = [
-  "all stock",
-  "show all stock",
-  "show me all stock",
-  "list stock",
-  "stock list",
-  "current stock list",
-  "stock report",
-  "stock summary",
-  "stock details",
-  "what stock do we have",
-  "what inventory do we have",
-  "which products are in stock",
-  "what products are in stock",
-  "which products do we have",
-  "what products do we have in stock",
-  "which items are in stock",
-  "stockil ippo ethokke products undu",
-  "stockil ethokke products undu",
-  "stockil ippo ethokke product undu",
-  "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്",
-  "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്റ്റുകൾ ഉണ്ട്",
-  "സ്റ്റോക്കിൽ ഏതൊക്കെ സാധനങ്ങൾ ഉണ്ട്",
-  "സ്റ്റോക്കിൽ എന്തൊക്കെ ഉണ്ട്",
-  "list inventory",
-  "all inventory",
-  "inventory report",
-  "stock ellam",
-  "stock kaanikku",
-  "stock kanikku",
-  "stock list kaanikku",
-  "ella stock",
-  "ellam stock",
-  "എല്ലാ സ്റ്റോക്കും",
-  "എല്ലാ സ്റ്റോക്ക്",
-  "സ്റ്റോക്ക് ലിസ്റ്റ്",
-  "സ്റ്റോക്ക് കാണിക്കൂ",
-  "സ്റ്റോക്ക് കാണിക്ക്",
-  "സ്റ്റോക്ക് റിപ്പോർട്ട്",
-  "സ്റ്റോക്ക് സംഗ്രഹം",
-  "സ്റ്റോക്ക് എല്ലാം",
-  "സ്റ്റോക്ക് വിവരങ്ങൾ",
-  "എല്ലാ സാധനങ്ങളും",
-  "എല്ലാ സാധനങ്ങൾ",
-  "നിലവിലെ സ്റ്റോക്ക് ലിസ്റ്റ്",
-];
-
-function normalizeQueryText(value: string): string {
-  return value
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(/[?!,;:()[\]{}"'’“”]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 
 const COMPANY_LEGAL_SUFFIXES = new Set([
   "limited", "ltd", "private", "pvt", "llp", "llc", "inc", "incorporated",
@@ -303,24 +89,6 @@ function companyMatchScore(query: string, candidate: string): number {
     editSimilarity(wanted.replace(/\s/g, ""), actual.replace(/\s/g, "")) * 0.9);
 }
 
-function extractCompanyName(text: string): string | null {
-  const original = text.normalize("NFKC").trim().replace(/[?!]+$/g, "").trim();
-  const patterns = [
-    /^(.+?)\s+(?:enna|called|named)\s+company\b/i,
-    /\bcompany\s+(?:called|named)\s+(.+?)(?=\s+(?:available|ariyamo|known|now|ippol|products?|items?|ethra|how many)\b|$)/i,
-    /^(.+?)\s+(?:company\s+(?:ariyamo|known|available)|ninakkariyamo|ariyamo)\b/i,
-  ];
-  for (const pattern of patterns) {
-    const match = original.match(pattern)?.[1]?.trim();
-    if (match) return match.replace(/[?!.,]+$/g, "").trim() || null;
-  }
-  const cleaned = original
-    .replace(/\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|stockil|ippo|eethellam|ethokke|ethokkeyanu|quantity|qty|please|tell|me|is|are|the|of|company|unrecognized|stoke|store|stocke|enna|ninakkariyamo|ariyamo)\b/gi, " ")
-    .replace(/[?!,;:()[\]{}"'’“”]+/g, " ")
-    .replace(/\s+/g, " ").trim();
-  return cleaned || null;
-}
-
 export function scoreCompanyNameMatch(query: string, candidate: string): number {
   return companyMatchScore(query, candidate);
 }
@@ -357,295 +125,39 @@ export function resolveCompanyStockQueryCandidate(
   return { matchedCompany: best.name, ambiguousCompanies: [] };
 }
 
-function includesAny(value: string, terms: string[]): boolean {
-  return terms.some((term) => value.includes(term));
-}
-
-function extractStockProductQuery(value: string): string | null {
-  let cleaned = value.normalize("NFKC");
-
-  cleaned = cleaned
-    .replace(
-      /\b(?:stock|balance|available|availability|remaining|left|qty|quantity|how|many|much|is|there|what|current|please|tell|me|of|ethra|undo|undu|undallo|bakki|aanu|aan)\b/gi,
-      " ",
-    )
-    .replace(
-      /സ്റ്റോക്ക്|എത്രയാണ്|എത്ര|ബാക്കി|ഉണ്ടോ|ഉണ്ട്|എണ്ണം|എന്താണ്|പറയാമോ|പറയൂ/g,
-      " ",
-    )
-    .replace(/[?!,;:()[\]{}"'’“”]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!cleaned) return null;
-
-  const normalized = normalizeProductDescription(cleaned);
-  return normalized ? cleaned : null;
-}
-
-function hasNamedDriverTripPrefix(text: string): boolean {
-  const normalized = normalizeQueryText(text);
-  if (!includesAny(normalized, TRIP_TERMS)) return false;
-
-  // Vehicle-filter queries have a separate deterministic path and must not be
-  // reclassified as named-driver queries.
-  if (/\b([a-z]{2})\s*(\d{1,2})\s*([a-z]{1,3})\s*(\d{1,4})\b/i.test(normalized)) {
-    return false;
-  }
-
-  const tokens = normalized.split(" ").filter(Boolean);
-  const cueTokens = new Set(
-    [
-      ...TRIP_TERMS,
-      ...COUNT_TERMS,
-      ...TODAY_TERMS,
-      ...YESTERDAY_TERMS,
-      ...TRIP_QUERY_TERMS,
-      ...TRIP_LATEST_TERMS,
-      ...TODAY_PRODUCT_MOVEMENT_TERMS,
-    ].flatMap((term) => term.split(/\s+/)),
-  );
-  const nonNameTokens = new Set([
-    "please", "tell", "me", "the", "for", "of", "about", "driver", "drivers",
-    "new", "all", "any", "my", "our", "their", "these", "those", "every",
-    "how", "much", "many", "what", "when", "where", "who", "why", "which",
-    "did", "does", "has", "have", "make", "made", "go", "went", "completed",
-    "dispatch", "dispatched", "despatch", "poyi", "poya", "ennu", "cheythu",
-    "ഡ്രൈവർ", "ഡ്രൈവര്", "ട്രൈവർ", "എന്ന", "എന്നുള്ള",
-  ]);
-  const firstCueIndex = tokens.findIndex((token) => cueTokens.has(token));
-  if (firstCueIndex > 0) {
-    const prefix = tokens.slice(0, firstCueIndex);
-    if (prefix.some((token) => !nonNameTokens.has(token))) return true;
-  }
-
-  // A date/count cue can precede the driver's name in natural Manglish:
-  // "innale Majeed ethra trip poyi?". Inspect all tokens before "trip", not
-  // only the words before the first cue, while excluding known question words.
-  const firstTripIndex = tokens.findIndex((token) => TRIP_TERMS.includes(token));
-  if (firstTripIndex > 0) {
-    const beforeTrip = tokens.slice(0, firstTripIndex);
-    if (
-      beforeTrip.some(
-        (token) => !cueTokens.has(token) && !nonNameTokens.has(token),
-      )
-    ) {
-      return true;
-    }
-  }
-
-  // Also cover English forms such as "How many trips did Majeed make
-  // yesterday?" without treating generic pronouns as driver names.
-  const nameAfterCue = normalized.match(
-    /\b(?:for|of|did|does|has|have)\s+([\p{L}\p{N}]+)(?=\s|$)/u,
-  )?.[1];
-  const genericSubjects = new Set([
-    "we", "you", "they", "i", "he", "she", "it", "us", "them", "all",
-    "any", "today", "yesterday", "ഇന്ന്", "ഇന്നലെ",
-  ]);
-  return Boolean(nameAfterCue && !genericSubjects.has(nameAfterCue));
-}
-
-export function isDriverRelatedQuestion(text: string): boolean {
-  const normalized = normalizeQueryText(text);
-  const explicitDriverTerm =
-    /\b(driver|drivers|driverude|driverine)\b/.test(normalized) ||
-    [
-      "ഡ്രൈവർ",
-      "ഡ്രൈവര്",
-      "ട്രൈവർ",
-      "ട്രൈവര",
-      "ട്രാഇവര",
-      "ട്രാവർ",
-      "ഡ്രൈവറായിരുന്നു",
-    ].some((term) => normalized.includes(term));
-
-  // Use the same route for every name; do not privilege Rasheed in code.
-  return explicitDriverTerm || hasNamedDriverTripPrefix(text);
-}
-
-export function parseFastWhatsAppQuery(
-  text: string,
-): FastWhatsAppQuery | null {
-  // Driver names and intents are resolved by semantic classification, not word position.
-  if (isDriverRelatedQuestion(text)) return null;
-
-  const normalized = normalizeQueryText(text);
-  if (!normalized) return null;
-
-  const hasBill = includesAny(normalized, BILL_TERMS);
-  const hasCount = includesAny(normalized, COUNT_TERMS);
-
-  if (
-    (includesAny(normalized, PRODUCT_TERMS) || /\bproducts?\b/i.test(normalized)) &&
-    (includesAny(normalized, STOCK_QUESTION_TERMS) ||
-      includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS) ||
-      /\b(?:ethra|available|undu|undo|quantity)\b/i.test(normalized)) &&
-    !includesAny(normalized, COMPANY_TERMS) &&
-    !includesAny(normalized, TODAY_TERMS) &&
-    !includesAny(normalized, YESTERDAY_TERMS) &&
-    !includesAny(normalized, TODAY_PRODUCT_MOVEMENT_TERMS) &&
-    !includesAny(normalized, STOCK_INVENTORY_LIST_TERMS) &&
-    !includesAny(normalized, ["what", "which", "all", "eethellam", "ethokke", "എന്തൊക്കെ", "ഏതൊക്കെ", "ഏതെല്ലാം"])
-  ) {
-    const companyName = text.normalize("NFKC")
-      .replace(/\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|stockil|ippo|eethellam|ethokke|ethokkeyanu|quantity|qty|please|tell|me|is|are|the|of|company|unrecognized|stoke)\b/gi, " ")
-      .replace(/[?!,;:()[\]{}"'’“”]+/g, " ")
-      .replace(/\s+/g, " ").trim();
-    if (
-      companyName &&
-      /[\p{L}]{2,}/u.test(companyName) &&
-      !includesAny(normalizeQueryText(companyName), ["unknown", "unrecognized", "product", "item"])
-    ) {
-      return { type: "company_directory", companyName, includeProducts: true };
-    }
-  }
-
-  if (
-    includesAny(normalized, COMPANY_TERMS) &&
-    includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)
-  ) {
-    const isCompanyListRequest = includesAny(normalized, [
-      "all", "which", "what", "list", "eethellam", "companies",
-      "കമ്പനികൾ", "കമ്പനികള", "ഏതെല്ലാം", "എതെല്ലാം", "ഏതൊക്കെ", "എന്തൊക്കെ", "ഉള്ളത്",
-    ]);
-    const companyName = isCompanyListRequest ? null : extractCompanyName(text);
-    return {
-      type: "company_directory",
-      companyName,
-      includeProducts: includesAny(normalized, PRODUCT_TERMS) &&
-        (includesAny(normalized, STOCK_QUESTION_TERMS) ||
-          includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)),
-    };
-  }
-
-  const asksForProductMovement =
-    (includesAny(normalized, PRODUCT_TERMS) || includesAny(normalized, STOCK_TERMS)) &&
-    includesAny(normalized, TODAY_PRODUCT_MOVEMENT_TERMS);
-  if (asksForProductMovement && includesAny(normalized, YESTERDAY_TERMS)) {
-    return { type: "yesterday_products_summary" };
-  }
-  if (asksForProductMovement && includesAny(normalized, TODAY_TERMS)) {
-    return { type: "today_products_summary" };
-  }
-
-  if (hasBill && includesAny(normalized, PENDING_TERMS)) {
-    return { type: "pending_bill_count" };
-  }
-
-  if (
-    hasBill &&
-    hasCount &&
-    includesAny(normalized, TODAY_TERMS)
-  ) {
-    return { type: "today_bill_count" };
-  }
-
-  if (hasBill && includesAny(normalized, LATEST_TERMS)) {
-    return { type: "latest_bill" };
-  }
-
-  if (includesAny(normalized, TRIP_TERMS)) {
-    const vehicleMatch = normalized.match(/\b([a-z]{2})\s*(\d{1,2})\s*([a-z]{1,3})\s*(\d{1,4})\b/i);
-    if (
-      vehicleMatch &&
-      (includesAny(normalized, TRIP_QUERY_TERMS) ||
-        includesAny(normalized, TODAY_TERMS) ||
-        includesAny(normalized, YESTERDAY_TERMS))
-    ) {
-      const [, state, district, series, number] = vehicleMatch;
-      const vehicleNumber = [state, district, series, number]
-        .join("")
-        .toUpperCase();
-      const yesterday = includesAny(normalized, YESTERDAY_TERMS);
-      return {
-        type: "trip_filter_summary",
-        filterBy: "vehicle",
-        filterValue: vehicleNumber,
-        yesterday,
-      };
-    }
-
-    if (includesAny(normalized, TRIP_QUERY_TERMS)) {
-      const destinationMatch = normalized.match(
-        /(?:trips?|ട്രിപ്പ്|ട്രിപ്പുകൾ)\s+(?:to|for|at|in)\s+(.+?)(?=\s+(?:today|innu|innathe|inn|yesterday|innale|how many|count|ethra|show|list|details|summary|ഇന്ന്|ഇന്നത്തെ|ഇന്നലെ|എത്ര|എണ്ണം|കാണിക്കൂ|കാണിക്ക്|പറയൂ|വിവരങ്ങൾ)|$)/i,
-      );
-      const destination = destinationMatch?.[1]
-        ?.replace(/[%_]/g, "")
-        .trim();
-      if (destination && destination.length >= 2 && destination.length <= 60) {
-        return {
-          type: "trip_filter_summary",
-          filterBy: "destination",
-          filterValue: destination,
-          yesterday: includesAny(normalized, YESTERDAY_TERMS),
-        };
-      }
-    }
-  }
-
-  if (
-    includesAny(normalized, TRIP_TERMS) &&
-    includesAny(normalized, YESTERDAY_TERMS)
-  ) {
-    return { type: "yesterday_trip_summary" };
-  }
-
-  if (
-    includesAny(normalized, TRIP_TERMS) &&
-    includesAny(normalized, TODAY_TERMS)
-  ) {
-    return { type: "today_trip_summary" };
-  }
-
-  if (
-    includesAny(normalized, TRIP_TERMS) &&
-    includesAny(normalized, TRIP_LATEST_TERMS)
-  ) {
-    return { type: "latest_trip" };
-  }
-
-  if (
-    includesAny(normalized, STOCK_TERMS) &&
-    includesAny(normalized, STOCK_INVENTORY_LIST_TERMS)
-  ) {
-    return { type: "stock_inventory_summary" };
-  }
-
-  const periodMatch = PERIOD_TERMS.find((entry) =>
-    includesAny(normalized, entry.terms),
-  );
-  if (periodMatch) {
-    return { type: "ops_period_summary", period: periodMatch.period };
-  }
-
-  if (
-    includesAny(normalized, STOCK_TERMS) &&
-    includesAny(normalized, STOCK_QUESTION_TERMS)
-  ) {
-    const productQuery = extractStockProductQuery(text);
-    return productQuery
-      ? { type: "stock_balance", productQuery }
-      : { type: "stock_product_required" };
-  }
-
-  return null;
-}
-
 export function mapAiClassificationToFastQuery(
   classification: AiOperationalQueryClassification,
 ): FastWhatsAppQuery | null {
   if (classification.intent === "unsupported" || classification.intent === "start_trip") return null;
 
   if (classification.intent === "stock_balance") {
-    return classification.product_query
-      ? { type: "stock_balance", productQuery: classification.product_query }
+    if (classification.product_query) {
+      return {
+        type: "stock_balance",
+        productQuery: classification.product_query,
+        companyName: classification.company_name ?? undefined,
+      };
+    }
+    return classification.company_name
+      ? {
+          type: "company_directory",
+          companyName: classification.company_name,
+          includeProducts: true,
+        }
       : { type: "stock_product_required" };
+  }
+
+  if (classification.intent === "stock_inventory_summary" && classification.company_name) {
+    return {
+      type: "company_directory",
+      companyName: classification.company_name,
+      includeProducts: true,
+    };
   }
 
   if (classification.intent === "company_directory") {
     const rawName = classification.product_query?.trim() || null;
-    return { type: "company_directory", companyName: rawName ? extractCompanyName(rawName) ?? rawName : null };
+    return { type: "company_directory", companyName: rawName, includeProducts: classification.include_products ?? false };
   }
 
   if (classification.intent === "driver_trip_summary") {
@@ -658,6 +170,14 @@ export function mapAiClassificationToFastQuery(
   if (classification.intent === "driver_trip_list") {
     const driverName = classification.driver_name?.trim();
     return driverName ? { type: "driver_trip_list", driverName } : null;
+  }
+
+  if (classification.intent === "trip_filter_summary") {
+    const filterBy = classification.filter_by ?? null;
+    const filterValue = classification.filter_value?.trim() ?? null;
+    return filterBy && filterValue
+      ? { type: "trip_filter_summary", filterBy, filterValue, yesterday: classification.yesterday }
+      : null;
   }
 
   if (classification.intent === "ops_period_summary") {
@@ -1116,7 +636,7 @@ async function companyDirectoryAnswer(
     products.length > 20 ? "മറ്റു products ഉം records-ൽ ഉണ്ട്." : "",
   ].filter(Boolean).join("\n");
 }
-async function stockBalanceAnswer(productQuery: string): Promise<string> {
+async function stockBalanceAnswer(productQuery: string, companyName?: string): Promise<string> {
   const normalized = normalizeProductDescription(productQuery);
   if (!normalized) {
     return "ഏത് സാധനത്തിന്റെ സ്റ്റോക്കാണെന്ന് പേര് കൂടി അയക്കൂ.";
@@ -1134,7 +654,21 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
   const activeCompanyNames = Array.from(new Set((companyRows ?? [])
     .map((row) => String(row.canonical_name ?? "").trim())
     .filter(Boolean)));
-  const companyMatch = resolveCompanyStockQueryCandidate(productQuery, activeCompanyNames);
+  let canonicalCompanyFilter: string | null = null;
+  if (companyName) {
+    const companyFilterMatch = resolveCompanyStockQueryCandidate(companyName, activeCompanyNames);
+    if (companyFilterMatch.ambiguousCompanies.length > 0) {
+      return ["ഏത് കമ്പനിയുടെ stock ആണ് വേണ്ടത്?", ...companyFilterMatch.ambiguousCompanies.map((name) => "• " + name)].join("\\n");
+    }
+    if (!companyFilterMatch.matchedCompany) {
+      return companyName + " എന്ന കമ്പനിയെ active company directory-ൽ സുരക്ഷിതമായി match ചെയ്യാനായില്ല. ശരിയായ company name അയക്കൂ.";
+    }
+    canonicalCompanyFilter = companyFilterMatch.matchedCompany;
+  }
+
+  const companyMatch = canonicalCompanyFilter
+    ? { matchedCompany: null, ambiguousCompanies: [] as string[] }
+    : resolveCompanyStockQueryCandidate(productQuery, activeCompanyNames);
   if (companyMatch.ambiguousCompanies.length > 0) {
     return [
       "ഏത് കമ്പനിയുടെ stock ആണ് വേണ്ടത്?",
@@ -1191,13 +725,15 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
     );
   }
 
-  const { data, error } = await supabase
+  const stockBalanceQuery = supabase
     .from("stock_balances")
     .select(
       "product_id, company_id, company_name, product_name, unit, current_quantity, balance_known",
     )
-    .in("product_id", productIds)
-    .limit(MAX_STOCK_MATCHES);
+    .in("product_id", productIds);
+  const { data, error } = canonicalCompanyFilter
+    ? await stockBalanceQuery.eq("company_name", canonicalCompanyFilter).limit(MAX_STOCK_MATCHES)
+    : await stockBalanceQuery.limit(MAX_STOCK_MATCHES);
 
   if (error) {
     throw new Error("Failed to load stock balance: " + error.message);
@@ -1693,7 +1229,7 @@ async function answerFastQuery(
     return operationalPeriodSummary(query.period);
   }
 
-  return stockBalanceAnswer(query.productQuery);
+  return stockBalanceAnswer(query.productQuery, query.companyName);
 }
 
 export async function handleFastWhatsAppQuery(
@@ -1719,71 +1255,68 @@ export async function handleFastWhatsAppQuery(
   }
 
   const startedAt = performance.now();
-  let resolver: "deterministic" | "ai_intent" | "ai_fallback" | "fixed_fallback" =
-    "deterministic";
-  // Resolve driver questions semantically; positional name regexes can mistake question/date words for a driver name.
-  let query = isDriverRelatedQuestion(message.textBody)
-    ? null
-    : parseFastWhatsAppQuery(message.textBody);
-  const driverQuestion = !query && isDriverRelatedQuestion(message.textBody);
-  const likelyOperational = !query && !driverQuestion && looksLikeOperationalQuery(message.textBody);
+  let resolver: "ai_intent" | "ai_fallback" | "fixed_fallback" = "ai_intent";
+  let query: FastWhatsAppQuery | null = null;
   let classificationReply: string | null = null;
-  let operationalClassifierFailed = false;
   let classifierOutcome: "not_attempted" | "no_result" | "mapped" | "unsupported" | "failed" =
-    "not_attempted";
+    "no_result";
   let classifierDurationMs = 0;
+  let likelyOperational = false;
 
-  if (!query) {
-    classifierOutcome = "no_result";
-    const classifierStartedAt = performance.now();
+  // Natural-language meaning is resolved by the semantic classifier first.
+  // The legacy phrase parser is deliberately not used to route live messages.
+  const classifierStartedAt = performance.now();
+  try {
+    let driverNames: string[] = [];
     try {
-      let driverNames: string[] | undefined;
-      if (driverQuestion) {
-        const supabase = getSupabaseAdmin();
-        const { data: drivers, error: driverDirectoryError } = await supabase
-          .from("ops_drivers")
-          .select("name")
-          .eq("active", true);
-        if (driverDirectoryError) {
-          throw new Error("Failed to load driver directory for intent resolution: " + driverDirectoryError.message);
-        }
-        driverNames = (drivers ?? []).map((driver) => String(driver.name ?? "")).filter(Boolean);
-      }
-      const classification = await classifyOperationalQueryWithGroq(
-        message.textBody,
-        { driverNames },
-      );
-      if (classification) {
-        classifierOutcome = classification.intent === "unsupported" ? "unsupported" : "mapped";
-        query = mapAiClassificationToFastQuery(classification);
-        if (query?.type === "company_directory") {
-          const normalizedInput = normalizeQueryText(message.textBody);
-          query.includeProducts = includesAny(normalizedInput, PRODUCT_TERMS);
-          if (!query.companyName) {
-            const isCompanyListRequest = includesAny(normalizedInput, [
-              "all", "which", "list", "eethellam", "companies",
-              "കമ്പനികൾ", "ഏതെല്ലാം", "ഏതൊക്കെ",
-            ]);
-            query.companyName = isCompanyListRequest
-              ? null
-              : extractCompanyName(message.textBody) ?? message.textBody.trim();
-          }
-        }
-        if (query) resolver = "ai_intent";
-        else classificationReply = classification.reply;
-      }
+      const { data: drivers, error: driverDirectoryError } = await getSupabaseAdmin()
+        .from("ops_drivers")
+        .select("name")
+        .eq("active", true);
+      if (driverDirectoryError) throw driverDirectoryError;
+      driverNames = (drivers ?? [])
+        .map((driver) => String(driver.name ?? "").normalize("NFKC").trim())
+        .filter(Boolean);
     } catch (error) {
-      operationalClassifierFailed = true;
-      classifierOutcome = "failed";
-      console.warn("WhatsApp operational intent classification failed", {
-        reason:
-          error instanceof Error
-            ? error.message.slice(0, 180)
-            : "Unknown classification error",
+      console.warn("Driver directory unavailable during semantic classification", {
+        reason: error instanceof Error ? error.message.slice(0, 180) : "Unknown driver directory error",
       });
-    } finally {
-      classifierDurationMs = Math.round(performance.now() - classifierStartedAt);
     }
+
+    const classification = await classifyOperationalQueryWithGroq(message.textBody, {
+      driverNames,
+    });
+    if (classification) {
+      classifierOutcome = classification.intent === "unsupported" ? "unsupported" : "mapped";
+      likelyOperational = classification.intent !== "unsupported";
+      query = mapAiClassificationToFastQuery(classification);
+      classificationReply = classification.reply;
+
+      // Driver actions/queries must resolve to an exact active directory identity.
+      const driverQuery = query?.type === "driver_trip_summary" || query?.type === "driver_trip_list"
+        ? query
+        : null;
+      if (driverQuery && !driverNames.some(
+        (name) => name.toLocaleLowerCase("en") === driverQuery.driverName.toLocaleLowerCase("en"),
+      )) {
+        query = null;
+        classificationReply = "Driver directory-ൽ ഈ പേര് കൃത്യമായി കണ്ടെത്താനായില്ല. പേര് confirm ചെയ്യൂ.";
+        classifierOutcome = "unsupported";
+      }
+
+      if (query) {
+        resolver = "ai_intent";
+      } else if (classification.reply) {
+        resolver = "ai_fallback";
+      }
+    }
+  } catch (error) {
+    classifierOutcome = "failed";
+    console.warn("WhatsApp semantic intent classification failed", {
+      reason: error instanceof Error ? error.message.slice(0, 180) : "Unknown classification error",
+    });
+  } finally {
+    classifierDurationMs = Math.round(performance.now() - classifierStartedAt);
   }
 
   const lookupStartedAt = performance.now();
@@ -1791,48 +1324,15 @@ export async function handleFastWhatsAppQuery(
 
   if (query) {
     body = await answerFastQuery(query);
-  } else if (driverQuestion && classificationReply) {
-    resolver = "ai_fallback";
-    body = classificationReply;
-  } else if (driverQuestion) {
-    resolver = "fixed_fallback";
-    body = "ഏത് driver-ന്റെ trips ആണ് വേണ്ടത്? Driver-ന്റെ പേര്, ഇന്ന്/ഇന്നലെ എന്ന് അയക്കൂ.";
-  } else if (options.fromVoice) {
-    resolver = "fixed_fallback";
-    body = voiceQueryClarification(message.textBody);
   } else if (classificationReply) {
     resolver = "ai_fallback";
     body = classificationReply;
-  } else if (likelyOperational) {
+  } else if (options.fromVoice) {
     resolver = "fixed_fallback";
-    body = fixedOperationalFallback();
-
-    if (operationalClassifierFailed) {
-      console.info("Operational fallback used after classifier failure");
-    }
-  } else if (
-    classifierOutcome === "failed" ||
-    classifierOutcome === "unsupported" ||
-    classifierOutcome === "mapped"
-  ) {
+    body = voiceQueryClarification(message.textBody);
+  } else {
     resolver = "fixed_fallback";
     body = fixedUniversalFallback(message.textBody);
-  } else {
-    resolver = "ai_fallback";
-    try {
-      body =
-        (await generateUniversalWhatsAppReply(message.textBody)) ??
-        fixedUniversalFallback(message.textBody);
-    } catch (error) {
-      resolver = "fixed_fallback";
-      console.warn("Universal WhatsApp fallback reply failed", {
-        reason:
-          error instanceof Error
-            ? error.message.slice(0, 180)
-            : "Unknown fallback error",
-      });
-      body = fixedUniversalFallback(message.textBody);
-    }
   }
 
   const lookupDurationMs = Math.round(performance.now() - lookupStartedAt);
@@ -1860,7 +1360,8 @@ export async function handleFastWhatsAppQuery(
       : query?.type === "yesterday_trip_summary" ? "yesterday" : null,
     resolver,
     likelyOperational,
-    deterministicMatch: resolver === "deterministic",
+    semanticClassification: true,
+    deterministicMatch: false,
     classifierOutcome,
     classifierDurationMs,
     lookupDurationMs,
