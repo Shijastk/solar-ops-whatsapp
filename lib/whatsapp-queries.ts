@@ -39,6 +39,7 @@ export type FastWhatsAppQuery =
   | { type: "today_trip_summary" }
   | { type: "yesterday_trip_summary" }
   | { type: "driver_trip_summary"; driverName: string; yesterday: boolean }
+  | { type: "driver_trip_list"; driverName: string }
   | { type: "trip_filter_summary"; filterBy: "vehicle" | "destination"; filterValue: string; yesterday: boolean }
   | { type: "driver_count" }
   | { type: "today_products_summary" }
@@ -498,6 +499,11 @@ export function mapAiClassificationToFastQuery(
     return driverName
       ? { type: "driver_trip_summary", driverName, yesterday: classification.yesterday }
       : null;
+  }
+
+  if (classification.intent === "driver_trip_list") {
+    const driverName = classification.driver_name?.trim();
+    return driverName ? { type: "driver_trip_list", driverName } : null;
   }
 
   if (classification.intent === "ops_period_summary") {
@@ -1011,6 +1017,7 @@ async function driverTripsSummary(
   driverName: string,
   yesterday = false,
   now = new Date(),
+  allTime = false,
 ): Promise<string> {
   const supabase = getSupabaseAdmin();
   const queryTime = yesterday ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
@@ -1045,21 +1052,34 @@ async function driverTripsSummary(
       : "“" + driverName + "” എന്ന പേരിൽ ഒന്നിലധികം drivers ഉണ്ട്. കൃത്യമായ പേര് തിരഞ്ഞെടുക്കൂ.";
   }
   const driver = matched[0];
-  const { data: trips, error } = await supabase
+  let tripRequest = supabase
     .from("delivery_trips")
-    .select("display_name, vehicle_number, driver_id, finalized_at")
+    .select("display_name, vehicle_number, driver_id, finalized_at", { count: "exact" })
     .eq("status", "ready")
     .eq("driver_id", driver.id)
-    .gte("finalized_at", bounds.start)
-    .lt("finalized_at", bounds.end)
     .order("finalized_at", { ascending: false })
     .limit(50);
+  if (!allTime) {
+    tripRequest = tripRequest.gte("finalized_at", bounds.start).lt("finalized_at", bounds.end);
+  }
+  const { data: trips, error, count } = await tripRequest;
   if (error) throw new Error("Failed to load driver trips: " + error.message);
   const rows = (trips ?? []) as TripSummaryRow[];
   const names = await driverNamesById(rows.map((row) => row.driver_id).filter((id): id is string => Boolean(id)));
-  return rows.length === 0
-    ? (yesterday ? "ഇന്നലെ " : "ഇന്ന് ") + driverName + " എന്ന driver-ന്റെ finalized trip കണ്ടെത്തിയില്ല."
-    : formatTripSummary(rows, names, (yesterday ? "ഇന്നലത്തെ " : "ഇന്നത്തെ ") + driverName + "യുടെ trips (ആകെ " + String(rows.length) + "):");
+  if (rows.length === 0) {
+    return allTime
+      ? driverName + " എന്ന driver-ന്റെ saved finalized trips ഒന്നും കണ്ടെത്തിയില്ല."
+      : (yesterday ? "ഇന്നലെ " : "ഇന്ന് ") + driverName + " എന്ന driver-ന്റെ finalized trip കണ്ടെത്തിയില്ല.";
+  }
+  if (allTime) {
+    const total = count ?? rows.length;
+    const heading = driverName + "യുടെ എല്ലാ saved finalized trips (ആകെ " + String(total) + ")";
+    const boundedHeading = total > rows.length
+      ? heading + "; ഏറ്റവും പുതിയ " + String(rows.length) + " മാത്രം കാണിക്കുന്നു:"
+      : heading + ":";
+    return formatTripSummary(rows, names, boundedHeading);
+  }
+  return formatTripSummary(rows, names, (yesterday ? "ഇന്നലത്തെ " : "ഇന്നത്തെ ") + driverName + "യുടെ trips (ആകെ " + String(rows.length) + "):");
 }
 
 async function filteredTripsSummary(
@@ -1392,6 +1412,10 @@ async function answerFastQuery(
 
   if (query.type === "driver_trip_summary") {
     return driverTripsSummary(query.driverName, query.yesterday);
+  }
+
+  if (query.type === "driver_trip_list") {
+    return driverTripsSummary(query.driverName, false, new Date(), true);
   }
 
   if (query.type === "trip_filter_summary") {
