@@ -1621,12 +1621,12 @@ export async function handleTripWorkflowInbound(
       return "ignored";
     }
 
-    if (classification?.intent === "unsupported") {
+    if (classification?.intent === "unsupported" && classification.reply) {
       await sendOpsReply({
         requestId: deterministicUuid("trip-natural-intent-unsupported:" + storedMessageId),
         replyToMessageId: storedMessageId,
         knownInboundAt: message.timestamp,
-        body: classification.reply ?? "Trip request സുരക്ഷിതമായി സ്ഥിരീകരിക്കാൻ കഴിഞ്ഞില്ല. Driver name / request ഒന്ന് കൂടി വ്യക്തമാക്കൂ.",
+        body: classification.reply,
       });
       return "handled";
     }
