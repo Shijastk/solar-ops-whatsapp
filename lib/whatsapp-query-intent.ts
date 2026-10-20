@@ -137,9 +137,17 @@ function findExactDriverNameInQuery(
     const nameTokens = normalizeNameTokens(driverName);
     if (nameTokens.length === 0 || nameTokens.length > queryTokens.length) return false;
     return queryTokens.some((_, index) => {
-      const matchesName = nameTokens.every(
-        (token, offset) => queryTokens[index + offset] === token,
-      );
+      const matchesName = nameTokens.every((token, offset) => {
+        const queryToken = queryTokens[index + offset];
+        if (queryToken === token) return true;
+        // Manglish possessives attach suffixes to names, e.g. "Majeedinte".
+        // Strip only when the remaining token exactly equals the canonical name token.
+        return ["inte", "ude", "ine", "inu"].some(
+          (suffix) =>
+            queryToken.endsWith(suffix) &&
+            queryToken.slice(0, -suffix.length) === token,
+        );
+      });
       if (!matchesName) return false;
 
       // Do not accept a shorter directory name when the message contains a
@@ -152,7 +160,9 @@ function findExactDriverNameInQuery(
         "ഇന്ന്", "ഇന്നലെ", "ട്രിപ്പ്", "ട്രിപ്പുകൾ", "poyi", "poya",
         "went", "make", "made", "go", "completed", "dispatch", "dispatched",
         "did", "does", "has", "have", "inte", "ude", "ine", "inu",
-        "aanu", "aayirunnu", "എന്ന", "എന്നുള്ള", "ഡ്രൈവർ", "ഡ്രൈവര്",
+        "aanu", "aayirunnu", "aake", "ella", "ellam", "total", "list",
+        "details", "cheyyamo", "cheyyu", "parayu", "kaanikku",
+        "എന്ന", "എന്നുള്ള", "ഡ്രൈവർ", "ഡ്രൈവര്",
       ]);
       return allowedAfterName.has(tokenAfterName);
     });
@@ -430,14 +440,15 @@ export async function classifyOperationalQueryWithGroq(
     (parsed.data.intent === "yesterday_trip_summary" ||
       parsed.data.intent === "today_trip_summary");
   const driverTripSummary = hasTripTerm && parsed.data.intent === "driver_trip_summary";
+  const driverTripList = hasTripTerm && parsed.data.intent === "driver_trip_list";
   const correctNamedDriverTrip =
-    resolvedDriverName !== null && (generalDayTripSummary || driverTripSummary);
+    resolvedDriverName !== null && (generalDayTripSummary || driverTripSummary || driverTripList);
 
   // A named-driver query that does not match the active directory must never
   // degrade into a company-wide summary or trust a model-inferred partial name.
   if (
     driverNames.length > 0 &&
-    (generalDayTripSummary || driverTripSummary) &&
+    (generalDayTripSummary || driverTripSummary || driverTripList) &&
     resolvedDriverName === null &&
     hasExplicitNamedDriverTripQuery(boundedText)
   ) {
@@ -452,7 +463,11 @@ export async function classifyOperationalQueryWithGroq(
   }
 
   return {
-    intent: correctNamedDriverTrip ? "driver_trip_summary" : parsed.data.intent,
+    intent: correctNamedDriverTrip
+      ? driverTripList
+        ? "driver_trip_list"
+        : "driver_trip_summary"
+      : parsed.data.intent,
     product_query: productQuery,
     driver_name: correctNamedDriverTrip
       ? resolvedDriverName
