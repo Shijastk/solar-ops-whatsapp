@@ -131,9 +131,28 @@ export function mapAiClassificationToFastQuery(
   if (classification.intent === "unsupported" || classification.intent === "start_trip") return null;
 
   if (classification.intent === "stock_balance") {
-    return classification.product_query
-      ? { type: "stock_balance", productQuery: classification.product_query, companyName: classification.company_name ?? undefined }
+    if (classification.product_query) {
+      return {
+        type: "stock_balance",
+        productQuery: classification.product_query,
+        companyName: classification.company_name ?? undefined,
+      };
+    }
+    return classification.company_name
+      ? {
+          type: "company_directory",
+          companyName: classification.company_name,
+          includeProducts: true,
+        }
       : { type: "stock_product_required" };
+  }
+
+  if (classification.intent === "stock_inventory_summary" && classification.company_name) {
+    return {
+      type: "company_directory",
+      companyName: classification.company_name,
+      includeProducts: true,
+    };
   }
 
   if (classification.intent === "company_directory") {
