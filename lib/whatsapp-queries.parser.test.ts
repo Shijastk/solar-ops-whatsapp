@@ -31,4 +31,16 @@ describe("isDriverRelatedQuestion voice transcript guard", () => {
   it("recognizes a common garbled Malayalam ASR spelling of driver", () => {
     expect(isDriverRelatedQuestion("ടൃഷീദയം എന്നാന ട്രാഇവര ഇന്ന്യ ട്രിപ്പുകൾ പോയിട്ടുണ്ടോ?")).toBe(true);
   });
+
+  it("recognizes a driver name after the yesterday cue in Manglish", () => {
+    expect(isDriverRelatedQuestion("innale Majeed ethra trip poyi?")).toBe(true);
+    expect(parseFastWhatsAppQuery("innale Majeed ethra trip poyi?")).toBeNull();
+  });
+
+  it("keeps a generic yesterday trip count on the day-summary route", () => {
+    expect(isDriverRelatedQuestion("Innale ethra trips dispatch cheythu?")).toBe(false);
+    expect(parseFastWhatsAppQuery("Innale ethra trips dispatch cheythu?")).toEqual({
+      type: "yesterday_trip_summary",
+    });
+  });
 });
