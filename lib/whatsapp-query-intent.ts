@@ -440,7 +440,12 @@ export async function classifyOperationalQueryWithGroq(
     (parsed.data.intent === "yesterday_trip_summary" ||
       parsed.data.intent === "today_trip_summary");
   const driverTripSummary = hasTripTerm && parsed.data.intent === "driver_trip_summary";
-  const driverTripList = hasTripTerm && parsed.data.intent === "driver_trip_list";
+  const asksAllTimeTripList =
+    hasTripTerm &&
+    /(?:\ball\b|\baake\b|\bellam\b|\bella\b|എല്ലാ|ആകെ)/u.test(normalizedQuery) &&
+    /(?:\blist\b|\bshow\b|\bdetails\b|\bsummary\b|ലിസ്റ്റ്|കാണിക്ക|വിവരങ്ങൾ)/u.test(normalizedQuery);
+  const driverTripList =
+    hasTripTerm && (parsed.data.intent === "driver_trip_list" || asksAllTimeTripList);
   const correctNamedDriverTrip =
     resolvedDriverName !== null && (generalDayTripSummary || driverTripSummary || driverTripList);
 
