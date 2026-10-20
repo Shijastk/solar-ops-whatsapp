@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { aggregateMobileTripItems } from "@/lib/mobile-trip-items";
 import {
   cleanDestination,
   choosePrimaryDestination,
@@ -76,20 +77,22 @@ function serializeTrip(t: Trip) {
             unit: i.stock_products.unit,
             companyId: t.company_id,
           }))
-        : t.trip_documents
-            .filter(
-              (b) =>
-                b.document_drafts?.stock_status !== "duplicate_document" &&
-                b.document_drafts?.workflow_status !== "cancelled",
-            )
-            .flatMap((b) =>
-              (b.document_drafts?.document_items ?? []).map((i) => ({
-                productName: i.description,
-                quantity: Number(i.quantity),
-                unit: i.unit,
-                companyId: b.document_drafts?.stock_company_id,
-              })),
-            ),
+        : aggregateMobileTripItems(
+            t.trip_documents
+              .filter(
+                (b) =>
+                  b.document_drafts?.stock_status !== "duplicate_document" &&
+                  b.document_drafts?.workflow_status !== "cancelled",
+              )
+              .flatMap((b) =>
+                (b.document_drafts?.document_items ?? []).map((i) => ({
+                  productName: i.description,
+                  quantity: Number(i.quantity),
+                  unit: i.unit,
+                  companyId: b.document_drafts?.stock_company_id,
+                })),
+              ),
+          ),
     bills: t.trip_documents.map((b) => ({
       messageId: b.message_id,
       companyId: b.document_drafts?.stock_company_id ?? null,
