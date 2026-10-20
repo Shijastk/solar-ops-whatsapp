@@ -112,11 +112,11 @@ const LATEST_TERMS = [
 ];
 
 const STOCK_TERMS = ["stock", "സ്റ്റോക്ക"];
-const COMPANY_TERMS = ["company", "companies", "supplier", "കമ്പനി", "കമ്പനികൾ", "കമ്പനിയുടെ"];
+const COMPANY_TERMS = ["company", "companies", "supplier", "കമ്പനി", "കമ്പനികൾ", "കമ്പനിയുടെ", "കമ്പനികള", "കമ്പനികളുടെ", "കമ്പനികളാണ്"];
 const COMPANY_DIRECTORY_QUESTION_TERMS = [
   "available", "availability", "which", "what", "list", "all", "eethellam",
   "ariyamo", "known", "know", "ആരിയാമോ", "അറിയാമോ", "ഏതെല്ലാം", "ഏതൊക്കെ",
-  "ലഭ്യമാണ്", "ലഭ്യമാണോ", "ഇപ്പോൾ",
+  "ലഭ്യമാണ്", "ലഭ്യമാണോ", "ഇപ്പോൾ", "എതെല്ലാം", "ഉള്ളത്", "ഉള്ള",
 ];
 const TRIP_TERMS = ["trip", "trips", "ട്രിപ്പ്", "ട്രിപ്പുകൾ"];
 const PRODUCT_TERMS = [
@@ -475,7 +475,7 @@ export function parseFastWhatsAppQuery(
   ) {
     const isCompanyListRequest = includesAny(normalized, [
       "all", "which", "what", "list", "eethellam", "companies",
-      "കമ്പനികൾ", "ഏതെല്ലാം", "ഏതൊക്കെ", "എന്തൊക്കെ",
+      "കമ്പനികൾ", "കമ്പനികള", "ഏതെല്ലാം", "എതെല്ലാം", "ഏതൊക്കെ", "എന്തൊക്കെ", "ഉള്ളത്",
     ]);
     const companyName = isCompanyListRequest ? null : extractCompanyName(text);
     return {
