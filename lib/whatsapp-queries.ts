@@ -381,9 +381,10 @@ export function parseFastWhatsAppQuery(
     includesAny(normalized, COMPANY_TERMS) &&
     includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)
   ) {
+    const original = text.normalize("NFKC").trim();
     const companyName =
-      normalized.match(/^(.+?)\s+(?:enna|called|named)\s+company\b/u)?.[1]?.trim() ??
-      normalized.match(/\bcompany\s+(?:called|named)\s+(.+?)(?:\s+(?:available|ariyamo|known|now|ippol)\b|$)/u)?.[1]?.trim() ??
+      original.match(/^(.+?)\s+(?:enna|called|named)\s+company\b/iu)?.[1]?.trim() ??
+      original.match(/\bcompany\s+(?:called|named)\s+(.+?)(?:\s+(?:available|ariyamo|known|now|ippol)\b|$)/iu)?.[1]?.trim() ??
       null;
     return { type: "company_directory", companyName };
   }
