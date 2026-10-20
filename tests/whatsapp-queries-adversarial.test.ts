@@ -66,6 +66,10 @@ const negativeScenarios = [
 ].map((input, index) => ({ id: "negative-or-incomplete-" + (index + 1), input }));
 
 describe("adversarial Solar Ops intent routing (100+ scenarios)", () => {
+  it("contains at least 100 positive adversarial query variants", () => {
+    expect(positiveScenarios.length + negativeScenarios.length).toBeGreaterThanOrEqual(100);
+  });
+
   it.each(positiveScenarios)(
     "routes $id to the expected typed read intent",
     ({ input, expectedType }) => {
@@ -104,4 +108,3 @@ describe("adversarial Solar Ops intent routing (100+ scenarios)", () => {
   });
 });
 
-expect(positiveScenarios.length + negativeScenarios.length).toBeGreaterThanOrEqual(100);
