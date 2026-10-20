@@ -92,7 +92,7 @@ export const OPERATIONAL_QUERY_CATALOG = {
   start_trip: {
     domain: "trips",
     kind: "action",
-    description: "Explicitly request starting/creating a trip",
+    description: "Explicitly request starting/creating a trip; never for trip status/history or future/scheduled questions",
     requiredEntities: [],
     optionalEntities: ["driver", "vehicle", "destination", "bill context"],
     source: "trip creation workflow; not the read-query executor",
