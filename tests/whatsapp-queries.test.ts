@@ -35,6 +35,14 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(parseFastWhatsAppQuery("latest trip")).toEqual({
       type: "latest_trip",
     });
+    expect(parseFastWhatsAppQuery("eethellam company ippol available aanu")).toEqual({
+      type: "company_directory",
+      companyName: null,
+    });
+    expect(parseFastWhatsAppQuery("Savtr Solar enna company ninakkariyamo")).toEqual({
+      type: "company_directory",
+      companyName: "Savtr Solar",
+    });
     expect(
       parseFastWhatsAppQuery("Innu poya products eethellam aanu"),
     ).toEqual({ type: "today_products_summary" });
@@ -118,6 +126,7 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(isDriverRelatedQuestion("UnknownTestDriver innale ethra trip poyi?")).toBe(true);
     expect(isDriverRelatedQuestion("Innale ethra trips dispatch cheythu?")).toBe(false);
     expect(isDriverRelatedQuestion("How many trips did Majeed make yesterday?")).toBe(true);
+    expect(isDriverRelatedQuestion("Majeedinte aake trip list cheyyamo")).toBe(true);
     expect(isDriverRelatedQuestion("How many trips did we make yesterday?")).toBe(false);
     expect(isDriverRelatedQuestion("latest bill")).toBe(false);
   });
@@ -218,6 +227,32 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(summary).toContain("ആദ്യത്തെ 20 entries");
     expect(summary).toContain("മറ്റു entries ഉണ്ട്");
     expect(summary).not.toContain("Product 21:");
+  });
+
+  it("maps company directory classification to a read-only query", () => {
+    expect(
+      mapAiClassificationToFastQuery({
+        intent: "company_directory",
+        product_query: null,
+        driver_name: null,
+        yesterday: false,
+        period: null,
+        reply: null,
+      }),
+    ).toEqual({ type: "company_directory", companyName: null });
+  });
+
+  it("maps all-time driver trip list classifications to a typed read query", () => {
+    expect(
+      mapAiClassificationToFastQuery({
+        intent: "driver_trip_list",
+        product_query: null,
+        driver_name: "Majeed",
+        yesterday: false,
+        period: null,
+        reply: null,
+      }),
+    ).toEqual({ type: "driver_trip_list", driverName: "Majeed" });
   });
 
   it("never routes a trip-start action through the read-only query handler", () => {

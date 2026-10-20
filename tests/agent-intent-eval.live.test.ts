@@ -12,6 +12,9 @@ const cases: Array<{
   yesterday?: boolean;
   driverNameMustBeNull?: boolean;
 }> = [
+  { id: "company-list-available-manglish", input: "Eethellam company ippol available aanu?", expected: "company_directory" },
+  { id: "company-name-with-question", input: "Savtr Solar enna company ninakkariyamo?", expected: "company_directory" },
+  { id: "company-name-alone", input: "Savtr Solar", expected: "company_directory" },
   { id: "stock-summary-en", input: "show me the stock we have", expected: "stock_inventory_summary" },
   { id: "stock-summary-ml", input: "നമ്മുടെ സ്റ്റോക്ക് ലിസ്റ്റ് കാണിക്കൂ", expected: "stock_inventory_summary" },
   { id: "driver-count-ml", input: "എത്ര ഡ്രൈവർമാരുണ്ട്?", expected: "driver_count" },
@@ -27,9 +30,12 @@ const cases: Array<{
   { id: "driver-trip-yesterday-english", input: "How many trips did Rasheed make yesterday?", expected: "driver_trip_summary", namedDriver: "Rasheed", yesterday: true },
   { id: "driver-trip-yesterday-malayalam", input: "റഷീദ് ഇന്നലെ എത്ര ട്രിപ്പ് പോയി?", expected: "driver_trip_summary", namedDriver: "Rasheed", yesterday: true },
   { id: "driver-trip-yesterday-majeed", input: "Majeed innale ethra trip poyi?", expected: "driver_trip_summary", namedDriver: "Majeed", yesterday: true },
+  { id: "driver-trip-all-time-manglish", input: "Majeedinte aake trip list cheyyamo", expected: "driver_trip_list", namedDriver: "Majeed" },
   { id: "unknown-driver-yesterday", input: "UnknownTestDriver innale ethra trip poyi?", expected: "unsupported", driverNameMustBeNull: true },
   { id: "partial-driver-name-collision", input: "Majeed P innale ethra trip poyi?", expected: "unsupported", driverNameMustBeNull: true },
   { id: "generic-yesterday-trip-count", input: "Innale ethra trips dispatch cheythu?", expected: "yesterday_trip_summary" },
+  { id: "company-list-available", input: "Eethellam company ippol available aanu?", expected: "company_directory" },
+  { id: "company-name-savtr-solar", input: "Savtr Solar enna company ninakkariyamo?", expected: "company_directory" },
   { id: "stock-list-manglish", input: "Stockil ippo ethokke products undu?", expected: "stock_inventory_summary" },
   { id: "stock-list-malayalam", input: "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്.", expected: "stock_inventory_summary" },
   { id: "greeting", input: "Hello, how are you?", expected: "unsupported" },

@@ -71,6 +71,41 @@ describe("WhatsApp AI intent fallback", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("classifies a standalone company name as a company lookup", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                intent: "company_directory",
+                product_query: "Savtr Solar",
+                driver_name: null,
+                yesterday: false,
+                period: null,
+                reply: null,
+              }),
+            },
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(looksLikeOperationalQuery("Savtr Solar")).toBe(true);
+    await expect(classifyOperationalQueryWithGroq("Savtr Solar")).resolves.toMatchObject({
+      intent: "company_directory",
+      product_query: "Savtr Solar",
+    });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body.messages[0].content).toContain("copy only that company name into product_query");
+  });
+
   it("sends only bounded user text for unresolved operational intent classification", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
@@ -163,6 +198,47 @@ describe("WhatsApp AI intent fallback", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(String(init.body));
     expect(body.messages[1].content.length).toBe(500);
+  });
+
+  it("resolves Manglish possessive driver names and all-time trip-list wording", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  intent: "driver_trip_summary",
+                  product_query: null,
+                  driver_name: "Majeedinte",
+                  yesterday: false,
+                  period: null,
+                  reply: null,
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      classifyOperationalQueryWithGroq("Majeedinte aake trip list cheyyamo", {
+        driverNames: ["Rasheed", "Majeed"],
+      }),
+    ).resolves.toEqual({
+      intent: "driver_trip_list",
+      product_query: null,
+      driver_name: "Majeed",
+      yesterday: false,
+      period: null,
+      reply: null,
+    });
   });
 
   it("extracts a clearly named driver and yesterday intent", async () => {

@@ -35,10 +35,12 @@ export type FastWhatsAppQuery =
   | { type: "latest_bill" }
   | { type: "stock_balance"; productQuery: string }
   | { type: "stock_inventory_summary" }
+  | { type: "company_directory"; companyName: string | null }
   | { type: "stock_product_required" }
   | { type: "today_trip_summary" }
   | { type: "yesterday_trip_summary" }
   | { type: "driver_trip_summary"; driverName: string; yesterday: boolean }
+  | { type: "driver_trip_list"; driverName: string }
   | { type: "trip_filter_summary"; filterBy: "vehicle" | "destination"; filterValue: string; yesterday: boolean }
   | { type: "driver_count" }
   | { type: "today_products_summary" }
@@ -110,6 +112,12 @@ const LATEST_TERMS = [
 ];
 
 const STOCK_TERMS = ["stock", "സ്റ്റോക്ക"];
+const COMPANY_TERMS = ["company", "companies", "supplier", "കമ്പനി", "കമ്പനികൾ", "കമ്പനിയുടെ"];
+const COMPANY_DIRECTORY_QUESTION_TERMS = [
+  "available", "availability", "which", "what", "list", "all", "eethellam",
+  "ariyamo", "known", "know", "ആരിയാമോ", "അറിയാമോ", "ഏതെല്ലാം", "ഏതൊക്കെ",
+  "ലഭ്യമാണ്", "ലഭ്യമാണോ", "ഇപ്പോൾ",
+];
 const TRIP_TERMS = ["trip", "trips", "ട്രിപ്പ്", "ട്രിപ്പുകൾ"];
 const PRODUCT_TERMS = [
   "product",
@@ -369,6 +377,18 @@ export function parseFastWhatsAppQuery(
   const hasBill = includesAny(normalized, BILL_TERMS);
   const hasCount = includesAny(normalized, COUNT_TERMS);
 
+  if (
+    includesAny(normalized, COMPANY_TERMS) &&
+    includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)
+  ) {
+    const original = text.normalize("NFKC").trim();
+    const companyName =
+      original.match(/^(.+?)\s+(?:enna|called|named)\s+company\b/iu)?.[1]?.trim() ??
+      original.match(/\bcompany\s+(?:called|named)\s+(.+?)(?:\s+(?:available|ariyamo|known|now|ippol)\b|$)/iu)?.[1]?.trim() ??
+      null;
+    return { type: "company_directory", companyName };
+  }
+
   const asksForProductMovement =
     (includesAny(normalized, PRODUCT_TERMS) || includesAny(normalized, STOCK_TERMS)) &&
     includesAny(normalized, TODAY_PRODUCT_MOVEMENT_TERMS);
@@ -493,11 +513,20 @@ export function mapAiClassificationToFastQuery(
       : { type: "stock_product_required" };
   }
 
+  if (classification.intent === "company_directory") {
+    return { type: "company_directory", companyName: classification.product_query?.trim() || null };
+  }
+
   if (classification.intent === "driver_trip_summary") {
     const driverName = classification.driver_name?.trim();
     return driverName
       ? { type: "driver_trip_summary", driverName, yesterday: classification.yesterday }
       : null;
+  }
+
+  if (classification.intent === "driver_trip_list") {
+    const driverName = classification.driver_name?.trim();
+    return driverName ? { type: "driver_trip_list", driverName } : null;
   }
 
   if (classification.intent === "ops_period_summary") {
@@ -880,6 +909,42 @@ async function stockInventorySummary(): Promise<string> {
   return formatStockInventorySummary(data ?? []);
 }
 
+async function companyDirectoryAnswer(companyName: string | null = null): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("stock_balances")
+    .select("company_name")
+    .order("company_name", { ascending: true })
+    .limit(500);
+
+  if (error) throw new Error("Failed to load companies from stock records: " + error.message);
+  const companies = Array.from(new Set(
+    (data ?? [])
+      .map((row) => String(row.company_name ?? "").trim())
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b));
+
+  if (companies.length === 0) {
+    return "നിലവിലെ stock records-ൽ company names കണ്ടെത്തിയില്ല. അതിനാൽ ഇപ്പോൾ ലഭ്യമായ കമ്പനികളുടെ പട്ടിക സ്ഥിരീകരിക്കാൻ കഴിയുന്നില്ല.";
+  }
+
+  if (companyName) {
+    const normalizedTarget = companyName.normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const match = companies.find((name) =>
+      name.normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]+/gu, " ").trim() === normalizedTarget
+    );
+    return match
+      ? match + " എന്ന പേര് current stock records-ൽ കാണുന്നുണ്ട്."
+      : companyName + " എന്ന പേര് current stock records-ൽ കണ്ടെത്തിയില്ല. അതുകൊണ്ട് കമ്പനി നിലവിലില്ലെന്നോ supplier അല്ലെന്നോ ഉറപ്പിച്ച് പറയാനാവില്ല.";
+  }
+
+  return [
+    "നിലവിലെ stock records-ൽ കാണുന്ന കമ്പനികൾ:",
+    ...companies.map((name) => "• " + name),
+    "കുറിപ്പ്: ഇത് current stock records-ൽ ഉള്ള പേരുകളുടെ പട്ടികയാണ്; company registration അല്ലെങ്കിൽ എല്ലാ supplier-മാരുടെയും directory അല്ല.",
+  ].join("\n");
+}
+
 async function stockBalanceAnswer(productQuery: string): Promise<string> {
   const normalized = normalizeProductDescription(productQuery);
   if (!normalized) {
@@ -1011,6 +1076,7 @@ async function driverTripsSummary(
   driverName: string,
   yesterday = false,
   now = new Date(),
+  allTime = false,
 ): Promise<string> {
   const supabase = getSupabaseAdmin();
   const queryTime = yesterday ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
@@ -1045,21 +1111,34 @@ async function driverTripsSummary(
       : "“" + driverName + "” എന്ന പേരിൽ ഒന്നിലധികം drivers ഉണ്ട്. കൃത്യമായ പേര് തിരഞ്ഞെടുക്കൂ.";
   }
   const driver = matched[0];
-  const { data: trips, error } = await supabase
+  let tripRequest = supabase
     .from("delivery_trips")
-    .select("display_name, vehicle_number, driver_id, finalized_at")
+    .select("display_name, vehicle_number, driver_id, finalized_at", { count: "exact" })
     .eq("status", "ready")
     .eq("driver_id", driver.id)
-    .gte("finalized_at", bounds.start)
-    .lt("finalized_at", bounds.end)
     .order("finalized_at", { ascending: false })
     .limit(50);
+  if (!allTime) {
+    tripRequest = tripRequest.gte("finalized_at", bounds.start).lt("finalized_at", bounds.end);
+  }
+  const { data: trips, error, count } = await tripRequest;
   if (error) throw new Error("Failed to load driver trips: " + error.message);
   const rows = (trips ?? []) as TripSummaryRow[];
   const names = await driverNamesById(rows.map((row) => row.driver_id).filter((id): id is string => Boolean(id)));
-  return rows.length === 0
-    ? (yesterday ? "ഇന്നലെ " : "ഇന്ന് ") + driverName + " എന്ന driver-ന്റെ finalized trip കണ്ടെത്തിയില്ല."
-    : formatTripSummary(rows, names, (yesterday ? "ഇന്നലത്തെ " : "ഇന്നത്തെ ") + driverName + "യുടെ trips (ആകെ " + String(rows.length) + "):");
+  if (rows.length === 0) {
+    return allTime
+      ? driverName + " എന്ന driver-ന്റെ saved finalized trips ഒന്നും കണ്ടെത്തിയില്ല."
+      : (yesterday ? "ഇന്നലെ " : "ഇന്ന് ") + driverName + " എന്ന driver-ന്റെ finalized trip കണ്ടെത്തിയില്ല.";
+  }
+  if (allTime) {
+    const total = count ?? rows.length;
+    const heading = driverName + "യുടെ എല്ലാ saved finalized trips (ആകെ " + String(total) + ")";
+    const boundedHeading = total > rows.length
+      ? heading + "; ഏറ്റവും പുതിയ " + String(rows.length) + " മാത്രം കാണിക്കുന്നു:"
+      : heading + ":";
+    return formatTripSummary(rows, names, boundedHeading);
+  }
+  return formatTripSummary(rows, names, (yesterday ? "ഇന്നലത്തെ " : "ഇന്നത്തെ ") + driverName + "യുടെ trips (ആകെ " + String(rows.length) + "):");
 }
 
 async function filteredTripsSummary(
@@ -1382,6 +1461,10 @@ async function answerFastQuery(
     return stockInventorySummary();
   }
 
+  if (query.type === "company_directory") {
+    return companyDirectoryAnswer(query.companyName);
+  }
+
   if (query.type === "today_trip_summary") {
     return tripsSummaryForDay(false);
   }
@@ -1392,6 +1475,10 @@ async function answerFastQuery(
 
   if (query.type === "driver_trip_summary") {
     return driverTripsSummary(query.driverName, query.yesterday);
+  }
+
+  if (query.type === "driver_trip_list") {
+    return driverTripsSummary(query.driverName, false, new Date(), true);
   }
 
   if (query.type === "trip_filter_summary") {
