@@ -265,8 +265,8 @@ const COMPANY_LEGAL_SUFFIXES = new Set([
 
 function normalizeCompanyName(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase("en")
-    .replace(/[^\\p{L}\\p{N}]+/gu, " ")
-    .split(/\\s+/)
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .split(/\s+/)
     .filter((token) => token && !COMPANY_LEGAL_SUFFIXES.has(token))
     .join(" ").trim();
 }
@@ -300,24 +300,24 @@ function companyMatchScore(query: string, candidate: string): number {
     (Math.min(candidateToken.length, token.length) >= 4 &&
       editSimilarity(candidateToken, token) >= 0.68))).length;
   return Math.max((shared / wantedTokens.length) * 0.82,
-    editSimilarity(wanted.replace(/\\s/g, ""), actual.replace(/\\s/g, "")) * 0.9);
+    editSimilarity(wanted.replace(/\s/g, ""), actual.replace(/\s/g, "")) * 0.9);
 }
 
 function extractCompanyName(text: string): string | null {
   const original = text.normalize("NFKC").trim().replace(/[?!]+$/g, "").trim();
   const patterns = [
-    /^(.+?)\\s+(?:enna|called|named)\\s+company\\b/i,
-    /\\bcompany\\s+(?:called|named)\\s+(.+?)(?=\\s+(?:available|ariyamo|known|now|ippol|products?|items?|ethra|how many)\\b|$)/i,
-    /^(.+?)\\s+(?:company\\s+(?:ariyamo|known|available)|ninakkariyamo|ariyamo)\\b/i,
+    /^(.+?)\s+(?:enna|called|named)\s+company\b/i,
+    /\bcompany\s+(?:called|named)\s+(.+?)(?=\s+(?:available|ariyamo|known|now|ippol|products?|items?|ethra|how many)\b|$)/i,
+    /^(.+?)\s+(?:company\s+(?:ariyamo|known|available)|ninakkariyamo|ariyamo)\b/i,
   ];
   for (const pattern of patterns) {
     const match = original.match(pattern)?.[1]?.trim();
     if (match) return match.replace(/[?!.,]+$/g, "").trim() || null;
   }
   const cleaned = original
-    .replace(/\\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|quantity|qty|please|tell|me|is|are|the|of|company|enna|ninakkariyamo|ariyamo)\\b/gi, " ")
-    .replace(/[?!,;:()[\\]{}"'’“”]+/g, " ")
-    .replace(/\\s+/g, " ").trim();
+    .replace(/\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|quantity|qty|please|tell|me|is|are|the|of|company|enna|ninakkariyamo|ariyamo)\b/gi, " ")
+    .replace(/[?!,;:()[\]{}"'’“”]+/g, " ")
+    .replace(/\s+/g, " ").trim();
   return cleaned || null;
 }
 
@@ -450,9 +450,9 @@ export function parseFastWhatsAppQuery(
     !includesAny(normalized, COMPANY_TERMS)
   ) {
     const companyName = text.normalize("NFKC")
-      .replace(/\\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|quantity|qty|please|tell|me|is|are|the|of|company)\\b/gi, " ")
-      .replace(/[?!,;:()[\\]{}"'’“”]+/g, " ")
-      .replace(/\\s+/g, " ").trim();
+      .replace(/\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|quantity|qty|please|tell|me|is|are|the|of|company)\b/gi, " ")
+      .replace(/[?!,;:()[\]{}"'’“”]+/g, " ")
+      .replace(/\s+/g, " ").trim();
     if (companyName) return { type: "company_directory", companyName, includeProducts: true };
   }
 
