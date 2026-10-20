@@ -71,6 +71,41 @@ describe("WhatsApp AI intent fallback", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("classifies a standalone company name as a company lookup", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                intent: "company_directory",
+                product_query: "Savtr Solar",
+                driver_name: null,
+                yesterday: false,
+                period: null,
+                reply: null,
+              }),
+            },
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(looksLikeOperationalQuery("Savtr Solar")).toBe(true);
+    await expect(classifyOperationalQueryWithGroq("Savtr Solar")).resolves.toMatchObject({
+      intent: "company_directory",
+      product_query: "Savtr Solar",
+    });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body.messages[0].content).toContain("copy only that company name into product_query");
+  });
+
   it("sends only bounded user text for unresolved operational intent classification", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
