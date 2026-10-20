@@ -3,6 +3,7 @@ import {
   isDriverRelatedQuestion,
   parseFastWhatsAppQuery,
   scoreCompanyNameMatch,
+  resolveCompanyStockQueryCandidate,
 } from "../lib/whatsapp-queries";
 
 // Adversarial deterministic parser regression pack. This deliberately tests
@@ -84,6 +85,30 @@ describe("adversarial Solar Ops intent routing (100+ scenarios)", () => {
       expect(parseFastWhatsAppQuery(input)).toBeNull();
     },
   );
+
+  it("routes a company-only stock balance query to company-level resolution", () => {
+    expect(resolveCompanyStockQueryCandidate("savitr solar", [
+      "SAVITR SOLAR SOLUTIONS LIMITED",
+    ])).toEqual({
+      matchedCompany: "SAVITR SOLAR SOLUTIONS LIMITED",
+      ambiguousCompanies: [],
+    });
+  });
+
+  it("does not confuse a numeric solar product query with a company name", () => {
+    expect(resolveCompanyStockQueryCandidate("Solar 560 panel", [
+      "SAVITR SOLAR SOLUTIONS LIMITED",
+    ])).toEqual({ matchedCompany: null, ambiguousCompanies: [] });
+  });
+
+  it("asks for clarification when company-only stock query matches multiple companies", () => {
+    const result = resolveCompanyStockQueryCandidate("savitr solar", [
+      "SAVITR SOLAR SOLUTIONS LIMITED",
+      "SAVITR SOLAR PRIVATE LIMITED",
+    ]);
+    expect(result.matchedCompany).toBeNull();
+    expect(result.ambiguousCompanies).toHaveLength(2);
+  });
 
   it.each([
     ["Savtr Solar", "SAVITR SOLAR SOLUTIONS LIMITED"],
