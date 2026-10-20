@@ -221,6 +221,19 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(summary).not.toContain("Product 21:");
   });
 
+  it("maps all-time driver trip list classifications to a typed read query", () => {
+    expect(
+      mapAiClassificationToFastQuery({
+        intent: "driver_trip_list",
+        product_query: null,
+        driver_name: "Majeed",
+        yesterday: false,
+        period: null,
+        reply: null,
+      }),
+    ).toEqual({ type: "driver_trip_list", driverName: "Majeed" });
+  });
+
   it("never routes a trip-start action through the read-only query handler", () => {
     expect(
       mapAiClassificationToFastQuery({
