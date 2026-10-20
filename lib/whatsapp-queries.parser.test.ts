@@ -37,10 +37,15 @@ describe("isDriverRelatedQuestion voice transcript guard", () => {
     expect(parseFastWhatsAppQuery("innale Majeed ethra trip poyi?")).toBeNull();
   });
 
-  it("keeps a generic yesterday trip count on the day-summary route", () => {
-    expect(isDriverRelatedQuestion("Innale ethra trips dispatch cheythu?")).toBe(false);
-    expect(parseFastWhatsAppQuery("Innale ethra trips dispatch cheythu?")).toEqual({
-      type: "yesterday_trip_summary",
-    });
+  it("keeps generic yesterday trip questions on the day-summary route", () => {
+    for (const question of [
+      "Innale ethra trips dispatch cheythu?",
+      "Yesterday how much trip",
+    ]) {
+      expect(isDriverRelatedQuestion(question)).toBe(false);
+      expect(parseFastWhatsAppQuery(question)).toEqual({
+        type: "yesterday_trip_summary",
+      });
+    }
   });
 });

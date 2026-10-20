@@ -422,9 +422,6 @@ export async function classifyOperationalQueryWithGroq(
   const hasTripTerm = /(?:^|[^\p{L}\p{N}])(?:trip|trips|ട്രിപ്പ്|ട്രിപ്പുകൾ)(?:$|[^\p{L}\p{N}])/iu.test(boundedText);
   const hasYesterdayTerm = /(?:^|[^\p{L}\p{N}])(?:yesterday|innale)(?:$|[^\p{L}\p{N}])/iu.test(normalizedQuery) ||
     boundedText.includes("ഇന്നലെ");
-  const hasTodayTerm = /(?:^|[^\p{L}\p{N}])(?:today|innu|innathe|inn)(?:$|[^\p{L}\p{N}])/iu.test(normalizedQuery) ||
-    boundedText.includes("ഇന്ന്") ||
-    boundedText.includes("ഇന്നത്തെ");
 
   // When the model returns a general day summary for a query that explicitly
   // names one exact active driver, preserve that driver filter.
