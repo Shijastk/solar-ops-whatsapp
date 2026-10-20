@@ -451,6 +451,7 @@ export function parseFastWhatsAppQuery(
       includeProducts: includesAny(normalized, PRODUCT_TERMS) &&
         (includesAny(normalized, STOCK_QUESTION_TERMS) ||
           includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)),
+    };
   }
 
   const asksForProductMovement =
