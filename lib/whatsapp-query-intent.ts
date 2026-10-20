@@ -83,65 +83,6 @@ const strictResponseSchema = {
   additionalProperties: false,
 } as const;
 
-const DOMAIN_HINTS = [
-  "bill",
-  "invoice",
-  "stock",
-  "inventory",
-  "solar",
-  "energy",
-  "industries",
-  "traders",
-  "distributors",
-  "enterprise",
-  "enterprises",
-  "pvt",
-  "ltd",
-  "product",
-  "panel",
-  "inverter",
-  "topcon",
-  "dcr",
-  "non dcr",
-  "wp",
-  "ബിൽ",
-  "ബില്ല്",
-  "സ്റ്റോക്ക്",
-  "ഇൻവെന്ററി",
-  "പാനൽ",
-  "ഇൻവെർട്ടർ",
-  "സാധനം",
-  "പ്രോഡക്റ്റ്",
-  "പ്രൊഡക്റ്റ്",
-  "പ്രൊഡക്റ്റുകൾ",
-  "പ്രൊഡക്ട്",
-  "trip",
-  "trips",
-  "company",
-  "companies",
-  "supplier",
-  "available companies",
-  "company directory",
-  "കമ്പനി",
-  "കമ്പനികൾ",
-  "കമ്പനിയുടെ",
-  "route",
-  "driver",
-  "ട്രിപ്പ്",
-  "ട്രിപ്പുകൾ",
-  "റൂട്ട്",
-  "ഡ്രൈവർ",
-  "summary",
-  "week",
-  "month",
-  "year",
-  "ആഴ്ച",
-  "വാരം",
-  "മാസം",
-  "വർഷം",
-  "സമ്മറി",
-];
-
 export type AiOperationalQueryClassification = z.infer<
   typeof classificationSchema
 >;
@@ -151,20 +92,6 @@ function normalizeNameTokens(value: string): string[] {
     .normalize("NFKC")
     .toLocaleLowerCase("en")
     .match(/[\p{L}\p{N}]+/gu) ?? [];
-}
-
-function normalizeQueryText(value: string): string {
-  return value
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-export function looksLikeOperationalQuery(text: string): boolean {
-  const normalized = normalizeQueryText(text);
-  if (!normalized) return false;
-  return DOMAIN_HINTS.some((hint) => normalized.includes(hint));
 }
 
 function sanitizeProviderErrorText(value: string): string | null {
