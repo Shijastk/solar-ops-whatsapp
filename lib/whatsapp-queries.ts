@@ -35,7 +35,7 @@ export type FastWhatsAppQuery =
   | { type: "latest_bill" }
   | { type: "stock_balance"; productQuery: string }
   | { type: "stock_inventory_summary" }
-  | { type: "company_directory"; companyName: string | null }
+  | { type: "company_directory"; companyName: string | null; includeProducts?: boolean }
   | { type: "stock_product_required" }
   | { type: "today_trip_summary" }
   | { type: "yesterday_trip_summary" }
@@ -258,6 +258,69 @@ function normalizeQueryText(value: string): string {
     .trim();
 }
 
+
+const COMPANY_LEGAL_SUFFIXES = new Set([
+  "limited", "ltd", "private", "pvt", "llp", "llc", "inc", "incorporated",
+]);
+
+function normalizeCompanyName(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase("en")
+    .replace(/[^\\p{L}\\p{N}]+/gu, " ")
+    .split(/\\s+/)
+    .filter((token) => token && !COMPANY_LEGAL_SUFFIXES.has(token))
+    .join(" ").trim();
+}
+
+function editSimilarity(left: string, right: string): number {
+  if (left === right) return 1;
+  if (!left || !right) return 0;
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= left.length; i += 1) {
+    let diagonal = previous[0];
+    previous[0] = i;
+    for (let j = 1; j <= right.length; j += 1) {
+      const above = previous[j];
+      previous[j] = Math.min(previous[j] + 1, previous[j - 1] + 1,
+        diagonal + (left[i - 1] === right[j - 1] ? 0 : 1));
+      diagonal = above;
+    }
+  }
+  return 1 - previous[right.length] / Math.max(left.length, right.length);
+}
+
+function companyMatchScore(query: string, candidate: string): number {
+  const wanted = normalizeCompanyName(query);
+  const actual = normalizeCompanyName(candidate);
+  if (!wanted || !actual) return 0;
+  if (wanted === actual) return 1;
+  const wantedTokens = wanted.split(" ");
+  const actualTokens = actual.split(" ");
+  const shared = wantedTokens.filter((token) => actualTokens.some((candidateToken) =>
+    candidateToken === token ||
+    (Math.min(candidateToken.length, token.length) >= 4 &&
+      editSimilarity(candidateToken, token) >= 0.68))).length;
+  return Math.max((shared / wantedTokens.length) * 0.82,
+    editSimilarity(wanted.replace(/\\s/g, ""), actual.replace(/\\s/g, "")) * 0.9);
+}
+
+function extractCompanyName(text: string): string | null {
+  const original = text.normalize("NFKC").trim().replace(/[?!]+$/g, "").trim();
+  const patterns = [
+    /^(.+?)\\s+(?:enna|called|named)\\s+company\\b/i,
+    /\\bcompany\\s+(?:called|named)\\s+(.+?)(?=\\s+(?:available|ariyamo|known|now|ippol|products?|items?|ethra|how many)\\b|$)/i,
+    /^(.+?)\\s+(?:company\\s+(?:ariyamo|known|available)|ninakkariyamo|ariyamo)\\b/i,
+  ];
+  for (const pattern of patterns) {
+    const match = original.match(pattern)?.[1]?.trim();
+    if (match) return match.replace(/[?!.,]+$/g, "").trim() || null;
+  }
+  return null;
+}
+
+export function scoreCompanyNameMatch(query: string, candidate: string): number {
+  return companyMatchScore(query, candidate);
+}
+
 function includesAny(value: string, terms: string[]): boolean {
   return terms.some((term) => value.includes(term));
 }
@@ -381,12 +444,13 @@ export function parseFastWhatsAppQuery(
     includesAny(normalized, COMPANY_TERMS) &&
     includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)
   ) {
-    const original = text.normalize("NFKC").trim();
-    const companyName =
-      original.match(/^(.+?)\s+(?:enna|called|named)\s+company\b/iu)?.[1]?.trim() ??
-      original.match(/\bcompany\s+(?:called|named)\s+(.+?)(?:\s+(?:available|ariyamo|known|now|ippol)\b|$)/iu)?.[1]?.trim() ??
-      null;
-    return { type: "company_directory", companyName };
+    const companyName = extractCompanyName(text);
+    return {
+      type: "company_directory",
+      companyName,
+      includeProducts: includesAny(normalized, PRODUCT_TERMS) &&
+        (includesAny(normalized, STOCK_QUESTION_TERMS) ||
+          includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)),
   }
 
   const asksForProductMovement =
@@ -514,7 +578,8 @@ export function mapAiClassificationToFastQuery(
   }
 
   if (classification.intent === "company_directory") {
-    return { type: "company_directory", companyName: classification.product_query?.trim() || null };
+    const rawName = classification.product_query?.trim() || null;
+    return { type: "company_directory", companyName: rawName ? extractCompanyName(rawName) ?? rawName : null };
   }
 
   if (classification.intent === "driver_trip_summary") {
@@ -909,42 +974,58 @@ async function stockInventorySummary(): Promise<string> {
   return formatStockInventorySummary(data ?? []);
 }
 
-async function companyDirectoryAnswer(companyName: string | null = null): Promise<string> {
+async function companyDirectoryAnswer(
+  companyName: string | null = null,
+  includeProducts = false,
+): Promise<string> {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("stock_balances")
-    .select("company_name")
-    .order("company_name", { ascending: true })
-    .limit(500);
-
+  const { data, error } = await supabase.from("stock_balances")
+    .select("company_name").order("company_name", { ascending: true }).limit(500);
   if (error) throw new Error("Failed to load companies from stock records: " + error.message);
-  const companies = Array.from(new Set(
-    (data ?? [])
-      .map((row) => String(row.company_name ?? "").trim())
-      .filter(Boolean),
-  )).sort((a, b) => a.localeCompare(b));
-
+  const companies = Array.from(new Set((data ?? [])
+    .map((row) => String(row.company_name ?? "").trim()).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b));
   if (companies.length === 0) {
     return "നിലവിലെ stock records-ൽ company names കണ്ടെത്തിയില്ല. അതിനാൽ ഇപ്പോൾ ലഭ്യമായ കമ്പനികളുടെ പട്ടിക സ്ഥിരീകരിക്കാൻ കഴിയുന്നില്ല.";
   }
-
-  if (companyName) {
-    const normalizedTarget = companyName.normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-    const match = companies.find((name) =>
-      name.normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]+/gu, " ").trim() === normalizedTarget
-    );
-    return match
-      ? match + " എന്ന പേര് current stock records-ൽ കാണുന്നുണ്ട്."
-      : companyName + " എന്ന പേര് current stock records-ൽ കണ്ടെത്തിയില്ല. അതുകൊണ്ട് കമ്പനി നിലവിലില്ലെന്നോ supplier അല്ലെന്നോ ഉറപ്പിച്ച് പറയാനാവില്ല.";
-  }
-
-  return [
+  if (!companyName) return [
     "നിലവിലെ stock records-ൽ കാണുന്ന കമ്പനികൾ:",
     ...companies.map((name) => "• " + name),
     "കുറിപ്പ്: ഇത് current stock records-ൽ ഉള്ള പേരുകളുടെ പട്ടികയാണ്; company registration അല്ലെങ്കിൽ എല്ലാ supplier-മാരുടെയും directory അല്ല.",
   ].join("\n");
-}
 
+  const ranked = companies.map((name) => ({ name, score: companyMatchScore(companyName, name) }))
+    .sort((left, right) => right.score - left.score);
+  const best = ranked[0], second = ranked[1];
+  if (!best || best.score < 0.48) {
+    return companyName + " എന്ന പേരിന് current stock records-ൽ വിശ്വസനീയമായ match കണ്ടെത്തിയില്ല. കമ്പനി നിലവിലില്ലെന്നോ supplier അല്ലെന്നോ ഇതിൽ നിന്ന് ഉറപ്പിക്കാനാവില്ല.";
+  }
+  if (second && second.score >= 0.62 && best.score - second.score < 0.12) {
+    return ["ഏത് കമ്പനിയെയാണ് ഉദ്ദേശിച്ചത്?",
+      ...ranked.filter((item) => item.score >= Math.max(0.62, best.score - 0.12))
+        .slice(0, 4).map((item) => "• " + item.name)].join("\n");
+  }
+
+  const canonicalCompany = best.name;
+  if (!includeProducts) return canonicalCompany + " എന്ന company name current stock records-ൽ കാണുന്നുണ്ട്.";
+  const { data: stockRows, error: stockError } = await supabase.from("stock_balances")
+    .select("product_name, unit, current_quantity, balance_known")
+    .eq("company_name", canonicalCompany).order("product_name", { ascending: true }).limit(100);
+  if (stockError) throw new Error("Failed to load company stock products: " + stockError.message);
+  const products = Array.from(new Map((stockRows ?? []).map((row) => [
+    String(row.product_name ?? "").trim().toLocaleLowerCase("en"), row,
+  ])).values()).filter((row) => String(row.product_name ?? "").trim());
+  const available = products.filter((row) => Boolean(row.balance_known) && Number(row.current_quantity) > 0);
+  if (products.length === 0) return canonicalCompany + " എന്ന കമ്പനിക്ക് current stock records-ൽ products കണ്ടെത്തിയില്ല.";
+  return [
+    canonicalCompany + " — current stock summary:",
+    "Stock records-ൽ products: " + products.length,
+    "Quantity അറിയാവുന്നതും stock ഉള്ളതുമായ products: " + available.length,
+    ...products.slice(0, 20).map((row) => "• " + String(row.product_name) + ": " +
+      (row.balance_known ? String(Number(row.current_quantity)) + " " + String(row.unit ?? "") : "quantity സ്ഥിരീകരിച്ചിട്ടില്ല")),
+    products.length > 20 ? "മറ്റു products ഉം records-ൽ ഉണ്ട്." : "",
+  ].filter(Boolean).join("\n");
+}
 async function stockBalanceAnswer(productQuery: string): Promise<string> {
   const normalized = normalizeProductDescription(productQuery);
   if (!normalized) {
@@ -1462,7 +1543,7 @@ async function answerFastQuery(
   }
 
   if (query.type === "company_directory") {
-    return companyDirectoryAnswer(query.companyName);
+    return companyDirectoryAnswer(query.companyName, query.includeProducts);
   }
 
   if (query.type === "today_trip_summary") {
@@ -1564,6 +1645,9 @@ export async function handleFastWhatsAppQuery(
       if (classification) {
         classifierOutcome = classification.intent === "unsupported" ? "unsupported" : "mapped";
         query = mapAiClassificationToFastQuery(classification);
+        if (query?.type === "company_directory") {
+          query.includeProducts = includesAny(normalizeQueryText(message.textBody), PRODUCT_TERMS);
+        }
         if (query) resolver = "ai_intent";
         else classificationReply = classification.reply;
       }
