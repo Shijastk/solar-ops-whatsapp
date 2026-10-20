@@ -27,6 +27,7 @@ const cases: Array<{
   { id: "driver-trip-yesterday-english", input: "How many trips did Rasheed make yesterday?", expected: "driver_trip_summary", namedDriver: "Rasheed", yesterday: true },
   { id: "driver-trip-yesterday-malayalam", input: "റഷീദ് ഇന്നലെ എത്ര ട്രിപ്പ് പോയി?", expected: "driver_trip_summary", namedDriver: "Rasheed", yesterday: true },
   { id: "driver-trip-yesterday-majeed", input: "Majeed innale ethra trip poyi?", expected: "driver_trip_summary", namedDriver: "Majeed", yesterday: true },
+  { id: "driver-trip-all-time-manglish", input: "Majeedinte aake trip list cheyyamo", expected: "driver_trip_list", namedDriver: "Majeed" },
   { id: "unknown-driver-yesterday", input: "UnknownTestDriver innale ethra trip poyi?", expected: "unsupported", driverNameMustBeNull: true },
   { id: "partial-driver-name-collision", input: "Majeed P innale ethra trip poyi?", expected: "unsupported", driverNameMustBeNull: true },
   { id: "generic-yesterday-trip-count", input: "Innale ethra trips dispatch cheythu?", expected: "yesterday_trip_summary" },
