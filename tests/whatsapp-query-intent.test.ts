@@ -356,7 +356,7 @@ describe("WhatsApp AI intent fallback", () => {
               content: JSON.stringify({
                 intent: "yesterday_trip_summary",
                 product_query: null,
-                driver_name: null,
+                driver_name: "Rasheed",
                 yesterday: true,
                 period: null,
                 reply: null,
