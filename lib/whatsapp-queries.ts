@@ -35,6 +35,7 @@ export type FastWhatsAppQuery =
   | { type: "latest_bill" }
   | { type: "stock_balance"; productQuery: string }
   | { type: "stock_inventory_summary" }
+  | { type: "company_directory"; companyName: string | null }
   | { type: "stock_product_required" }
   | { type: "today_trip_summary" }
   | { type: "yesterday_trip_summary" }
@@ -494,6 +495,10 @@ export function mapAiClassificationToFastQuery(
       : { type: "stock_product_required" };
   }
 
+  if (classification.intent === "company_directory") {
+    return { type: "company_directory", companyName: null };
+  }
+
   if (classification.intent === "driver_trip_summary") {
     const driverName = classification.driver_name?.trim();
     return driverName
@@ -884,6 +889,32 @@ async function stockInventorySummary(): Promise<string> {
   }
 
   return formatStockInventorySummary(data ?? []);
+}
+
+async function companyDirectoryAnswer(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("stock_balances")
+    .select("company_name")
+    .order("company_name", { ascending: true })
+    .limit(500);
+
+  if (error) throw new Error("Failed to load companies from stock records: " + error.message);
+  const companies = Array.from(new Set(
+    (data ?? [])
+      .map((row) => String(row.company_name ?? "").trim())
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b));
+
+  if (companies.length === 0) {
+    return "നിലവിലെ stock records-ൽ company names കണ്ടെത്തിയില്ല. അതിനാൽ ഇപ്പോൾ ലഭ്യമായ കമ്പനികളുടെ പട്ടിക സ്ഥിരീകരിക്കാൻ കഴിയുന്നില്ല.";
+  }
+
+  return [
+    "നിലവിലെ stock records-ൽ കാണുന്ന കമ്പനികൾ:",
+    ...companies.map((name) => "• " + name),
+    "കുറിപ്പ്: ഇത് current stock records-ൽ ഉള്ള പേരുകളുടെ പട്ടികയാണ്; company registration അല്ലെങ്കിൽ എല്ലാ supplier-മാരുടെയും directory അല്ല.",
+  ].join("\n");
 }
 
 async function stockBalanceAnswer(productQuery: string): Promise<string> {
@@ -1400,6 +1431,10 @@ async function answerFastQuery(
 
   if (query.type === "stock_inventory_summary") {
     return stockInventorySummary();
+  }
+
+  if (query.type === "company_directory") {
+    return companyDirectoryAnswer();
   }
 
   if (query.type === "today_trip_summary") {
