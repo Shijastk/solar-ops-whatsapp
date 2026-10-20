@@ -103,7 +103,7 @@ describe("WhatsApp AI intent fallback", () => {
     });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(String(init.body));
-    expect(body.messages[0].content).toContain("copy only that company name into product_query");
+    expect(body.messages[0].content).toContain("For company_directory, copy only the company name into product_query");
   });
 
   it("sends only bounded user text for unresolved operational intent classification", async () => {
@@ -626,7 +626,7 @@ describe("WhatsApp AI intent fallback", () => {
     );
   });
 
-  it("overrides unsupported model output for explicit driver-count and multilingual stock-list phrases", async () => {
+  it("preserves the semantic model result instead of overriding it with phrase rules", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
 
@@ -657,16 +657,13 @@ describe("WhatsApp AI intent fallback", () => {
       "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്.",
       "നമ്മുടെ സ്റ്റോക്ക് ലിസ്റ്റ് കാണിക്കൂ",
     ]) {
-      const expectedIntent = input === "active drivers count"
-        ? "driver_count"
-        : "stock_inventory_summary";
       await expect(classifyOperationalQueryWithGroq(input)).resolves.toEqual({
-        intent: expectedIntent,
+        intent: "unsupported",
         product_query: null,
         driver_name: null,
         yesterday: false,
         period: null,
-        reply: null,
+        reply: "Please clarify your request.",
       });
     }
     expect(fetchMock).toHaveBeenCalledTimes(4);
