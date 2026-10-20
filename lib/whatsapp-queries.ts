@@ -1013,26 +1013,50 @@ async function companyDirectoryAnswer(
   includeProducts = false,
 ): Promise<string> {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.from("stock_balances")
-    .select("company_name").order("company_name", { ascending: true }).limit(500);
-  if (error) throw new Error("Failed to load companies from stock records: " + error.message);
-  const companies = Array.from(new Set((data ?? [])
-    .map((row) => String(row.company_name ?? "").trim()).filter(Boolean)))
+  // The company master is the source of truth for the directory. Stock balances
+  // are a product/quantity view and omit companies that currently have no stock.
+  const { data: companyRows, error: companyError } = await supabase
+    .from("stock_companies")
+    .select("canonical_name, active")
+    .eq("active", true)
+    .order("canonical_name", { ascending: true })
+    .limit(500);
+  if (companyError) {
+    throw new Error("Failed to load active companies from company directory: " + companyError.message);
+  }
+  const companies = Array.from(new Set((companyRows ?? [])
+    .map((row) => String(row.canonical_name ?? "").trim()).filter(Boolean)))
     .sort((a, b) => a.localeCompare(b));
   if (companies.length === 0) {
-    return "നിലവിലെ stock records-ൽ company names കണ്ടെത്തിയില്ല. അതിനാൽ ഇപ്പോൾ ലഭ്യമായ കമ്പനികളുടെ പട്ടിക സ്ഥിരീകരിക്കാൻ കഴിയുന്നില്ല.";
+    return "നിലവിലെ company directory-ൽ active company records കണ്ടെത്തിയില്ല. അതിനാൽ ഇപ്പോൾ ലഭ്യമായ കമ്പനികളുടെ പട്ടിക സ്ഥിരീകരിക്കാൻ കഴിയുന്നില്ല.";
   }
-  if (!companyName) return [
-    "നിലവിലെ stock records-ൽ കാണുന്ന കമ്പനികൾ:",
-    ...companies.map((name) => "• " + name),
-    "കുറിപ്പ്: ഇത് current stock records-ൽ ഉള്ള പേരുകളുടെ പട്ടികയാണ്; company registration അല്ലെങ്കിൽ എല്ലാ supplier-മാരുടെയും directory അല്ല.",
-  ].join("\n");
+  if (!companyName) {
+    const { data: stockCompanies, error: stockError } = await supabase
+      .from("stock_balances")
+      .select("company_name")
+      .limit(1000);
+    if (stockError) {
+      throw new Error("Failed to check companies with stock records: " + stockError.message);
+    }
+    const companiesWithStock = new Set((stockCompanies ?? [])
+      .map((row) => String(row.company_name ?? "").trim().toLocaleLowerCase("en"))
+      .filter(Boolean));
+    return [
+      "Company directory-ൽ ഉള്ള active കമ്പനികൾ:",
+      ...companies.map((name) => "• " + name + (
+        companiesWithStock.has(name.toLocaleLowerCase("en"))
+          ? " — current stock records ഉണ്ട്"
+          : " — current stock balance record കണ്ടെത്തിയില്ല"
+      )),
+      "കുറിപ്പ്: ഇത് active company directory-യിലെ പേരുകളാണ്. Stock ഇല്ലാത്തത് കമ്പനി ഇല്ലെന്നർത്ഥമല്ല.",
+    ].join("\\n");
+  }
 
   const ranked = companies.map((name) => ({ name, score: companyMatchScore(companyName, name) }))
     .sort((left, right) => right.score - left.score);
   const best = ranked[0], second = ranked[1];
   if (!best || best.score < 0.48) {
-    return companyName + " എന്ന പേരിന് current stock records-ൽ വിശ്വസനീയമായ match കണ്ടെത്തിയില്ല. കമ്പനി നിലവിലില്ലെന്നോ supplier അല്ലെന്നോ ഇതിൽ നിന്ന് ഉറപ്പിക്കാനാവില്ല.";
+    return companyName + " എന്ന പേരിന് active company directory-ൽ വിശ്വസനീയമായ match കണ്ടെത്തിയില്ല. കമ്പനി നിലവിലില്ലെന്നോ supplier അല്ലെന്നോ ഇതിൽ നിന്ന് ഉറപ്പിക്കാനാവില്ല.";
   }
   if (second && second.score >= 0.62 && best.score - second.score < 0.12) {
     return ["ഏത് കമ്പനിയെയാണ് ഉദ്ദേശിച്ചത്?",
@@ -1041,7 +1065,7 @@ async function companyDirectoryAnswer(
   }
 
   const canonicalCompany = best.name;
-  if (!includeProducts) return canonicalCompany + " എന്ന company name current stock records-ൽ കാണുന്നുണ്ട്.";
+  if (!includeProducts) return canonicalCompany + " എന്ന company name active company directory-ൽ കാണുന്നുണ്ട്.";
   const { data: stockRows, error: stockError } = await supabase.from("stock_balances")
     .select("product_name, unit, current_quantity, balance_known")
     .eq("company_name", canonicalCompany).order("product_name", { ascending: true }).limit(100);
