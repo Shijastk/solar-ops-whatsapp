@@ -315,7 +315,7 @@ function extractCompanyName(text: string): string | null {
     if (match) return match.replace(/[?!.,]+$/g, "").trim() || null;
   }
   const cleaned = original
-    .replace(/\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|stockil|ippo|eethellam|ethokke|ethokkeyanu|quantity|qty|please|tell|me|is|are|the|of|company|unrecognized|stoke|enna|ninakkariyamo|ariyamo)\b/gi, " ")
+    .replace(/\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|stockil|ippo|eethellam|ethokke|ethokkeyanu|quantity|qty|please|tell|me|is|are|the|of|company|unrecognized|stoke|store|stocke|enna|ninakkariyamo|ariyamo)\b/gi, " ")
     .replace(/[?!,;:()[\]{}"'’“”]+/g, " ")
     .replace(/\s+/g, " ").trim();
   return cleaned || null;
