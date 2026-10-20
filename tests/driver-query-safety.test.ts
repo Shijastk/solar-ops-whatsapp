@@ -13,6 +13,17 @@ vi.mock("@/lib/replies", () => ({
   sendOpsReply: sendOpsReplyMock,
 }));
 
+vi.mock("@/lib/whatsapp-query-intent", () => ({
+  classifyOperationalQueryWithGroq: vi.fn().mockResolvedValue({
+    intent: "unsupported",
+    product_query: null,
+    driver_name: null,
+    yesterday: false,
+    period: null,
+    reply: "Driver directory-ൽ ഈ പേര് കൃത്യമായി കണ്ടെത്താനായില്ല. പേര് confirm ചെയ്യൂ.",
+  }),
+}));
+
 import { handleFastWhatsAppQuery } from "../lib/whatsapp-queries";
 
 type Filter = [column: string, value: unknown];
