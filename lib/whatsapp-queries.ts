@@ -445,10 +445,10 @@ export function parseFastWhatsAppQuery(
   const hasCount = includesAny(normalized, COUNT_TERMS);
 
   if (
-    (includesAny(normalized, PRODUCT_TERMS) || /\\bproducts?\\b/i.test(normalized)) &&
+    (includesAny(normalized, PRODUCT_TERMS) || /\bproducts?\b/i.test(normalized)) &&
     (includesAny(normalized, STOCK_QUESTION_TERMS) ||
       includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS) ||
-      /\\b(?:ethra|available|undu|undo|quantity)\\b/i.test(normalized)) &&
+      /\b(?:ethra|available|undu|undo|quantity)\b/i.test(normalized)) &&
     !includesAny(normalized, COMPANY_TERMS) &&
     !includesAny(normalized, TODAY_TERMS) &&
     !includesAny(normalized, YESTERDAY_TERMS) &&
@@ -462,7 +462,7 @@ export function parseFastWhatsAppQuery(
       .replace(/\s+/g, " ").trim();
     if (
       companyName &&
-      /[\\p{L}]{2,}/u.test(companyName) &&
+      /[\p{L}]{2,}/u.test(companyName) &&
       !includesAny(normalizeQueryText(companyName), ["unknown", "unrecognized", "product", "item"])
     ) {
       return { type: "company_directory", companyName, includeProducts: true };
