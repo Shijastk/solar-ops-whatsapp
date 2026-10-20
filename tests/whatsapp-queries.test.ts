@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterSafeFuzzyStockCandidates,
+  formatCompanyStockSummary,
   formatStockInventorySummary,
   indiaDayBounds,
   mapAiClassificationToFastQuery,
@@ -9,6 +10,28 @@ import {
 } from "../lib/whatsapp-queries";
 
 describe("typed operational query helpers", () => {
+  it("does not imply that unknown product quantities mean there is no stock", () => {
+    const reply = formatCompanyStockSummary("SAVITR SOLAR SOLUTIONS LIMITED", [
+      { product_name: "Deye inverter", unit: "pcs", current_quantity: null, balance_known: false },
+      { product_name: "Solar panel", unit: "pcs", current_quantity: null, balance_known: false },
+    ]);
+
+    expect(reply).toContain("Quantity സ്ഥിരീകരിച്ച products: 0 / 2");
+    expect(reply).toContain("Quantity സ്ഥിരീകരിച്ച് stock ഉള്ള products: 0");
+    expect(reply).toContain("മൊത്തം stock ഇല്ലെന്ന് ഉറപ്പിക്കാൻ കഴിയില്ല");
+    expect(reply).toContain("Deye inverter: quantity സ്ഥിരീകരിച്ചിട്ടില്ല");
+  });
+
+  it("states no stock only when every listed quantity is known and zero", () => {
+    const reply = formatCompanyStockSummary("Example Solar", [
+      { product_name: "Panel", unit: "pcs", current_quantity: 0, balance_known: true },
+      { product_name: "Inverter", unit: "pcs", current_quantity: "0", balance_known: true },
+    ]);
+
+    expect(reply).toContain("സ്ഥിരീകരിച്ച quantity പ്രകാരം stock ഉള്ള products ഒന്നുമില്ല");
+    expect(reply).not.toContain("മൊത്തം stock ഇല്ലെന്ന് ഉറപ്പിക്കാൻ കഴിയില്ല");
+  });
+
   it("formats live stock rows without inventing unknown counts and caps the reply", () => {
     expect(
       formatStockInventorySummary([
