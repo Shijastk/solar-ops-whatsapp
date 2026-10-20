@@ -122,6 +122,8 @@ describe("WhatsApp AI intent fallback", () => {
     });
     expect(JSON.stringify(body)).not.toContain("groq-test-secret");
     expect(body.messages).toHaveLength(2);
+    expect(body.messages[0].content).toContain("driver_trip_summary = Summarize trips for one exact active driver");
+    expect(body.messages[0].content).toContain("Innale Majeed ethra trip poyi?");
     expect(body.messages[1].content).toBe("Innu poya products eethellam aanu");
     expect(body.response_format.json_schema.strict).toBe(true);
     expect(body.max_completion_tokens).toBe(200);
@@ -310,6 +312,84 @@ describe("WhatsApp AI intent fallback", () => {
     });
   });
 
+  it("preserves Majeed, rejects unknown named drivers, and keeps general counts general", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const generalYesterdayResponse = () =>
+      new Response(
+        JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                intent: "yesterday_trip_summary",
+                product_query: null,
+                driver_name: null,
+                yesterday: true,
+                period: null,
+                reply: null,
+              }),
+            },
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const fetchMock = vi.fn().mockImplementation(generalYesterdayResponse);
+    vi.stubGlobal("fetch", fetchMock);
+    const options = { driverNames: ["abdulla", "Majeed", "rasheed"] };
+
+    await expect(
+      classifyOperationalQueryWithGroq("Majeed innale ethra trip poyi?", options),
+    ).resolves.toMatchObject({
+      intent: "driver_trip_summary",
+      driver_name: "Majeed",
+      yesterday: true,
+    });
+
+    await expect(
+      classifyOperationalQueryWithGroq("Majeed ethra trip poyi?", options),
+    ).resolves.toMatchObject({
+      intent: "driver_trip_summary",
+      driver_name: "Majeed",
+      yesterday: false,
+    });
+
+    await expect(
+      classifyOperationalQueryWithGroq("UnknownTestDriver innale ethra trip poyi?", options),
+    ).resolves.toMatchObject({
+      intent: "unsupported",
+      driver_name: null,
+      yesterday: false,
+      reply: expect.stringContaining("Driver directory"),
+    });
+
+    await expect(
+      classifyOperationalQueryWithGroq("How many trips did UnknownTestDriver make yesterday?", options),
+    ).resolves.toMatchObject({
+      intent: "unsupported",
+      driver_name: null,
+      yesterday: false,
+      reply: expect.stringContaining("Driver directory"),
+    });
+
+    await expect(
+      classifyOperationalQueryWithGroq("UnknownTestDriver ethra trip poyi?", options),
+    ).resolves.toMatchObject({
+      intent: "unsupported",
+      driver_name: null,
+      yesterday: false,
+      reply: expect.stringContaining("Driver directory"),
+    });
+
+    await expect(
+      classifyOperationalQueryWithGroq("Innale ethra trips dispatch cheythu?", options),
+    ).resolves.toMatchObject({
+      intent: "yesterday_trip_summary",
+      driver_name: null,
+      yesterday: true,
+    });
+  });
+
   it("does not infer a named driver from a partial directory-name match", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
@@ -340,9 +420,10 @@ describe("WhatsApp AI intent fallback", () => {
         driverNames: ["Rasheed P", "Majeed"],
       }),
     ).resolves.toMatchObject({
-      intent: "today_trip_summary",
+      intent: "unsupported",
       driver_name: null,
       yesterday: false,
+      reply: expect.stringContaining("Driver directory"),
     });
   });
 
@@ -467,6 +548,52 @@ describe("WhatsApp AI intent fallback", () => {
     expect(body.response_format.json_schema.schema.properties.intent.enum).toContain(
       "stock_inventory_summary",
     );
+  });
+
+  it("overrides unsupported model output for explicit driver-count and multilingual stock-list phrases", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockImplementation(
+      () => new Response(
+        JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                intent: "unsupported",
+                product_query: null,
+                driver_name: null,
+                yesterday: false,
+                period: null,
+                reply: "Please clarify your request.",
+              }),
+            },
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    for (const input of [
+      "active drivers count",
+      "Stockil ippo ethokke products undu?",
+      "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്.",
+      "നമ്മുടെ സ്റ്റോക്ക് ലിസ്റ്റ് കാണിക്കൂ",
+    ]) {
+      const expectedIntent = input === "active drivers count"
+        ? "driver_count"
+        : "stock_inventory_summary";
+      await expect(classifyOperationalQueryWithGroq(input)).resolves.toEqual({
+        intent: expectedIntent,
+        product_query: null,
+        driver_name: null,
+        yesterday: false,
+        period: null,
+        reply: null,
+      });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("classifies an explicit natural-language trip start and extracts only a named driver", async () => {

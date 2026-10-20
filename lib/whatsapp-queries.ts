@@ -206,6 +206,18 @@ const STOCK_INVENTORY_LIST_TERMS = [
   "stock details",
   "what stock do we have",
   "what inventory do we have",
+  "which products are in stock",
+  "what products are in stock",
+  "which products do we have",
+  "what products do we have in stock",
+  "which items are in stock",
+  "stockil ippo ethokke products undu",
+  "stockil ethokke products undu",
+  "stockil ippo ethokke product undu",
+  "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്",
+  "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്റ്റുകൾ ഉണ്ട്",
+  "സ്റ്റോക്കിൽ ഏതൊക്കെ സാധനങ്ങൾ ഉണ്ട്",
+  "സ്റ്റോക്കിൽ എന്തൊക്കെ ഉണ്ട്",
   "list inventory",
   "all inventory",
   "inventory report",
@@ -264,9 +276,73 @@ function extractStockProductQuery(value: string): string | null {
   return normalized ? cleaned : null;
 }
 
+function hasNamedDriverTripPrefix(text: string): boolean {
+  const normalized = normalizeQueryText(text);
+  if (!includesAny(normalized, TRIP_TERMS)) return false;
+
+  // Vehicle-filter queries have a separate deterministic path and must not be
+  // reclassified as named-driver queries.
+  if (/\b([a-z]{2})\s*(\d{1,2})\s*([a-z]{1,3})\s*(\d{1,4})\b/i.test(normalized)) {
+    return false;
+  }
+
+  const tokens = normalized.split(" ").filter(Boolean);
+  const cueTokens = new Set(
+    [
+      ...TRIP_TERMS,
+      ...COUNT_TERMS,
+      ...TODAY_TERMS,
+      ...YESTERDAY_TERMS,
+      ...TRIP_QUERY_TERMS,
+      ...TRIP_LATEST_TERMS,
+      ...TODAY_PRODUCT_MOVEMENT_TERMS,
+    ].flatMap((term) => term.split(/\s+/)),
+  );
+  const nonNameTokens = new Set([
+    "please", "tell", "me", "the", "for", "of", "about", "driver", "drivers",
+    "new", "all", "any", "my", "our", "their", "these", "those", "every",
+    "how", "much", "many", "what", "when", "where", "who", "why", "which",
+    "did", "does", "has", "have", "make", "made", "go", "went", "completed",
+    "dispatch", "dispatched", "despatch", "poyi", "poya", "ennu", "cheythu",
+    "ഡ്രൈവർ", "ഡ്രൈവര്", "ട്രൈവർ", "എന്ന", "എന്നുള്ള",
+  ]);
+  const firstCueIndex = tokens.findIndex((token) => cueTokens.has(token));
+  if (firstCueIndex > 0) {
+    const prefix = tokens.slice(0, firstCueIndex);
+    if (prefix.some((token) => !nonNameTokens.has(token))) return true;
+  }
+
+  // A date/count cue can precede the driver's name in natural Manglish:
+  // "innale Majeed ethra trip poyi?". Inspect all tokens before "trip", not
+  // only the words before the first cue, while excluding known question words.
+  const firstTripIndex = tokens.findIndex((token) => TRIP_TERMS.includes(token));
+  if (firstTripIndex > 0) {
+    const beforeTrip = tokens.slice(0, firstTripIndex);
+    if (
+      beforeTrip.some(
+        (token) => !cueTokens.has(token) && !nonNameTokens.has(token),
+      )
+    ) {
+      return true;
+    }
+  }
+
+  // Also cover English forms such as "How many trips did Majeed make
+  // yesterday?" without treating generic pronouns as driver names.
+  const nameAfterCue = normalized.match(
+    /\b(?:for|of|did|does|has|have)\s+([\p{L}\p{N}]+)(?=\s|$)/u,
+  )?.[1];
+  const genericSubjects = new Set([
+    "we", "you", "they", "i", "he", "she", "it", "us", "them", "all",
+    "any", "today", "yesterday", "ഇന്ന്", "ഇന്നലെ",
+  ]);
+  return Boolean(nameAfterCue && !genericSubjects.has(nameAfterCue));
+}
+
 export function isDriverRelatedQuestion(text: string): boolean {
   const normalized = normalizeQueryText(text);
-  return /\b(driver|drivers|rash?eed|rasheed|rashi|driverude|driverine)\b/.test(normalized) ||
+  const explicitDriverTerm =
+    /\b(driver|drivers|driverude|driverine)\b/.test(normalized) ||
     [
       "ഡ്രൈവർ",
       "ഡ്രൈവര്",
@@ -274,10 +350,11 @@ export function isDriverRelatedQuestion(text: string): boolean {
       "ട്രൈവര",
       "ട്രാഇവര",
       "ട്രാവർ",
-      "റഷീദ്",
-      "റഷീദിനെ",
       "ഡ്രൈവറായിരുന്നു",
     ].some((term) => normalized.includes(term));
+
+  // Use the same route for every name; do not privilege Rasheed in code.
+  return explicitDriverTerm || hasNamedDriverTripPrefix(text);
 }
 
 export function parseFastWhatsAppQuery(
@@ -957,31 +1034,10 @@ async function driverTripsSummary(
     throw new Error("Failed to load exact driver match: " + exactDriverError.message);
   }
 
-  let matched = (exactDrivers ?? []) as Array<{ id: string; name: string }>;
-  if (matched.length === 0) {
-    // Fuzzy fallback is bounded and only accepted when it resolves uniquely.
-    const { data: drivers, error: driverError } = await supabase
-      .from("ops_drivers")
-      .select("id, name")
-      .order("name", { ascending: true })
-      .limit(100);
-
-    if (driverError) {
-      throw new Error("Failed to load driver directory: " + driverError.message);
-    }
-
-    const normalizeForFuzzyMatch = (value: string) =>
-      value.normalize("NFKC").toLocaleLowerCase("en")
-        .replace(/[^\\p{L}\\p{N}]/gu, "");
-    const normalizedTarget = normalizeForFuzzyMatch(driverName);
-    matched = ((drivers ?? []) as Array<{ id: string; name: string }>).filter((driver) => {
-      const name = normalizeForFuzzyMatch(String(driver.name ?? ""));
-      return name.length > 0 &&
-        (name === normalizedTarget ||
-          name.includes(normalizedTarget) ||
-          normalizedTarget.includes(name));
-    });
-  }
+  // Never turn an unrecognized name into a different driver's record through
+  // substring matching. The semantic resolver must provide the canonical name;
+  // otherwise ask the sender to confirm it.
+  const matched = (exactDrivers ?? []) as Array<{ id: string; name: string }>;
 
   if (matched.length !== 1) {
     return matched.length === 0
@@ -1443,6 +1499,9 @@ export async function handleFastWhatsAppQuery(
 
   if (query) {
     body = await answerFastQuery(query);
+  } else if (driverQuestion && classificationReply) {
+    resolver = "ai_fallback";
+    body = classificationReply;
   } else if (driverQuestion) {
     resolver = "fixed_fallback";
     body = "ഏത് driver-ന്റെ trips ആണ് വേണ്ടത്? Driver-ന്റെ പേര്, ഇന്ന്/ഇന്നലെ എന്ന് അയക്കൂ.";
