@@ -13,6 +13,17 @@ vi.mock("@/lib/replies", () => ({
   sendOpsReply: sendOpsReplyMock,
 }));
 
+vi.mock("@/lib/whatsapp-query-intent", () => ({
+  classifyOperationalQueryWithGroq: vi.fn().mockResolvedValue({
+    intent: "driver_trip_summary",
+    product_query: null,
+    driver_name: "Rasheed",
+    yesterday: true,
+    period: null,
+    reply: null,
+  }),
+}));
+
 import { handleFastWhatsAppQuery } from "../lib/whatsapp-queries";
 
 const originalEnv = {
