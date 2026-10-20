@@ -1049,7 +1049,7 @@ async function companyDirectoryAnswer(
           : " — current stock balance record കണ്ടെത്തിയില്ല"
       )),
       "കുറിപ്പ്: ഇത് active company directory-യിലെ പേരുകളാണ്. Stock ഇല്ലാത്തത് കമ്പനി ഇല്ലെന്നർത്ഥമല്ല.",
-    ].join("\\n");
+    ].join("\n");
   }
 
   const ranked = companies.map((name) => ({ name, score: companyMatchScore(companyName, name) }))
