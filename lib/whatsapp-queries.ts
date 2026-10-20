@@ -314,7 +314,11 @@ function extractCompanyName(text: string): string | null {
     const match = original.match(pattern)?.[1]?.trim();
     if (match) return match.replace(/[?!.,]+$/g, "").trim() || null;
   }
-  return null;
+  const cleaned = original
+    .replace(/\\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|quantity|qty|please|tell|me|is|are|the|of|company|enna|ninakkariyamo|ariyamo)\\b/gi, " ")
+    .replace(/[?!,;:()[\\]{}"'’“”]+/g, " ")
+    .replace(/\\s+/g, " ").trim();
+  return cleaned || null;
 }
 
 export function scoreCompanyNameMatch(query: string, candidate: string): number {
