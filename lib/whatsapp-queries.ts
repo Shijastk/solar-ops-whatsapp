@@ -298,15 +298,32 @@ function hasNamedDriverTripPrefix(text: string): boolean {
       ...TODAY_PRODUCT_MOVEMENT_TERMS,
     ].flatMap((term) => term.split(/\s+/)),
   );
+  const nonNameTokens = new Set([
+    "please", "tell", "me", "the", "for", "of", "about", "driver", "drivers",
+    "new", "all", "any", "my", "our", "their", "these", "those", "every",
+    "did", "does", "has", "have", "make", "made", "go", "went", "completed",
+    "dispatch", "dispatched", "despatch", "poyi", "poya", "ennu", "cheythu",
+    "ഡ്രൈവർ", "ഡ്രൈവര്", "ട്രൈവർ", "എന്ന", "എന്നുള്ള",
+  ]);
   const firstCueIndex = tokens.findIndex((token) => cueTokens.has(token));
   if (firstCueIndex > 0) {
     const prefix = tokens.slice(0, firstCueIndex);
-    const nonNamePrefixes = new Set([
-      "please", "tell", "me", "the", "for", "of", "about", "driver",
-      "new", "all", "any", "my", "our", "their", "these", "those", "every",
-      "ഡ്രൈവർ", "ഡ്രൈവര്", "ട്രൈവർ", "എന്ന", "എന്നുള്ള",
-    ]);
-    if (prefix.some((token) => !nonNamePrefixes.has(token))) return true;
+    if (prefix.some((token) => !nonNameTokens.has(token))) return true;
+  }
+
+  // A date/count cue can precede the driver's name in natural Manglish:
+  // "innale Majeed ethra trip poyi?". Inspect all tokens before "trip", not
+  // only the words before the first cue, while excluding known question words.
+  const firstTripIndex = tokens.findIndex((token) => TRIP_TERMS.includes(token));
+  if (firstTripIndex > 0) {
+    const beforeTrip = tokens.slice(0, firstTripIndex);
+    if (
+      beforeTrip.some(
+        (token) => !cueTokens.has(token) && !nonNameTokens.has(token),
+      )
+    ) {
+      return true;
+    }
   }
 
   // Also cover English forms such as "How many trips did Majeed make
