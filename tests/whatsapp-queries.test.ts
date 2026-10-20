@@ -63,7 +63,7 @@ describe("typed operational query helpers", () => {
         period: null,
         reply: null,
       }),
-    ).toEqual({ type: "company_directory", companyName: null });
+    ).toEqual({ type: "company_directory", companyName: null, includeProducts: false });
   });
 
   it("maps all-time driver trip list classifications to a typed read query", () => {
