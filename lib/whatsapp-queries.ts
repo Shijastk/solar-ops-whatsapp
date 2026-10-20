@@ -301,6 +301,7 @@ function hasNamedDriverTripPrefix(text: string): boolean {
   const nonNameTokens = new Set([
     "please", "tell", "me", "the", "for", "of", "about", "driver", "drivers",
     "new", "all", "any", "my", "our", "their", "these", "those", "every",
+    "how", "much", "many", "what", "when", "where", "who", "why", "which",
     "did", "does", "has", "have", "make", "made", "go", "went", "completed",
     "dispatch", "dispatched", "despatch", "poyi", "poya", "ennu", "cheythu",
     "ഡ്രൈവർ", "ഡ്രൈവര്", "ട്രൈവർ", "എന്ന", "എന്നുള്ള",
