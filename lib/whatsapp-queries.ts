@@ -447,7 +447,10 @@ export function parseFastWhatsAppQuery(
   if (
     includesAny(normalized, PRODUCT_TERMS) &&
     includesAny(normalized, STOCK_QUESTION_TERMS) &&
-    !includesAny(normalized, COMPANY_TERMS)
+    !includesAny(normalized, COMPANY_TERMS) &&
+    !includesAny(normalized, TODAY_TERMS) &&
+    !includesAny(normalized, YESTERDAY_TERMS) &&
+    !includesAny(normalized, TODAY_PRODUCT_MOVEMENT_TERMS)
   ) {
     const companyName = text.normalize("NFKC")
       .replace(/\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|quantity|qty|please|tell|me|is|are|the|of|company)\b/gi, " ")
@@ -1663,7 +1666,17 @@ export async function handleFastWhatsAppQuery(
         classifierOutcome = classification.intent === "unsupported" ? "unsupported" : "mapped";
         query = mapAiClassificationToFastQuery(classification);
         if (query?.type === "company_directory") {
-          query.includeProducts = includesAny(normalizeQueryText(message.textBody), PRODUCT_TERMS);
+          const normalizedInput = normalizeQueryText(message.textBody);
+          query.includeProducts = includesAny(normalizedInput, PRODUCT_TERMS);
+          if (!query.companyName) {
+            const isCompanyListRequest = includesAny(normalizedInput, [
+              "all", "which", "list", "eethellam", "companies",
+              "കമ്പനികൾ", "ഏതെല്ലാം", "ഏതൊക്കെ",
+            ]);
+            query.companyName = isCompanyListRequest
+              ? null
+              : extractCompanyName(message.textBody) ?? message.textBody.trim();
+          }
         }
         if (query) resolver = "ai_intent";
         else classificationReply = classification.reply;
