@@ -446,7 +446,8 @@ export function parseFastWhatsAppQuery(
 
   if (
     includesAny(normalized, PRODUCT_TERMS) &&
-    includesAny(normalized, STOCK_QUESTION_TERMS) &&
+    (includesAny(normalized, STOCK_QUESTION_TERMS) ||
+      includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)) &&
     !includesAny(normalized, COMPANY_TERMS) &&
     !includesAny(normalized, TODAY_TERMS) &&
     !includesAny(normalized, YESTERDAY_TERMS) &&
