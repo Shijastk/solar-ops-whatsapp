@@ -118,6 +118,7 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(isDriverRelatedQuestion("UnknownTestDriver innale ethra trip poyi?")).toBe(true);
     expect(isDriverRelatedQuestion("Innale ethra trips dispatch cheythu?")).toBe(false);
     expect(isDriverRelatedQuestion("How many trips did Majeed make yesterday?")).toBe(true);
+    expect(isDriverRelatedQuestion("Majeedinte aake trip list cheyyamo")).toBe(true);
     expect(isDriverRelatedQuestion("How many trips did we make yesterday?")).toBe(false);
     expect(isDriverRelatedQuestion("latest bill")).toBe(false);
   });
