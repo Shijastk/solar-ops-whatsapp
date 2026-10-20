@@ -112,6 +112,12 @@ const LATEST_TERMS = [
 ];
 
 const STOCK_TERMS = ["stock", "സ്റ്റോക്ക"];
+const COMPANY_TERMS = ["company", "companies", "supplier", "കമ്പനി", "കമ്പനികൾ", "കമ്പനിയുടെ"];
+const COMPANY_DIRECTORY_QUESTION_TERMS = [
+  "available", "availability", "which", "what", "list", "all", "eethellam",
+  "ariyamo", "known", "know", "ആരിയാമോ", "അറിയാമോ", "ഏതെല്ലാം", "ഏതൊക്കെ",
+  "ലഭ്യമാണ്", "ലഭ്യമാണോ", "ഇപ്പോൾ",
+];
 const TRIP_TERMS = ["trip", "trips", "ട്രിപ്പ്", "ട്രിപ്പുകൾ"];
 const PRODUCT_TERMS = [
   "product",
@@ -370,6 +376,13 @@ export function parseFastWhatsAppQuery(
 
   const hasBill = includesAny(normalized, BILL_TERMS);
   const hasCount = includesAny(normalized, COUNT_TERMS);
+
+  if (
+    includesAny(normalized, COMPANY_TERMS) &&
+    includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)
+  ) {
+    return { type: "company_directory", companyName: null };
+  }
 
   const asksForProductMovement =
     (includesAny(normalized, PRODUCT_TERMS) || includesAny(normalized, STOCK_TERMS)) &&
