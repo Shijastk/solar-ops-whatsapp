@@ -264,7 +264,7 @@ export async function classifyOperationalQueryWithGroq(
       driver_name: null,
       yesterday: false,
       period: null,
-      reply: "Driver directory-ൽ ഈ പേര് കൃത്യമായി verify ചെയ്യാൻ കഴിഞ്ഞില്ല. ശരിയായ പേര് confirm ചെയ്യൂ.",
+      reply: "Driver directory-ൽ ഈ പേര് കൃത്യമായി verify ചെയ്യാൻ കഴിഞ്ഞില്ല. Trip create ചെയ്തിട്ടില്ല. ശരിയായ saved name confirm ചെയ്യൂ.",
     };
   }
 
