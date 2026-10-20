@@ -445,9 +445,10 @@ export function parseFastWhatsAppQuery(
   const hasCount = includesAny(normalized, COUNT_TERMS);
 
   if (
-    includesAny(normalized, PRODUCT_TERMS) &&
+    (includesAny(normalized, PRODUCT_TERMS) || /\\bproducts?\\b/i.test(normalized)) &&
     (includesAny(normalized, STOCK_QUESTION_TERMS) ||
-      includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)) &&
+      includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS) ||
+      /\\b(?:ethra|available|undu|undo|quantity)\\b/i.test(normalized)) &&
     !includesAny(normalized, COMPANY_TERMS) &&
     !includesAny(normalized, TODAY_TERMS) &&
     !includesAny(normalized, YESTERDAY_TERMS) &&
