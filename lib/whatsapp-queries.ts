@@ -1779,28 +1779,15 @@ export async function handleFastWhatsAppQuery(
       classificationReply = classification.reply;
 
       // Driver actions/queries must resolve to an exact active directory identity.
-      if (
-        (query?.type === "driver_trip_summary" || query?.type === "driver_trip_list") &&
-        !driverNames.some((name) =>
-          name.toLocaleLowerCase("en") ===
-          (query?.type === "driver_trip_summary" || query?.type === "driver_trip_list"
-            ? query.driverName.toLocaleLowerCase("en")
-            : ""),
-        )
-      ) {
-        const canonical = driverNames.find(
-          (name) => name.toLocaleLowerCase("en") ===
-            (query?.type === "driver_trip_summary" || query?.type === "driver_trip_list"
-              ? query.driverName.toLocaleLowerCase("en")
-              : ""),
-        );
-        if (!canonical) {
-          query = null;
-          classificationReply = "Driver directory-ൽ ഈ പേര് കൃത്യമായി കണ്ടെത്താനായില്ല. പേര് confirm ചെയ്യൂ.";
-          classifierOutcome = "unsupported";
-        } else if (query?.type === "driver_trip_summary" || query?.type === "driver_trip_list") {
-          query.driverName = canonical;
-        }
+      const driverQuery = query?.type === "driver_trip_summary" || query?.type === "driver_trip_list"
+        ? query
+        : null;
+      if (driverQuery && !driverNames.some(
+        (name) => name.toLocaleLowerCase("en") === driverQuery.driverName.toLocaleLowerCase("en"),
+      )) {
+        query = null;
+        classificationReply = "Driver directory-ൽ ഈ പേര് കൃത്യമായി കണ്ടെത്താനായില്ല. പേര് confirm ചെയ്യൂ.";
+        classifierOutcome = "unsupported";
       }
 
       if (query) {
