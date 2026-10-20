@@ -1621,6 +1621,16 @@ export async function handleTripWorkflowInbound(
       return "ignored";
     }
 
+    if (classification?.intent === "unsupported" && classification.reply) {
+      await sendOpsReply({
+        requestId: deterministicUuid("trip-natural-intent-unsupported:" + storedMessageId),
+        replyToMessageId: storedMessageId,
+        knownInboundAt: message.timestamp,
+        body: classification.reply,
+      });
+      return "handled";
+    }
+
     if (classification?.intent === "start_trip") {
       const requestedDriverName = classification.driver_name?.trim() || null;
       if (requestedDriverName) {
