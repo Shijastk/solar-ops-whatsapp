@@ -381,7 +381,11 @@ export function parseFastWhatsAppQuery(
     includesAny(normalized, COMPANY_TERMS) &&
     includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)
   ) {
-    return { type: "company_directory", companyName: null };
+    const companyName =
+      normalized.match(/^(.+?)\s+(?:enna|called|named)\s+company\b/u)?.[1]?.trim() ??
+      normalized.match(/\bcompany\s+(?:called|named)\s+(.+?)(?:\s+(?:available|ariyamo|known|now|ippol)\b|$)/u)?.[1]?.trim() ??
+      null;
+    return { type: "company_directory", companyName };
   }
 
   const asksForProductMovement =
@@ -509,7 +513,7 @@ export function mapAiClassificationToFastQuery(
   }
 
   if (classification.intent === "company_directory") {
-    return { type: "company_directory", companyName: null };
+    return { type: "company_directory", companyName: classification.product_query?.trim() || null };
   }
 
   if (classification.intent === "driver_trip_summary") {
@@ -904,7 +908,7 @@ async function stockInventorySummary(): Promise<string> {
   return formatStockInventorySummary(data ?? []);
 }
 
-async function companyDirectoryAnswer(): Promise<string> {
+async function companyDirectoryAnswer(companyName: string | null = null): Promise<string> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("stock_balances")
@@ -921,6 +925,16 @@ async function companyDirectoryAnswer(): Promise<string> {
 
   if (companies.length === 0) {
     return "നിലവിലെ stock records-ൽ company names കണ്ടെത്തിയില്ല. അതിനാൽ ഇപ്പോൾ ലഭ്യമായ കമ്പനികളുടെ പട്ടിക സ്ഥിരീകരിക്കാൻ കഴിയുന്നില്ല.";
+  }
+
+  if (companyName) {
+    const normalizedTarget = companyName.normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const match = companies.find((name) =>
+      name.normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]+/gu, " ").trim() === normalizedTarget
+    );
+    return match
+      ? match + " എന്ന പേര് current stock records-ൽ കാണുന്നുണ്ട്."
+      : companyName + " എന്ന പേര് current stock records-ൽ കണ്ടെത്തിയില്ല. അതുകൊണ്ട് കമ്പനി നിലവിലില്ലെന്നോ supplier അല്ലെന്നോ ഉറപ്പിച്ച് പറയാനാവില്ല.";
   }
 
   return [
@@ -1447,7 +1461,7 @@ async function answerFastQuery(
   }
 
   if (query.type === "company_directory") {
-    return companyDirectoryAnswer();
+    return companyDirectoryAnswer(query.companyName);
   }
 
   if (query.type === "today_trip_summary") {
