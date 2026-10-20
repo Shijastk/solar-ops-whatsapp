@@ -9,7 +9,6 @@ import { sendOpsReply } from "@/lib/replies";
 import {
   voiceQueryClarification,
   fixedUniversalFallback,
-  generateUniversalWhatsAppReply,
 } from "@/lib/whatsapp-fallback";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { NormalizedWhatsAppMessage } from "@/lib/whatsapp";
