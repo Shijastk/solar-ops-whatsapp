@@ -325,6 +325,38 @@ export function scoreCompanyNameMatch(query: string, candidate: string): number 
   return companyMatchScore(query, candidate);
 }
 
+export function resolveCompanyStockQueryCandidate(
+  query: string,
+  activeCompanyNames: string[],
+): { matchedCompany: string | null; ambiguousCompanies: string[] } {
+  // Numeric model/spec queries (for example, "Solar 560 panel") must remain
+  // product queries even when they contain a company keyword such as "Solar".
+  if (numericTokens(query).length > 0) {
+    return { matchedCompany: null, ambiguousCompanies: [] };
+  }
+
+  const ranked = activeCompanyNames
+    .map((name) => ({ name, score: companyMatchScore(query, name) }))
+    .filter((item) => item.name.trim())
+    .sort((left, right) => right.score - left.score);
+  const best = ranked[0];
+  if (!best || best.score < 0.62) {
+    return { matchedCompany: null, ambiguousCompanies: [] };
+  }
+
+  const closeMatches = ranked.filter(
+    (item) => item.score >= 0.62 && best.score - item.score < 0.12,
+  );
+  if (closeMatches.length > 1) {
+    return {
+      matchedCompany: null,
+      ambiguousCompanies: closeMatches.slice(0, 4).map((item) => item.name),
+    };
+  }
+
+  return { matchedCompany: best.name, ambiguousCompanies: [] };
+}
+
 function includesAny(value: string, terms: string[]): boolean {
   return terms.some((term) => value.includes(term));
 }
@@ -1091,6 +1123,27 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
   }
 
   const supabase = getSupabaseAdmin();
+  const { data: companyRows, error: companyError } = await supabase
+    .from("stock_companies")
+    .select("canonical_name")
+    .eq("active", true)
+    .limit(500);
+  if (companyError) {
+    throw new Error("Failed to resolve company stock query: " + companyError.message);
+  }
+  const activeCompanyNames = Array.from(new Set((companyRows ?? [])
+    .map((row) => String(row.canonical_name ?? "").trim())
+    .filter(Boolean)));
+  const companyMatch = resolveCompanyStockQueryCandidate(productQuery, activeCompanyNames);
+  if (companyMatch.ambiguousCompanies.length > 0) {
+    return [
+      "ഏത് കമ്പനിയുടെ stock ആണ് വേണ്ടത്?",
+      ...companyMatch.ambiguousCompanies.map((name) => "• " + name),
+    ].join("\\n");
+  }
+  if (companyMatch.matchedCompany) {
+    return companyDirectoryAnswer(companyMatch.matchedCompany, true);
+  }
   const [canonicalResult, aliasResult] = await Promise.all([
     supabase
       .from("stock_products")
