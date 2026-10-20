@@ -445,9 +445,6 @@ export async function classifyOperationalQueryWithGroq(
       yesterday: false,
       period: null,
       reply: "Driver directory-ൽ ഈ പേര് കൃത്യമായി കണ്ടെത്താനായില്ല. പേര് confirm ചെയ്യൂ.",
-      include_products: false,
-      filter_by: null,
-      filter_value: null,
     };
   }
 
@@ -458,7 +455,7 @@ export async function classifyOperationalQueryWithGroq(
         : "driver_trip_summary"
       : parsed.data.intent,
     product_query: productQuery,
-    company_name: parsed.data.company_name?.normalize("NFKC").trim() || null,
+    ...(parsed.data.company_name?.normalize("NFKC").trim() ? { company_name: parsed.data.company_name.normalize("NFKC").trim() } : {}),
     driver_name: correctNamedDriverTrip
       ? resolvedDriverName
       : parsed.data.driver_name?.normalize("NFKC").trim() || null,
@@ -467,8 +464,8 @@ export async function classifyOperationalQueryWithGroq(
       : parsed.data.yesterday,
     period: parsed.data.period,
     reply: parsed.data.reply?.normalize("NFKC").trim() || null,
-    include_products: parsed.data.include_products ?? false,
-    filter_by: parsed.data.filter_by ?? null,
-    filter_value: parsed.data.filter_value?.normalize("NFKC").trim() || null,
+    ...(parsed.data.include_products ? { include_products: true } : {}),
+    ...(parsed.data.filter_by ? { filter_by: parsed.data.filter_by } : {}),
+    ...(parsed.data.filter_value?.normalize("NFKC").trim() ? { filter_value: parsed.data.filter_value.normalize("NFKC").trim() } : {}),
   };
 }
