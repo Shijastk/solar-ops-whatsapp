@@ -3,7 +3,6 @@ import { deterministicUuid } from "@/lib/idempotency";
 import { isPricingQuestion, pricingPolicyReply } from "@/lib/pricing-policy";
 import {
   classifyOperationalQueryWithGroq,
-  looksLikeOperationalQuery,
   type AiOperationalQueryClassification,
 } from "@/lib/whatsapp-query-intent";
 import { sendOpsReply } from "@/lib/replies";
@@ -645,7 +644,7 @@ export function mapAiClassificationToFastQuery(
 
   if (classification.intent === "company_directory") {
     const rawName = classification.product_query?.trim() || null;
-    return { type: "company_directory", companyName: rawName ? extractCompanyName(rawName) ?? rawName : null };
+    return { type: "company_directory", companyName: rawName, includeProducts: classification.include_products };
   }
 
   if (classification.intent === "driver_trip_summary") {
@@ -658,6 +657,14 @@ export function mapAiClassificationToFastQuery(
   if (classification.intent === "driver_trip_list") {
     const driverName = classification.driver_name?.trim();
     return driverName ? { type: "driver_trip_list", driverName } : null;
+  }
+
+  if (classification.intent === "trip_filter_summary") {
+    const filterBy = classification.filter_by;
+    const filterValue = classification.filter_value?.trim();
+    return filterBy && filterValue
+      ? { type: "trip_filter_summary", filterBy, filterValue, yesterday: classification.yesterday }
+      : null;
   }
 
   if (classification.intent === "ops_period_summary") {
@@ -1719,71 +1726,76 @@ export async function handleFastWhatsAppQuery(
   }
 
   const startedAt = performance.now();
-  let resolver: "deterministic" | "ai_intent" | "ai_fallback" | "fixed_fallback" =
-    "deterministic";
-  // Resolve driver questions semantically; positional name regexes can mistake question/date words for a driver name.
-  let query = isDriverRelatedQuestion(message.textBody)
-    ? null
-    : parseFastWhatsAppQuery(message.textBody);
-  const driverQuestion = !query && isDriverRelatedQuestion(message.textBody);
-  const likelyOperational = !query && !driverQuestion && looksLikeOperationalQuery(message.textBody);
+  let resolver: "ai_intent" | "ai_fallback" | "fixed_fallback" = "ai_intent";
+  let query: FastWhatsAppQuery | null = null;
   let classificationReply: string | null = null;
-  let operationalClassifierFailed = false;
   let classifierOutcome: "not_attempted" | "no_result" | "mapped" | "unsupported" | "failed" =
-    "not_attempted";
+    "no_result";
   let classifierDurationMs = 0;
+  let likelyOperational = false;
 
-  if (!query) {
-    classifierOutcome = "no_result";
-    const classifierStartedAt = performance.now();
+  // Natural-language meaning is resolved by the semantic classifier first.
+  // The legacy phrase parser is deliberately not used to route live messages.
+  const classifierStartedAt = performance.now();
+  try {
+    let driverNames: string[] = [];
     try {
-      let driverNames: string[] | undefined;
-      if (driverQuestion) {
-        const supabase = getSupabaseAdmin();
-        const { data: drivers, error: driverDirectoryError } = await supabase
-          .from("ops_drivers")
-          .select("name")
-          .eq("active", true);
-        if (driverDirectoryError) {
-          throw new Error("Failed to load driver directory for intent resolution: " + driverDirectoryError.message);
-        }
-        driverNames = (drivers ?? []).map((driver) => String(driver.name ?? "")).filter(Boolean);
-      }
-      const classification = await classifyOperationalQueryWithGroq(
-        message.textBody,
-        { driverNames },
-      );
-      if (classification) {
-        classifierOutcome = classification.intent === "unsupported" ? "unsupported" : "mapped";
-        query = mapAiClassificationToFastQuery(classification);
-        if (query?.type === "company_directory") {
-          const normalizedInput = normalizeQueryText(message.textBody);
-          query.includeProducts = includesAny(normalizedInput, PRODUCT_TERMS);
-          if (!query.companyName) {
-            const isCompanyListRequest = includesAny(normalizedInput, [
-              "all", "which", "list", "eethellam", "companies",
-              "കമ്പനികൾ", "ഏതെല്ലാം", "ഏതൊക്കെ",
-            ]);
-            query.companyName = isCompanyListRequest
-              ? null
-              : extractCompanyName(message.textBody) ?? message.textBody.trim();
-          }
-        }
-        if (query) resolver = "ai_intent";
-        else classificationReply = classification.reply;
-      }
+      const { data: drivers, error: driverDirectoryError } = await getSupabaseAdmin()
+        .from("ops_drivers")
+        .select("name")
+        .eq("active", true);
+      if (driverDirectoryError) throw driverDirectoryError;
+      driverNames = (drivers ?? [])
+        .map((driver) => String(driver.name ?? "").normalize("NFKC").trim())
+        .filter(Boolean);
     } catch (error) {
-      operationalClassifierFailed = true;
-      classifierOutcome = "failed";
-      console.warn("WhatsApp operational intent classification failed", {
-        reason:
-          error instanceof Error
-            ? error.message.slice(0, 180)
-            : "Unknown classification error",
+      console.warn("Driver directory unavailable during semantic classification", {
+        reason: error instanceof Error ? error.message.slice(0, 180) : "Unknown driver directory error",
       });
-    } finally {
-      classifierDurationMs = Math.round(performance.now() - classifierStartedAt);
     }
+
+    const classification = await classifyOperationalQueryWithGroq(message.textBody, {
+      driverNames,
+    });
+    if (classification) {
+      classifierOutcome = classification.intent === "unsupported" ? "unsupported" : "mapped";
+      likelyOperational = classification.intent !== "unsupported";
+      query = mapAiClassificationToFastQuery(classification);
+      classificationReply = classification.reply;
+
+      // Driver actions/queries must resolve to an exact active directory identity.
+      if (
+        (query?.type === "driver_trip_summary" || query?.type === "driver_trip_list") &&
+        !driverNames.some((name) => name.toLocaleLowerCase("en") === query!.type && false)
+      ) {
+        const canonical = driverNames.find(
+          (name) => name.toLocaleLowerCase("en") ===
+            (query?.type === "driver_trip_summary" || query?.type === "driver_trip_list"
+              ? query.driverName.toLocaleLowerCase("en")
+              : ""),
+        );
+        if (!canonical) {
+          query = null;
+          classificationReply = "Driver directory-ൽ ഈ പേര് കൃത്യമായി കണ്ടെത്താനായില്ല. പേര് confirm ചെയ്യൂ.";
+          classifierOutcome = "unsupported";
+        } else if (query?.type === "driver_trip_summary" || query?.type === "driver_trip_list") {
+          query.driverName = canonical;
+        }
+      }
+
+      if (query) {
+        resolver = "ai_intent";
+      } else if (classification.reply) {
+        resolver = "ai_fallback";
+      }
+    }
+  } catch (error) {
+    classifierOutcome = "failed";
+    console.warn("WhatsApp semantic intent classification failed", {
+      reason: error instanceof Error ? error.message.slice(0, 180) : "Unknown classification error",
+    });
+  } finally {
+    classifierDurationMs = Math.round(performance.now() - classifierStartedAt);
   }
 
   const lookupStartedAt = performance.now();
@@ -1791,48 +1803,15 @@ export async function handleFastWhatsAppQuery(
 
   if (query) {
     body = await answerFastQuery(query);
-  } else if (driverQuestion && classificationReply) {
-    resolver = "ai_fallback";
-    body = classificationReply;
-  } else if (driverQuestion) {
-    resolver = "fixed_fallback";
-    body = "ഏത് driver-ന്റെ trips ആണ് വേണ്ടത്? Driver-ന്റെ പേര്, ഇന്ന്/ഇന്നലെ എന്ന് അയക്കൂ.";
-  } else if (options.fromVoice) {
-    resolver = "fixed_fallback";
-    body = voiceQueryClarification(message.textBody);
   } else if (classificationReply) {
     resolver = "ai_fallback";
     body = classificationReply;
-  } else if (likelyOperational) {
+  } else if (options.fromVoice) {
     resolver = "fixed_fallback";
-    body = fixedOperationalFallback();
-
-    if (operationalClassifierFailed) {
-      console.info("Operational fallback used after classifier failure");
-    }
-  } else if (
-    classifierOutcome === "failed" ||
-    classifierOutcome === "unsupported" ||
-    classifierOutcome === "mapped"
-  ) {
+    body = voiceQueryClarification(message.textBody);
+  } else {
     resolver = "fixed_fallback";
     body = fixedUniversalFallback(message.textBody);
-  } else {
-    resolver = "ai_fallback";
-    try {
-      body =
-        (await generateUniversalWhatsAppReply(message.textBody)) ??
-        fixedUniversalFallback(message.textBody);
-    } catch (error) {
-      resolver = "fixed_fallback";
-      console.warn("Universal WhatsApp fallback reply failed", {
-        reason:
-          error instanceof Error
-            ? error.message.slice(0, 180)
-            : "Unknown fallback error",
-      });
-      body = fixedUniversalFallback(message.textBody);
-    }
   }
 
   const lookupDurationMs = Math.round(performance.now() - lookupStartedAt);
@@ -1860,7 +1839,8 @@ export async function handleFastWhatsAppQuery(
       : query?.type === "yesterday_trip_summary" ? "yesterday" : null,
     resolver,
     likelyOperational,
-    deterministicMatch: resolver === "deterministic",
+    semanticClassification: true,
+    deterministicMatch: false,
     classifierOutcome,
     classifierDurationMs,
     lookupDurationMs,
