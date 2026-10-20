@@ -203,7 +203,7 @@ describe("WhatsApp AI intent fallback", () => {
             {
               message: {
                 content: JSON.stringify({
-                  intent: "driver_trip_summary",
+                  intent: "driver_trip_list",
                   product_query: null,
                   driver_name: "Majeed",
                   yesterday: false,
@@ -384,16 +384,22 @@ describe("WhatsApp AI intent fallback", () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
 
-    const generalYesterdayResponse = () =>
-      new Response(
+    const generalYesterdayResponse = (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body)) as { messages: Array<{ content: string }> };
+      const userQuery = body.messages[1]?.content ?? "";
+      const requestedDriver = userQuery.includes("UnknownTestDriver")
+        ? "UnknownTestDriver"
+        : userQuery.includes("Majeed") ? "Majeed" : null;
+      const yesterday = !userQuery.includes("Majeed ethra trip");
+      return new Response(
         JSON.stringify({
           choices: [{
             message: {
               content: JSON.stringify({
                 intent: "yesterday_trip_summary",
                 product_query: null,
-                driver_name: null,
-                yesterday: true,
+                driver_name: requestedDriver,
+                yesterday,
                 period: null,
                 reply: null,
               }),
@@ -402,6 +408,7 @@ describe("WhatsApp AI intent fallback", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
+    };
     const fetchMock = vi.fn().mockImplementation(generalYesterdayResponse);
     vi.stubGlobal("fetch", fetchMock);
     const options = { driverNames: ["abdulla", "Majeed", "rasheed"] };
