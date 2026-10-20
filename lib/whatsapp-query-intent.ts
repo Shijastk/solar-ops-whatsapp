@@ -1,26 +1,11 @@
 import { z } from "zod";
 import { getDocumentAutomationEnv } from "@/lib/env";
+import { AI_OPERATIONAL_INTENT_IDS } from "@/lib/operational-query-catalog";
 
 const MAX_QUERY_CHARS = 500;
 const MAX_PROVIDER_ERROR_CHARS = 240;
 
-const supportedIntentSchema = z.enum([
-  "today_bill_count",
-  "pending_bill_count",
-  "latest_bill",
-  "stock_balance",
-  "stock_inventory_summary",
-  "start_trip",
-  "today_trip_summary",
-  "yesterday_trip_summary",
-  "driver_trip_summary",
-  "driver_count",
-  "today_products_summary",
-  "yesterday_products_summary",
-  "latest_trip",
-  "ops_period_summary",
-  "unsupported",
-]);
+const supportedIntentSchema = z.enum([...AI_OPERATIONAL_INTENT_IDS, "unsupported"]);
 
 const periodSchema = z
   .enum([
@@ -59,23 +44,7 @@ const strictResponseSchema = {
   properties: {
     intent: {
       type: "string",
-      enum: [
-        "today_bill_count",
-        "pending_bill_count",
-        "latest_bill",
-        "stock_balance",
-        "stock_inventory_summary",
-        "start_trip",
-        "today_trip_summary",
-        "yesterday_trip_summary",
-        "driver_trip_summary",
-        "driver_count",
-        "today_products_summary",
-        "yesterday_products_summary",
-        "latest_trip",
-        "ops_period_summary",
-        "unsupported",
-      ],
+      enum: [...AI_OPERATIONAL_INTENT_IDS, "unsupported"],
     },
     product_query: {
       type: ["string", "null"],
