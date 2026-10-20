@@ -7,7 +7,6 @@ import {
 } from "@/lib/whatsapp-query-intent";
 import { sendOpsReply } from "@/lib/replies";
 import {
-  fixedOperationalFallback,
   voiceQueryClarification,
   fixedUniversalFallback,
   generateUniversalWhatsAppReply,
@@ -1766,7 +1765,12 @@ export async function handleFastWhatsAppQuery(
       // Driver actions/queries must resolve to an exact active directory identity.
       if (
         (query?.type === "driver_trip_summary" || query?.type === "driver_trip_list") &&
-        !driverNames.some((name) => name.toLocaleLowerCase("en") === query!.type && false)
+        !driverNames.some((name) =>
+          name.toLocaleLowerCase("en") ===
+          (query?.type === "driver_trip_summary" || query?.type === "driver_trip_list"
+            ? query.driverName.toLocaleLowerCase("en")
+            : ""),
+        )
       ) {
         const canonical = driverNames.find(
           (name) => name.toLocaleLowerCase("en") ===
