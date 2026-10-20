@@ -25,6 +25,7 @@ The resolver may interpret Malayalam, Manglish, English, punctuation, or common 
 | `latest_bill` | Most recently received bill | — | Bill/document ordering by received timestamp; restricted pricing omitted |
 | `stock_balance` | Quantity for one product | Product | Authoritative stock-balance query; distinguish unknown from zero |
 | `stock_inventory_summary` | List current stock | — | Bounded current inventory summary; preserve company scope and unknown quantities |
+| `company_directory` | List companies represented in current stock records | — | Distinct `stock_balances.company_name` values only; absence does not prove a company does not exist or is not a supplier |
 | `start_trip` | Start/create a trip | Workflow-specific | **Action, not a read query**; use the trip workflow's validations and confirmation rules |
 | `today_trip_summary` | Today's finalized trips | — | Current implementation uses `delivery_trips.status = ready` and `finalized_at` |
 | `yesterday_trip_summary` | Yesterday's finalized trips | — | Same status semantics, India-local day bounds |
@@ -54,6 +55,7 @@ These are implementation details and should not be duplicated as classifier labe
 |---|---|---|
 | Driver + today/yesterday + trip count/details | Implemented | Exact driver match; unknown/partial names must not fall back to company-wide results |
 | All-time list for a named driver | Implemented | Lists newest saved finalized trips, bounded to 50 rows and includes total count |
+| Company availability / company-name lookup | Implemented | Uses company names in current stock records only; not a complete registered-company or supplier directory |
 | Arbitrary date or explicit date range for a driver's trips | Not yet implemented | Requires typed start/end date extraction and explicit timezone/date validation |
 | Total current stock | Implemented as inventory summary | Result is bounded; do not claim an unbounded complete catalogue if truncated |
 | One product's current stock | Implemented | Product must be present and resolved against stock data |
