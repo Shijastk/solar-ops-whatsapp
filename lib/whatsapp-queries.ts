@@ -31,7 +31,7 @@ export type FastWhatsAppQuery =
   | { type: "today_bill_count" }
   | { type: "pending_bill_count" }
   | { type: "latest_bill" }
-  | { type: "stock_balance"; productQuery: string }
+  | { type: "stock_balance"; productQuery: string; companyName?: string }
   | { type: "stock_inventory_summary" }
   | { type: "company_directory"; companyName: string | null; includeProducts?: boolean }
   | { type: "stock_product_required" }
@@ -637,7 +637,7 @@ export function mapAiClassificationToFastQuery(
 
   if (classification.intent === "stock_balance") {
     return classification.product_query
-      ? { type: "stock_balance", productQuery: classification.product_query }
+      ? { type: "stock_balance", productQuery: classification.product_query, companyName: classification.company_name ?? undefined }
       : { type: "stock_product_required" };
   }
 
@@ -1122,7 +1122,7 @@ async function companyDirectoryAnswer(
     products.length > 20 ? "മറ്റു products ഉം records-ൽ ഉണ്ട്." : "",
   ].filter(Boolean).join("\n");
 }
-async function stockBalanceAnswer(productQuery: string): Promise<string> {
+async function stockBalanceAnswer(productQuery: string, companyName?: string): Promise<string> {
   const normalized = normalizeProductDescription(productQuery);
   if (!normalized) {
     return "ഏത് സാധനത്തിന്റെ സ്റ്റോക്കാണെന്ന് പേര് കൂടി അയക്കൂ.";
@@ -1140,7 +1140,21 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
   const activeCompanyNames = Array.from(new Set((companyRows ?? [])
     .map((row) => String(row.canonical_name ?? "").trim())
     .filter(Boolean)));
-  const companyMatch = resolveCompanyStockQueryCandidate(productQuery, activeCompanyNames);
+  let canonicalCompanyFilter: string | null = null;
+  if (companyName) {
+    const companyFilterMatch = resolveCompanyStockQueryCandidate(companyName, activeCompanyNames);
+    if (companyFilterMatch.ambiguousCompanies.length > 0) {
+      return ["ഏത് കമ്പനിയുടെ stock ആണ് വേണ്ടത്?", ...companyFilterMatch.ambiguousCompanies.map((name) => "• " + name)].join("\\n");
+    }
+    if (!companyFilterMatch.matchedCompany) {
+      return companyName + " എന്ന കമ്പനിയെ active company directory-ൽ സുരക്ഷിതമായി match ചെയ്യാനായില്ല. ശരിയായ company name അയക്കൂ.";
+    }
+    canonicalCompanyFilter = companyFilterMatch.matchedCompany;
+  }
+
+  const companyMatch = canonicalCompanyFilter
+    ? { matchedCompany: null, ambiguousCompanies: [] as string[] }
+    : resolveCompanyStockQueryCandidate(productQuery, activeCompanyNames);
   if (companyMatch.ambiguousCompanies.length > 0) {
     return [
       "ഏത് കമ്പനിയുടെ stock ആണ് വേണ്ടത്?",
@@ -1197,13 +1211,15 @@ async function stockBalanceAnswer(productQuery: string): Promise<string> {
     );
   }
 
-  const { data, error } = await supabase
+  const stockBalanceQuery = supabase
     .from("stock_balances")
     .select(
       "product_id, company_id, company_name, product_name, unit, current_quantity, balance_known",
     )
-    .in("product_id", productIds)
-    .limit(MAX_STOCK_MATCHES);
+    .in("product_id", productIds);
+  const { data, error } = canonicalCompanyFilter
+    ? await stockBalanceQuery.eq("company_name", canonicalCompanyFilter).limit(MAX_STOCK_MATCHES)
+    : await stockBalanceQuery.limit(MAX_STOCK_MATCHES);
 
   if (error) {
     throw new Error("Failed to load stock balance: " + error.message);
@@ -1699,7 +1715,7 @@ async function answerFastQuery(
     return operationalPeriodSummary(query.period);
   }
 
-  return stockBalanceAnswer(query.productQuery);
+  return stockBalanceAnswer(query.productQuery, query.companyName);
 }
 
 export async function handleFastWhatsAppQuery(
