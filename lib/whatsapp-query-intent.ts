@@ -440,7 +440,6 @@ export async function classifyOperationalQueryWithGroq(
     return {
       intent: "unsupported",
       product_query: null,
-      company_name: null,
       driver_name: null,
       yesterday: false,
       period: null,
