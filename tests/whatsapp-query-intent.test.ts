@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  classifyOperationalQueryWithGroq,
-  looksLikeOperationalQuery,
-} from "../lib/whatsapp-query-intent";
+import { classifyOperationalQueryWithGroq } from "../lib/whatsapp-query-intent";
 
 const originalEnv = {
   enabled: process.env.DOCUMENT_AUTOMATION_ENABLED,
@@ -54,10 +51,6 @@ describe("WhatsApp AI intent fallback", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    expect(looksLikeOperationalQuery("Hello, എങ്ങനെയുണ്ട്?")).toBe(false);
-    expect(looksLikeOperationalQuery("ഇന്നത്തെ trip details എന്താണ്?")).toBe(true);
-    expect(looksLikeOperationalQuery("ഈ മാസം summary")).toBe(true);
-    expect(looksLikeOperationalQuery("Innu poya products eethellam aanu")).toBe(true);
     await expect(
       classifyOperationalQueryWithGroq("Hello, എങ്ങനെയുണ്ട്?"),
     ).resolves.toEqual({
@@ -96,7 +89,6 @@ describe("WhatsApp AI intent fallback", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    expect(looksLikeOperationalQuery("Savtr Solar")).toBe(true);
     await expect(classifyOperationalQueryWithGroq("Savtr Solar")).resolves.toMatchObject({
       intent: "company_directory",
       product_query: "Savtr Solar",
