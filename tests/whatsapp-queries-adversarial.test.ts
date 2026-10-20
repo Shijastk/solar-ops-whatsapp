@@ -11,6 +11,7 @@ const positiveSeeds: Array<{ id: string; input: string; type: string }> = [
   { id: "company-list-manglish", input: "eethellam company ippol available aanu", type: "company_directory" },
   { id: "company-list-english", input: "which companies are available", type: "company_directory" },
   { id: "company-list-malayalam", input: "ഏതെല്ലാം കമ്പനികൾ ഇപ്പോൾ ലഭ്യമാണ്", type: "company_directory" },
+  { id: "company-list-malayalam-inflected", input: "എതെല്ലാം കമ്പനികളാണ് ഇപ്പോൾ ഉള്ളത്?", type: "company_directory" },
   { id: "company-name-typo", input: "Savtr Solar enna company ninakkariyamo", type: "company_directory" },
   { id: "company-products", input: "Savitr Solar products ethra available", type: "company_directory" },
   { id: "stock-summary-english", input: "show all stock", type: "stock_inventory_summary" },
