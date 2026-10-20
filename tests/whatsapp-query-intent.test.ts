@@ -95,7 +95,7 @@ describe("WhatsApp AI intent fallback", () => {
     });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(String(init.body));
-    expect(body.messages[0].content).toContain("For company_directory, copy only the company name into product_query");
+    expect(body.messages[0].content).toContain("Do not route company-specific stock questions to company_directory.");
   });
 
   it("sends only bounded user text for unresolved operational intent classification", async () => {
