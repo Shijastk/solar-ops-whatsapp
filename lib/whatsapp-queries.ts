@@ -643,7 +643,7 @@ export function mapAiClassificationToFastQuery(
 
   if (classification.intent === "company_directory") {
     const rawName = classification.product_query?.trim() || null;
-    return { type: "company_directory", companyName: rawName, includeProducts: classification.include_products };
+    return { type: "company_directory", companyName: rawName, includeProducts: classification.include_products ?? false };
   }
 
   if (classification.intent === "driver_trip_summary") {
@@ -659,8 +659,8 @@ export function mapAiClassificationToFastQuery(
   }
 
   if (classification.intent === "trip_filter_summary") {
-    const filterBy = classification.filter_by;
-    const filterValue = classification.filter_value?.trim();
+    const filterBy = classification.filter_by ?? null;
+    const filterValue = classification.filter_value?.trim() ?? null;
     return filterBy && filterValue
       ? { type: "trip_filter_summary", filterBy, filterValue, yesterday: classification.yesterday }
       : null;
