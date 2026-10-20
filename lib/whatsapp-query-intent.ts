@@ -236,6 +236,19 @@ export async function classifyOperationalQueryWithGroq(
     throw new Error("Groq query classification response was not valid JSON");
   }
 
+  // Normalize omitted optional entity fields for provider/test compatibility.
+  // Intent and entities still come from semantic classification; these are schema defaults only.
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const record = payload as Record<string, unknown>;
+    payload = {
+      company_name: null,
+      include_products: false,
+      filter_by: null,
+      filter_value: null,
+      ...record,
+    };
+  }
+
   const parsed = classificationSchema.safeParse(payload);
   if (!parsed.success) {
     throw new Error("Groq query classification output failed local validation");
@@ -275,7 +288,7 @@ export async function classifyOperationalQueryWithGroq(
       driver_name: null,
       yesterday: false,
       period: null,
-      reply: "Driver-ന്റെ പേര് active directory-ൽ കൃത്യമായി verify ചെയ്യാൻ കഴിഞ്ഞില്ല. ശരിയായ പേര് confirm ചെയ്യൂ.",
+      reply: "Driver-ന്റെ പേര് active directory-ൽ കൃത്യമായി verify ചെയ്യാൻ കഴിഞ്ഞില്ല. Trip create ചെയ്തിട്ടില്ല. ശരിയായ പേര് confirm ചെയ്യൂ.",
     };
   }
 
