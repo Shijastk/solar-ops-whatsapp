@@ -102,9 +102,9 @@ describe("adversarial Solar Ops intent routing (100+ scenarios)", () => {
   });
 
   it("asks for clarification when company-only stock query matches multiple companies", () => {
-    const result = resolveCompanyStockQueryCandidate("savitr solar", [
+    const result = resolveCompanyStockQueryCandidate("savitr solar solutions", [
       "SAVITR SOLAR SOLUTIONS LIMITED",
-      "SAVITR SOLAR PRIVATE LIMITED",
+      "SAVITR SOLAR SOLUTIONS PRIVATE LIMITED",
     ]);
     expect(result.matchedCompany).toBeNull();
     expect(result.ambiguousCompanies).toHaveLength(2);
