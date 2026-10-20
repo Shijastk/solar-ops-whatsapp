@@ -165,6 +165,47 @@ describe("WhatsApp AI intent fallback", () => {
     expect(body.messages[1].content.length).toBe(500);
   });
 
+  it("resolves Manglish possessive driver names and all-time trip-list wording", async () => {
+    process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
+    process.env.GROQ_API_KEY = "groq-test-secret";
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  intent: "driver_trip_summary",
+                  product_query: null,
+                  driver_name: "Majeedinte",
+                  yesterday: false,
+                  period: null,
+                  reply: null,
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      classifyOperationalQueryWithGroq("Majeedinte aake trip list cheyyamo", {
+        driverNames: ["Rasheed", "Majeed"],
+      }),
+    ).resolves.toEqual({
+      intent: "driver_trip_list",
+      product_query: null,
+      driver_name: "Majeed",
+      yesterday: false,
+      period: null,
+      reply: null,
+    });
+  });
+
   it("extracts a clearly named driver and yesterday intent", async () => {
     process.env.DOCUMENT_AUTOMATION_ENABLED = "true";
     process.env.GROQ_API_KEY = "groq-test-secret";
