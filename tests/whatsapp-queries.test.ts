@@ -41,7 +41,7 @@ describe("fast WhatsApp operational query parsing", () => {
     });
     expect(parseFastWhatsAppQuery("Savtr Solar enna company ninakkariyamo")).toEqual({
       type: "company_directory",
-      companyName: null,
+      companyName: "Savtr Solar",
     });
     expect(
       parseFastWhatsAppQuery("Innu poya products eethellam aanu"),
