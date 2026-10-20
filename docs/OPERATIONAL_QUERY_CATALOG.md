@@ -28,7 +28,8 @@ The resolver may interpret Malayalam, Manglish, English, punctuation, or common 
 | `start_trip` | Start/create a trip | Workflow-specific | **Action, not a read query**; use the trip workflow's validations and confirmation rules |
 | `today_trip_summary` | Today's finalized trips | — | Current implementation uses `delivery_trips.status = ready` and `finalized_at` |
 | `yesterday_trip_summary` | Yesterday's finalized trips | — | Same status semantics, India-local day bounds |
-| `driver_trip_summary` | Trips for one exact driver | Driver | Exact driver-directory match; current executor supports today/yesterday only |
+| `driver_trip_summary` | Trips for one exact driver today/yesterday | Driver | Exact driver-directory match; India-local day bounds |
+| `driver_trip_list` | Bounded all-time list of saved finalized trips for one exact driver | Driver | Exact driver-directory match; newest 50 rows maximum, with total count when available |
 | `driver_count` | Active driver count | — | Active `ops_drivers` records |
 | `today_products_summary` | Products on today's finalized trips | — | Linked trip documents/items; not a generic stock-out ledger |
 | `yesterday_products_summary` | Products on yesterday's finalized trips | — | Linked trip documents/items; not a generic stock-out ledger |
@@ -51,7 +52,8 @@ These are implementation details and should not be duplicated as classifier labe
 
 | Query family | Current state | Notes |
 |---|---|---|
-| Driver + today/yesterday + trip count/details | Implemented | Exact driver match; unknown/partial Latin-script names must not fall back to company-wide results |
+| Driver + today/yesterday + trip count/details | Implemented | Exact driver match; unknown/partial names must not fall back to company-wide results |
+| All-time list for a named driver | Implemented | Lists newest saved finalized trips, bounded to 50 rows and includes total count |
 | Arbitrary date or explicit date range for a driver's trips | Not yet implemented | Requires typed start/end date extraction and explicit timezone/date validation |
 | Total current stock | Implemented as inventory summary | Result is bounded; do not claim an unbounded complete catalogue if truncated |
 | One product's current stock | Implemented | Product must be present and resolved against stock data |
