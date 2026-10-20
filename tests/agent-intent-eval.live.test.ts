@@ -11,12 +11,14 @@ const cases: Array<{
   namedDriver?: string;
   yesterday?: boolean;
   driverNameMustBeNull?: boolean;
+  companyNameExpected?: string;
 }> = [
   { id: "company-list-available-manglish", input: "Eethellam company ippol available aanu?", expected: "company_directory" },
   { id: "company-name-with-question", input: "Savtr Solar enna company ninakkariyamo?", expected: "company_directory" },
   { id: "company-name-alone", input: "Savtr Solar", expected: "company_directory" },
-  { id: "company-products-available", input: "Savitr Solar products ethra available", expected: "company_directory" },
-  { id: "company-stock-query-manglish", input: "savitr solar stock ethra und?", expected: "company_directory" },
+  { id: "company-products-available", input: "Savitr Solar products ethra available", expected: "stock_inventory_summary", companyNameExpected: "Savitr Solar" },
+  { id: "company-stock-query-manglish", input: "savitr solar stock ethra und?", expected: "stock_inventory_summary", companyNameExpected: "Savitr Solar" },
+  { id: "company-stock-products-manglish", input: "Savitr Solar-il ethokke products stock und?", expected: "stock_inventory_summary", companyNameExpected: "Savitr Solar" },
   { id: "stock-summary-en", input: "show me the stock we have", expected: "stock_inventory_summary" },
   { id: "stock-summary-ml", input: "നമ്മുടെ സ്റ്റോക്ക് ലിസ്റ്റ് കാണിക്കൂ", expected: "stock_inventory_summary" },
   { id: "driver-count-ml", input: "എത്ര ഡ്രൈവർമാരുണ്ട്?", expected: "driver_count" },
@@ -85,9 +87,11 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           expected: testCase.expected,
           actual: actual?.intent ?? null,
           actualDriverName: actual?.driver_name ?? null,
+          actualCompanyName: actual?.company_name ?? null,
           actualYesterday: actual?.yesterday ?? null,
           actualReplyPreview: sanitizeModelReply(actual?.reply),
           passed: actual?.intent === testCase.expected,
+          companyNamePassed: !testCase.companyNameExpected || (actual?.company_name ?? "").toLocaleLowerCase("en").includes(testCase.companyNameExpected.toLocaleLowerCase("en")),
           driverPassed: testCase.driverNameMustBeNull
             ? actual?.driver_name == null
             : !testCase.namedDriver || actual?.driver_name === testCase.namedDriver,
@@ -103,9 +107,11 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
           expected: testCase.expected,
           actual: null,
           actualDriverName: null,
+          actualCompanyName: null,
           actualYesterday: null,
           actualReplyPreview: null,
           passed: false,
+          companyNamePassed: !testCase.companyNameExpected,
           driverPassed: !testCase.namedDriver && !testCase.driverNameMustBeNull,
           yesterdayPassed: testCase.yesterday !== true,
           replyPassed: testCase.expected !== "unsupported",
@@ -124,6 +130,7 @@ describe.skipIf(!runLiveEvaluation)("live Groq operational intent quality evalua
     const tripStartRecall = tripStartCases.filter((result) => result.passed).length;
     const safetyFailures = results.filter((result) => result.expected !== "start_trip" && result.actual === "start_trip").length;
     const secondaryFailures = results.filter((result) =>
+      !result.companyNamePassed ||
       !result.driverPassed ||
       !result.yesterdayPassed ||
       !result.replyPassed ||
