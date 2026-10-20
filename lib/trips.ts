@@ -1600,7 +1600,17 @@ export async function handleTripWorkflowInbound(
   if (looksLikePotentialTripStartRequest(message.textBody)) {
     let classification: Awaited<ReturnType<typeof classifyOperationalQueryWithGroq>> = null;
     try {
-      classification = await classifyOperationalQueryWithGroq(message.textBody);
+      const { data: activeDrivers, error: driverDirectoryError } = await getSupabaseAdmin()
+        .from("ops_drivers")
+        .select("name")
+        .eq("active", true);
+      if (driverDirectoryError) {
+        throw new Error("Failed to load active driver names for trip intent: " + driverDirectoryError.message);
+      }
+      const driverNames = (activeDrivers ?? [])
+        .map((driver) => String(driver.name ?? "").normalize("NFKC").trim())
+        .filter(Boolean);
+      classification = await classifyOperationalQueryWithGroq(message.textBody, { driverNames });
     } catch (error) {
       console.warn("Trip-start intent classification failed", {
         reason:
