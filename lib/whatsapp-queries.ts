@@ -315,7 +315,7 @@ function extractCompanyName(text: string): string | null {
     if (match) return match.replace(/[?!.,]+$/g, "").trim() || null;
   }
   const cleaned = original
-    .replace(/\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|stockil|ippo|eethellam|ethokke|ethokkeyanu|quantity|qty|please|tell|me|is|are|the|of|company|unrecognized|stoke|store|stocke|enna|ninakkariyamo|ariyamo)\b/gi, " ")
+    .replace(/\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|und|undallo|stock|stockil|ippo|eethellam|ethokke|ethokkeyanu|quantity|qty|please|tell|me|is|are|the|of|company|unrecognized|stoke|store|stocke|enna|ninakkariyamo|ariyamo)\b/gi, " ")
     .replace(/[?!,;:()[\]{}"'’“”]+/g, " ")
     .replace(/\s+/g, " ").trim();
   return cleaned || null;
@@ -366,7 +366,7 @@ function extractStockProductQuery(value: string): string | null {
 
   cleaned = cleaned
     .replace(
-      /\b(?:stock|balance|available|availability|remaining|left|qty|quantity|how|many|much|is|there|what|current|please|tell|me|of|ethra|undo|undu|undallo|bakki|aanu|aan)\b/gi,
+      /\b(?:stock|balance|available|availability|remaining|left|qty|quantity|how|many|much|is|there|what|current|please|tell|me|of|ethra|undo|undu|und|undallo|bakki|aanu|aan)\b/gi,
       " ",
     )
     .replace(
