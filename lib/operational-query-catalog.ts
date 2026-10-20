@@ -133,6 +133,17 @@ export const OPERATIONAL_QUERY_CATALOG = {
     status: "implemented",
     examples: ["Innale Majeed ethra trip poyi?", "How many trips did Rasheed do today?", "റഷീദ് ഇന്നലെ എത്ര ട്രിപ്പ് പോയി?"],
   },
+  driver_trip_list: {
+    domain: "trips",
+    kind: "read",
+    description: "List the most recent saved finalized trips for one exact driver across all dates",
+    requiredEntities: ["driver"],
+    optionalEntities: ["limit"],
+    source: "ops_drivers identity joined to delivery_trips",
+    resultSemantics: "Resolve the exact driver record; return newest finalized/ready trips across all dates with a bounded list; report total count separately when available; never include trips for another driver",
+    status: "implemented",
+    examples: ["Majeedinte aake trip list cheyyamo", "List all trips for Majeed", "മജീദിന്റെ എല്ലാ ട്രിപ്പുകളും കാണിക്കൂ"],
+  },
   driver_count: {
     domain: "drivers",
     kind: "read",
