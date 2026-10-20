@@ -450,7 +450,9 @@ export function parseFastWhatsAppQuery(
     !includesAny(normalized, COMPANY_TERMS) &&
     !includesAny(normalized, TODAY_TERMS) &&
     !includesAny(normalized, YESTERDAY_TERMS) &&
-    !includesAny(normalized, TODAY_PRODUCT_MOVEMENT_TERMS)
+    !includesAny(normalized, TODAY_PRODUCT_MOVEMENT_TERMS) &&
+    !includesAny(normalized, STOCK_INVENTORY_LIST_TERMS) &&
+    !includesAny(normalized, ["what", "which", "all", "eethellam", "ethokke", "എന്തൊക്കെ", "ഏതൊക്കെ", "ഏതെല്ലാം"])
   ) {
     const companyName = text.normalize("NFKC")
       .replace(/\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|quantity|qty|please|tell|me|is|are|the|of|company)\b/gi, " ")
@@ -463,7 +465,11 @@ export function parseFastWhatsAppQuery(
     includesAny(normalized, COMPANY_TERMS) &&
     includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)
   ) {
-    const companyName = extractCompanyName(text);
+    const isCompanyListRequest = includesAny(normalized, [
+      "all", "which", "what", "list", "eethellam", "companies",
+      "കമ്പനികൾ", "ഏതെല്ലാം", "ഏതൊക്കെ", "എന്തൊക്കെ",
+    ]);
+    const companyName = isCompanyListRequest ? null : extractCompanyName(text);
     return {
       type: "company_directory",
       companyName,
