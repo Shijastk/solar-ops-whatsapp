@@ -196,3 +196,11 @@ export function getOperationalQueryDefinition(
   return OPERATIONAL_QUERY_CATALOG[intent];
 }
 
+
+/** Compact catalogue-generated guidance shared with the semantic classifier. */
+export const OPERATIONAL_QUERY_CATALOG_PROMPT = AI_OPERATIONAL_INTENT_IDS
+  .map((intent) => {
+    const definition = OPERATIONAL_QUERY_CATALOG[intent];
+    return intent + " = " + definition.description + ". Examples: " + definition.examples.join(" / ");
+  })
+  .join("; ");

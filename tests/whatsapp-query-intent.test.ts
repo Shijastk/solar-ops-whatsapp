@@ -122,6 +122,8 @@ describe("WhatsApp AI intent fallback", () => {
     });
     expect(JSON.stringify(body)).not.toContain("groq-test-secret");
     expect(body.messages).toHaveLength(2);
+    expect(body.messages[0].content).toContain("driver_trip_summary = Summarize trips for one exact active driver");
+    expect(body.messages[0].content).toContain("Innale Majeed ethra trip poyi?");
     expect(body.messages[1].content).toBe("Innu poya products eethellam aanu");
     expect(body.response_format.json_schema.strict).toBe(true);
     expect(body.max_completion_tokens).toBe(200);
