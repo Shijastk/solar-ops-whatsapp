@@ -458,7 +458,13 @@ export function parseFastWhatsAppQuery(
       .replace(/\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|stockil|ippo|eethellam|ethokke|ethokkeyanu|quantity|qty|please|tell|me|is|are|the|of|company|unrecognized|stoke)\b/gi, " ")
       .replace(/[?!,;:()[\]{}"'’“”]+/g, " ")
       .replace(/\s+/g, " ").trim();
-    if (companyName) return { type: "company_directory", companyName, includeProducts: true };
+    if (
+      companyName &&
+      /[\\p{L}]{2,}/u.test(companyName) &&
+      !includesAny(normalizeQueryText(companyName), ["unknown", "unrecognized", "product", "item"])
+    ) {
+      return { type: "company_directory", companyName, includeProducts: true };
+    }
   }
 
   if (
