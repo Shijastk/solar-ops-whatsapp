@@ -8,6 +8,7 @@ export const AI_OPERATIONAL_INTENT_IDS = [
   "today_trip_summary",
   "yesterday_trip_summary",
   "driver_trip_summary",
+  "driver_trip_list",
   "driver_count",
   "today_products_summary",
   "yesterday_products_summary",
