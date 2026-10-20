@@ -560,6 +560,43 @@ async function stockInventorySummary(): Promise<string> {
   return formatStockInventorySummary(data ?? []);
 }
 
+export function formatCompanyStockSummary(
+  companyName: string,
+  products: Array<{
+    product_name: string | null;
+    unit: string | null;
+    current_quantity: number | string | null;
+    balance_known: boolean | null;
+  }>,
+): string {
+  const available = products.filter(
+    (row) => row.balance_known === true && Number(row.current_quantity) > 0,
+  );
+  const known = products.filter((row) => row.balance_known === true);
+  const unknown = products.filter((row) => row.balance_known !== true);
+
+  if (products.length === 0) {
+    return companyName + " എന്ന കമ്പനിക്ക് current stock records-ൽ products കണ്ടെത്തിയില്ല.";
+  }
+
+  return [
+    companyName + " — current stock summary:",
+    "Stock records-ൽ products: " + products.length,
+    "Quantity സ്ഥിരീകരിച്ച products: " + known.length + " / " + products.length,
+    "Quantity സ്ഥിരീകരിച്ച് stock ഉള്ള products: " + available.length,
+    unknown.length > 0
+      ? "കുറിപ്പ്: ചില products-ന്റെ quantity അറിയില്ല; അതിനാൽ മൊത്തം stock ഇല്ലെന്ന് ഉറപ്പിക്കാൻ കഴിയില്ല."
+      : available.length === 0
+        ? "സ്ഥിരീകരിച്ച quantity പ്രകാരം stock ഉള്ള products ഒന്നുമില്ല."
+        : "",
+    ...products.slice(0, 20).map((row) => "• " + String(row.product_name ?? "") + ": " +
+      (row.balance_known === true
+        ? String(Number(row.current_quantity)) + " " + String(row.unit ?? "")
+        : "quantity സ്ഥിരീകരിച്ചിട്ടില്ല")),
+    products.length > 20 ? "മറ്റു products ഉം records-ൽ ഉണ്ട്." : "",
+  ].filter(Boolean).join("\n");
+}
+
 async function companyDirectoryAnswer(
   companyName: string | null = null,
   includeProducts = false,
@@ -625,16 +662,7 @@ async function companyDirectoryAnswer(
   const products = Array.from(new Map((stockRows ?? []).map((row) => [
     String(row.product_name ?? "").trim().toLocaleLowerCase("en"), row,
   ])).values()).filter((row) => String(row.product_name ?? "").trim());
-  const available = products.filter((row) => Boolean(row.balance_known) && Number(row.current_quantity) > 0);
-  if (products.length === 0) return canonicalCompany + " എന്ന കമ്പനിക്ക് current stock records-ൽ products കണ്ടെത്തിയില്ല.";
-  return [
-    canonicalCompany + " — current stock summary:",
-    "Stock records-ൽ products: " + products.length,
-    "Quantity അറിയാവുന്നതും stock ഉള്ളതുമായ products: " + available.length,
-    ...products.slice(0, 20).map((row) => "• " + String(row.product_name) + ": " +
-      (row.balance_known ? String(Number(row.current_quantity)) + " " + String(row.unit ?? "") : "quantity സ്ഥിരീകരിച്ചിട്ടില്ല")),
-    products.length > 20 ? "മറ്റു products ഉം records-ൽ ഉണ്ട്." : "",
-  ].filter(Boolean).join("\n");
+  return formatCompanyStockSummary(canonicalCompany, products);
 }
 async function stockBalanceAnswer(productQuery: string, companyName?: string): Promise<string> {
   const normalized = normalizeProductDescription(productQuery);
