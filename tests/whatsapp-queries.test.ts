@@ -7,6 +7,7 @@ import {
   mapAiClassificationToFastQuery,
   opsPeriodBounds,
   parseFastWhatsAppQuery,
+  scoreCompanyNameMatch,
 } from "../lib/whatsapp-queries";
 
 describe("fast WhatsApp operational query parsing", () => {
@@ -38,11 +39,20 @@ describe("fast WhatsApp operational query parsing", () => {
     expect(parseFastWhatsAppQuery("eethellam company ippol available aanu")).toEqual({
       type: "company_directory",
       companyName: null,
+      includeProducts: false,
     });
     expect(parseFastWhatsAppQuery("Savtr Solar enna company ninakkariyamo")).toEqual({
       type: "company_directory",
       companyName: "Savtr Solar",
+      includeProducts: false,
     });
+    expect(parseFastWhatsAppQuery("Savitr Solar products ethra available")).toEqual({
+      type: "company_directory",
+      companyName: "Savitr Solar",
+      includeProducts: true,
+    });
+    expect(scoreCompanyNameMatch("Savtr Solar", "SAVITR SOLAR SOLUTIONS LIMITED")).toBeGreaterThanOrEqual(0.62);
+    expect(scoreCompanyNameMatch("Nexon", "NEXON SOLAR LIMITED")).toBeGreaterThanOrEqual(0.62);
     expect(
       parseFastWhatsAppQuery("Innu poya products eethellam aanu"),
     ).toEqual({ type: "today_products_summary" });
