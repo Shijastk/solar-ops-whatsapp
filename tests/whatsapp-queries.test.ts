@@ -53,6 +53,24 @@ describe("typed operational query helpers", () => {
     expect(summary).not.toContain("Product 21:");
   });
 
+  it("maps a named-company stock summary to a company-filtered inventory query", () => {
+    expect(
+      mapAiClassificationToFastQuery({
+        intent: "stock_inventory_summary",
+        product_query: null,
+        company_name: "Savitr Solar",
+        driver_name: null,
+        yesterday: false,
+        period: null,
+        reply: null,
+      }),
+    ).toEqual({
+      type: "company_directory",
+      companyName: "Savitr Solar",
+      includeProducts: true,
+    });
+  });
+
   it("maps company directory classification to a read-only query", () => {
     expect(
       mapAiClassificationToFastQuery({
