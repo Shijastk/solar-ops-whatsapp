@@ -441,6 +441,18 @@ export function parseFastWhatsAppQuery(
   const hasCount = includesAny(normalized, COUNT_TERMS);
 
   if (
+    includesAny(normalized, PRODUCT_TERMS) &&
+    includesAny(normalized, STOCK_QUESTION_TERMS) &&
+    !includesAny(normalized, COMPANY_TERMS)
+  ) {
+    const companyName = text.normalize("NFKC")
+      .replace(/\\b(?:products?|items?|available|availability|how|many|much|ethra|undu|undo|undallo|stock|quantity|qty|please|tell|me|is|are|the|of|company)\\b/gi, " ")
+      .replace(/[?!,;:()[\\]{}"'’“”]+/g, " ")
+      .replace(/\\s+/g, " ").trim();
+    if (companyName) return { type: "company_directory", companyName, includeProducts: true };
+  }
+
+  if (
     includesAny(normalized, COMPANY_TERMS) &&
     includesAny(normalized, COMPANY_DIRECTORY_QUESTION_TERMS)
   ) {
