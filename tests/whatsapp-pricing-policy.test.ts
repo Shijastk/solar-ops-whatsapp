@@ -83,6 +83,14 @@ describe("WhatsApp pricing restriction", () => {
   });
 
   it("does not expose invoice totals in the latest bill reply or fetch the total field", async () => {
+    state.classifyOperationalQueryWithGroq.mockResolvedValue({
+      intent: "latest_bill",
+      product_query: null,
+      driver_name: null,
+      yesterday: false,
+      period: null,
+      reply: null,
+    });
     state.getSupabaseAdmin.mockReturnValue({
       from: (table: string) => {
         const builder: Record<string, unknown> = {};
