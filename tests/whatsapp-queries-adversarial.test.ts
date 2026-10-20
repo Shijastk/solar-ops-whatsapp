@@ -95,6 +95,13 @@ describe("adversarial Solar Ops intent routing (100+ scenarios)", () => {
     });
   });
 
+  it("strips Manglish "und" before resolving a company-only stock query", () => {
+    expect(parseFastWhatsAppQuery("savitr solar stock ethra und?")).toEqual({
+      type: "stock_balance",
+      productQuery: "savitr solar",
+    });
+  });
+
   it("does not confuse a numeric solar product query with a company name", () => {
     expect(resolveCompanyStockQueryCandidate("Solar 560 panel", [
       "SAVITR SOLAR SOLUTIONS LIMITED",
