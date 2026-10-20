@@ -31,6 +31,8 @@ const cases: Array<{
   { id: "unknown-driver-yesterday", input: "UnknownTestDriver innale ethra trip poyi?", expected: "unsupported", driverNameMustBeNull: true },
   { id: "partial-driver-name-collision", input: "Majeed P innale ethra trip poyi?", expected: "unsupported", driverNameMustBeNull: true },
   { id: "generic-yesterday-trip-count", input: "Innale ethra trips dispatch cheythu?", expected: "yesterday_trip_summary" },
+  { id: "company-list-available", input: "Eethellam company ippol available aanu?", expected: "company_directory" },
+  { id: "company-name-savtr-solar", input: "Savtr Solar enna company ninakkariyamo?", expected: "company_directory" },
   { id: "stock-list-manglish", input: "Stockil ippo ethokke products undu?", expected: "stock_inventory_summary" },
   { id: "stock-list-malayalam", input: "സ്റ്റോക്കിൽ ഏതൊക്കെ പ്രൊഡക്ട്സ് ഉണ്ട്.", expected: "stock_inventory_summary" },
   { id: "greeting", input: "Hello, how are you?", expected: "unsupported" },
